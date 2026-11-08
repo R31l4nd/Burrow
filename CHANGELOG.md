@@ -53,6 +53,10 @@ says how it was verified.
   open when Burrow stopped are closed at the next start, instead of
   showing as running (a recording could not be removed).
 - The database's write-ahead log stayed as large as its biggest prune.
+- Building the image failed when GitHub's release downloads did (504s for
+  hours on 2026-11-08, the first CI run with them): the editor's tools
+  (hadolint, ruff, taplo, ShellCheck) are tried again, then fetched
+  through GitHub's API, checked against the same SHA-256.
 
 ### Verified
 
@@ -77,6 +81,9 @@ says how it was verified.
   notices through the channels, the heartbeat) and of the master key
   check against what Burrow seals; the gate; the Android test; a fresh
   install.
+- The image's tool stage built without cache while GitHub's release
+  downloads answered 504: ShellCheck came through the API with its
+  pinned SHA-256; CI's gate on GitHub built and tested the whole image.
 
 ## [2.20.3] - 2026-11-08
 

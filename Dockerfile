@@ -58,21 +58,33 @@ ARG TAPLO_VERSION=0.10.0
 # renovate: datasource=github-releases depName=koalaman/shellcheck extractVersion=^v(?<version>.+)$
 ARG SHELLCHECK_VERSION=0.11.0
 RUN set -eu; \
-  GH=https://github.com; \
   case "${TARGETARCH:-amd64}" in \
     amd64) \
-      HADOLINT="$GH/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-linux-x86_64 c7187db94eeeeca956519a6af171adc31453941a1e777961f6e680f697c8c507"; \
-      RUFF="$GH/astral-sh/ruff/releases/download/${RUFF_VERSION}/ruff-x86_64-unknown-linux-gnu.tar.gz 1bfbb819b5d4f9af501748862276b60e412d336034d99387691a4d4bce7a6f13"; \
-      TAPLO="$GH/tamasfe/taplo/releases/download/${TAPLO_VERSION}/taplo-linux-x86_64.gz 8fe196b894ccf9072f98d4e1013a180306e17d244830b03986ee5e8eabeb6156"; \
-      SHELLCHECK="$GH/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198" ;; \
+      HADOLINT="hadolint/hadolint v${HADOLINT_VERSION} hadolint-linux-x86_64 c7187db94eeeeca956519a6af171adc31453941a1e777961f6e680f697c8c507"; \
+      RUFF="astral-sh/ruff ${RUFF_VERSION} ruff-x86_64-unknown-linux-gnu.tar.gz 1bfbb819b5d4f9af501748862276b60e412d336034d99387691a4d4bce7a6f13"; \
+      TAPLO="tamasfe/taplo ${TAPLO_VERSION} taplo-linux-x86_64.gz 8fe196b894ccf9072f98d4e1013a180306e17d244830b03986ee5e8eabeb6156"; \
+      SHELLCHECK="koalaman/shellcheck v${SHELLCHECK_VERSION} shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198" ;; \
     arm64) \
-      HADOLINT="$GH/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-linux-arm64 f6198ef8090f404dbb771abfee086eb8c48ac177f30da7fd3510aca35b344b5d"; \
-      RUFF="$GH/astral-sh/ruff/releases/download/${RUFF_VERSION}/ruff-aarch64-unknown-linux-gnu.tar.gz a13061e8f471b49c9d2aa284c32dd54a0e5534d702d1a44e1d7f4c875569586d"; \
-      TAPLO="$GH/tamasfe/taplo/releases/download/${TAPLO_VERSION}/taplo-linux-aarch64.gz 033681d01eec8376c3fd38fa3703c79316f5e14bb013d859943b60a07bccdcc3"; \
-      SHELLCHECK="$GH/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.aarch64.tar.xz 12b331c1d2db6b9eb13cfca64306b1b157a86eb69db83023e261eaa7e7c14588" ;; \
+      HADOLINT="hadolint/hadolint v${HADOLINT_VERSION} hadolint-linux-arm64 f6198ef8090f404dbb771abfee086eb8c48ac177f30da7fd3510aca35b344b5d"; \
+      RUFF="astral-sh/ruff ${RUFF_VERSION} ruff-aarch64-unknown-linux-gnu.tar.gz a13061e8f471b49c9d2aa284c32dd54a0e5534d702d1a44e1d7f4c875569586d"; \
+      TAPLO="tamasfe/taplo ${TAPLO_VERSION} taplo-linux-aarch64.gz 033681d01eec8376c3fd38fa3703c79316f5e14bb013d859943b60a07bccdcc3"; \
+      SHELLCHECK="koalaman/shellcheck v${SHELLCHECK_VERSION} shellcheck-v${SHELLCHECK_VERSION}.linux.aarch64.tar.xz 12b331c1d2db6b9eb13cfca64306b1b157a86eb69db83023e261eaa7e7c14588" ;; \
     *) echo "unsupported architecture $TARGETARCH" >&2; exit 1 ;; \
   esac; \
-  fetch() { set -- $1; curl -fsSL -o "$(basename "$1")" "$1"; echo "$2  $(basename "$1")" | sha256sum -c -; }; \
+  # <repo> <tag> <file> <sha256>: the release download, tried again; when GitHub
+  # still fails it (504s on /releases/download for hours, 2026-11-08), the same
+  # file through the API: the release's asset of that name.
+  fetch() { \
+    set -- $1; \
+    curl -fsSL --retry 3 --retry-all-errors --retry-delay 5 -o "$3" "https://github.com/$1/releases/download/$2/$3" \
+    || { \
+      echo "$3: the release download failed, now through the API" >&2; \
+      a="$(curl -fsSL --retry 3 --retry-all-errors --retry-delay 5 "https://api.github.com/repos/$1/releases/tags/$2" | tr -d '\n' \
+        | grep -o "\"url\": *\"[^\"]*/releases/assets/[0-9]*\"[^}]*\"name\": *\"$3\"" | grep -o 'https://[^"]*/releases/assets/[0-9]*' | head -n 1)"; \
+      [ -n "$a" ] && curl -fsSL --retry 3 --retry-all-errors --retry-delay 5 -H 'Accept: application/octet-stream' -o "$3" "$a"; \
+    }; \
+    echo "$4  $3" | sha256sum -c -; \
+  }; \
   for spec in "$HADOLINT" "$RUFF" "$TAPLO" "$SHELLCHECK"; do fetch "$spec"; done; \
   mkdir -p /tools/bin; \
   install -m 0755 hadolint-linux-* /tools/bin/hadolint; \
