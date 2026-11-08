@@ -1,0 +1,1 @@
+First public release: terminals, files, containers and logs, alerts with push, AI log analysis, reports, users and single sign-on, host statistics.

@@ -1,0 +1,1 @@
+Optional "All files" on the Files page (off by default, after a warning); folder size with the number of files and folders; a problem report from a huge folder no longer crashes the app.

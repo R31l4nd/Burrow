@@ -1,0 +1,1 @@
+One menu button (three dots) on rows with several actions: channels, users, snippets, keys, phones, alerts, schedules, Proxmox guests; lines between warnings and AI usage; terminals connect quicker over WireGuard.

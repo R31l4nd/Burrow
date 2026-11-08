@@ -1,0 +1,55 @@
+# Draft for fdroiddata (metadata/io.github.r31l4nd.burrow.yml):
+# https://gitlab.com/fdroid/fdroiddata/-/blob/master/CONTRIBUTING.md
+# The toolchain is the one the app is built and tested with (android/Dockerfile,
+# scripts/node.sh; scripts/fdroid-check.sh in the gate keeps them equal). The
+# version fields are filled in by scripts/bump-version.sh.
+Categories:
+  - System
+  - Connectivity
+License: AGPL-3.0-only
+SourceCode: https://github.com/R31l4nd/Burrow
+IssueTracker: https://github.com/R31l4nd/Burrow/issues
+Changelog: https://github.com/R31l4nd/Burrow/blob/HEAD/CHANGELOG.md
+
+AutoName: Burrow
+Description: |-
+  Companion app for a self-hosted Burrow server (see the fastlane metadata in
+  the repository for the full description).
+
+RepoType: git
+Repo: https://github.com/R31l4nd/Burrow.git
+
+Builds:
+  - versionName: 2.20.3
+    versionCode: 22003
+    commit: v2.20.3
+    subdir: android/app
+    sudo:
+      # Node for the direct route's page, which the app carries as assets.
+      - curl -fsSLo /tmp/node.tar.xz https://nodejs.org/dist/v24.22.2/node-v24.22.2-linux-x64.tar.xz
+      - echo "48cc0e21e048790e54c0cf5749c2725005313d652651c40b7a21feb9697aaf75  /tmp/node.tar.xz" | sha256sum -c -
+      - tar -xJf /tmp/node.tar.xz -C /opt
+      - ln -s /opt/node-v24.22.2-linux-x64/bin/node /opt/node-v24.22.2-linux-x64/bin/npm /usr/local/bin/
+      # Go for the app's own WireGuard (android/wg), bound with gomobile.
+      - curl -fsSLo /tmp/go.tgz https://go.dev/dl/go1.27.2.linux-amd64.tar.gz
+      - echo "ecbadb99091a3f46e31f5f934b068b1864eafa7995211b39eaddf76996045fe5  /tmp/go.tgz" | sha256sum -c -
+      - tar -C /usr/local -xzf /tmp/go.tgz
+      - GOPATH=/opt/gotools GOBIN=/usr/local/bin /usr/local/go/bin/go install golang.org/x/mobile/cmd/gomobile@v0.0.0-20260908204917-8b95e45f8d3e golang.org/x/mobile/cmd/gobind@v0.0.0-20260908204917-8b95e45f8d3e
+    ndk: 30.0.16248370
+    gradle:
+      - yes
+    prebuild:
+      - export PATH=$PATH:/usr/local/go/bin
+      - cd ../..
+      - npm ci --ignore-scripts
+      - BURROW_NODE=local bash scripts/direct-assets.sh
+    scanignore:
+      - node_modules
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags ^v[0-9.]+$
+# The version code is major*10000 + minor*100 + patch (android/app/build.gradle.kts),
+# not the version itself: the checker reads it from the tag's own build file.
+UpdateCheckData: android/version-code.txt|(\d+)|package.json|"version":\s*"(\d+\.\d+\.\d+)"
+CurrentVersion: 2.20.3
+CurrentVersionCode: 22003

@@ -1,0 +1,1 @@
+Paste into a folder from a file's or folder's menu, in a workspace's tree too.

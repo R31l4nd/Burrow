@@ -1,0 +1,1 @@
+De widget op het startscherm toont je hosts, uitgevallen eerst; gekozen bestanden regel je vanuit de titelbalk; oude pakketlijsten haal je opnieuw op vanaf de pagina van een host.

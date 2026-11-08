@@ -1,0 +1,1 @@
+When a pasted name is already there: keep both, skip or replace. The terminal's history also works in your own tmux (Claude Code). The terminal's last line no longer hides half under the text box.

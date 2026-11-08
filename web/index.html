@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="theme-color" content="#121714" />
+    <meta name="color-scheme" content="dark light" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <title>Burrow</title>
+    <!-- Until the app starts: when its code does not load (the network changed
+         while loading, Wi-Fi to mobile), a way out instead of a blank page.
+         No script: the page's own may be what failed (and the CSP allows no
+         inline one). main.ts clears it. -->
+    <style>
+      .boot { font: 16px system-ui, sans-serif; text-align: center; padding: 30vh 16px 0; }
+      .boot .late { opacity: 0; animation: boot-late 0s 6s forwards; }
+      @keyframes boot-late { to { opacity: 1; } }
+    </style>
+  </head>
+  <body>
+    <div id="app"><div class="boot" data-testid="boot"><p>Burrow</p><p class="late" data-testid="boot-late">Not loaded? <a href="">Reload the page</a>. | Laadt het niet? <a href="">Herlaad de pagina</a>.</p></div></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

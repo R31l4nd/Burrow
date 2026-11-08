@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Noticing a change of network (home Wi-Fi, mobile data) for the app's WireGuard. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <!-- Transfers keep running with the screen off: a foreground service
+         with a notification while uploads or downloads are active. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- A direct-route session through the app's WireGuard, kept open in the
+         background on request (a notification with Stop). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- A terminal bell buzzes (navigator.vibrate in the page). -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- A newer app from this Burrow: Android's installer, after asking. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- A WireGuard QR code read with the camera, asked the first time (#96).
+         A phone without a camera still installs the app. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- "All files" on the Files page (report 862305): only when the person switches it on in
+         Burrow and then allows it in Android's own settings; off by default. -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!-- Cleartext is allowed for app tabs: a LAN app is often plain http
+         (http://nas:7878). Burrow itself is https only (Origins.normalize),
+         and the main WebView never leaves its origin. -->
+    <application
+        android:name=".BurrowApp"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
+        android:theme="@style/Theme.Burrow">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density|locale|layoutDirection|fontScale"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- burrow://open?to=/logs?... from a push notification (ntfy). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="burrow" android:host="open" />
+            </intent-filter>
+            <!-- Share target: files from any app go to a host. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+        </activity>
+
+        <!-- Host shortcuts (long-press the icon) open Burrow through this entry:
+             not exported, so another app cannot send a CONNECT that counts
+             (MainActivity is exported for the launcher, share and links). -->
+        <activity-alias
+            android:name=".HostShortcut"
+            android:targetActivity=".MainActivity"
+            android:exported="false" />
+
+        <!-- The direct SSH route, for when Burrow cannot be reached. A task of
+             its own: Burrow's main screen is singleTask, and starting it (a push,
+             the transfers notification, a share, a shortcut) ended everything
+             above it in its task, every direct session with it (A3-AND-04). A
+             change of language or font size no longer recreates it (A3-AND-20). -->
+        <activity
+            android:name=".DirectActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="io.github.r31l4nd.burrow.direct"
+            android:label="@string/direct_route"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density|locale|layoutDirection|fontScale"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- ZXing's own scanner screen, merged in from its library and unused
+             (the app's is SecureCapture): left out (A3-AND-21). -->
+        <activity
+            android:name="com.journeyapps.barcodescanner.CaptureActivity"
+            tools:node="remove" />
+
+        <!-- ZXing's scanner (QrScan.kt): in any orientation, as the phone is held. -->
+        <activity
+            android:name=".SecureCapture"
+            android:exported="false"
+            android:screenOrientation="fullSensor"
+            tools:ignore="DiscouragedApi"
+            android:stateNotNeeded="true"
+            android:theme="@style/zxing_CaptureTheme"
+            android:windowSoftInputMode="stateAlwaysHidden" />
+
+        <activity
+            android:name=".SetupActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- Web apps (Radarr, ...) as tabs, each with its own cookies. -->
+        <activity
+            android:name=".AppTabsActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="io.github.r31l4nd.burrow.apps"
+            android:label="@string/apps"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density|locale|layoutDirection|fontScale"
+            android:windowSoftInputMode="adjustResize" />
+
+        <service
+            android:name=".TransferService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- Stop and Retry on a download's notification (Downloads.kt). -->
+        <receiver
+            android:name=".Downloads$Actions"
+            android:exported="false" />
+
+        <service
+            android:name=".KeepAliveService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="An SSH session the user chose to keep open, over the app's own WireGuard tunnel" />
+        </service>
+
+        <!-- The home screen widget (Widget.kt). -->
+        <receiver
+            android:name=".BurrowWidget"
+            android:exported="false"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info" />
+        </receiver>
+
+        <!-- Burrow's own push, through the phone's UnifiedPush distributor (Push.kt). -->
+        <service
+            android:name=".BurrowPushService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="org.unifiedpush.android.connector.PUSH_EVENT" />
+            </intent-filter>
+        </service>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+</manifest>

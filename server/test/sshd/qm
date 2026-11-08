@@ -1,0 +1,21 @@
+#!/bin/sh
+# Stand-in for Proxmox VE's qm in the test sshd: two virtual machines whose
+# state lives in a file, so a start or stop is seen in the next list. Only
+# through sudo (as on a node for a user that is not root).
+[ "$(id -u)" = 0 ] || { echo 'qm: must be run as root' >&2; exit 2; }
+S=/var/lib/burrowtest-pve; mkdir -p $S
+st() { cat "$S/$1" 2>/dev/null || echo "$2"; }
+case "$1" in
+  list)
+    echo '      VMID NAME                 STATUS     MEM(MB)    BOOTDISK(GB) PID'
+    echo "       100 burrowtest-vm        $(st 100 running)    2048              32.00 4112"
+    echo "       101 burrowtest-win       $(st 101 stopped)    8192              64.00 0" ;;
+  start|stop|reboot|shutdown)
+    case "$2" in 100|101) ;; *) echo "Configuration file 'nodes/pve/qemu-server/$2.conf' does not exist" >&2; exit 2 ;; esac
+    case "$1" in start|reboot) echo running > "$S/$2" ;; *) echo stopped > "$S/$2" ;; esac ;;
+  guest)
+    [ "$2 $4" = 'cmd network-get-interfaces' ] || exit 2
+    [ "$3" = 100 ] || { echo 'QEMU guest agent is not running' >&2; exit 255; }
+    echo '[{"name":"lo","ip-addresses":[{"ip-address-type":"ipv4","ip-address":"127.0.0.1"}]},{"name":"ens18","ip-addresses":[{"ip-address-type":"ipv4","ip-address":"10.99.1.100"}]}]' ;;
+  *) echo "qm (test stand-in): $*" >&2; exit 2 ;;
+esac

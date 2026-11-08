@@ -1,0 +1,1 @@
+Optioneel "Alle bestanden" op de Bestanden-pagina (standaard uit, na een waarschuwing); mapgrootte met het aantal bestanden en mappen; een probleemmelding vanuit een enorme map laat de app niet meer crashen.

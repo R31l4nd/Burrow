@@ -1,0 +1,1 @@
+Files on the phone: zip, jar, apk and tar(.gz) open as folders and unpack beside themselves, an APK installs; open with, share and properties. Terminal scrolling is smooth. The app asks itself before screenshots are allowed, a WireGuard tunnel is set or its keys are forgotten.

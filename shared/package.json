@@ -1,0 +1,36 @@
+{
+  "name": "@burrow/shared",
+  "version": "2.20.3",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./effective": {
+      "types": "./dist/effective.d.ts",
+      "default": "./dist/effective.js"
+    },
+    "./snippets": {
+      "types": "./dist/snippets.d.ts",
+      "default": "./dist/snippets.js"
+    },
+    "./risk": {
+      "types": "./dist/risk.d.ts",
+      "default": "./dist/risk.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "4.6.7"
+  },
+  "sideEffects": false
+}

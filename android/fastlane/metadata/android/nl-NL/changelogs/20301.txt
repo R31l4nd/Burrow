@@ -1,0 +1,1 @@
+Open bestanden in een werkruimte zijn te herordenen door een tab te slepen of met Ctrl+Shift en een pijl. De afbeelding bij een probleemmelding dekt af wat bestanden, terminals en logs tonen, tenzij je ervoor kiest het mee te sturen. Het paneel onder een werkruimte of stack kan het opgeslagen wachtwoord van de host typen bij een sudo-prompt.

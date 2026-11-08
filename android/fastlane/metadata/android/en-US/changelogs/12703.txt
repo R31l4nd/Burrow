@@ -1,0 +1,1 @@
+Its own WireGuard set up from a QR code; split terminals with zoom; sessions shared read-only and recorded on request; Proxmox VE guests; log filters from a question in words; downloads with progress; Basic sign-in in app tabs. The app no longer closes when a transfer ends right after it began.

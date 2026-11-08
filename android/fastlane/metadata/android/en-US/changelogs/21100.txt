@@ -1,0 +1,1 @@
+Home screen widget with your hosts, alerts and package updates; package updates per host; scheduled commands; Wake-on-LAN from a chosen host.

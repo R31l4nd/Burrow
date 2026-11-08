@@ -1,0 +1,1 @@
+Settings -> System for what was only in the .env file; holding a file down only chooses it; fixes on narrow and sideways phones.

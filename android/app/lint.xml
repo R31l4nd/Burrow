@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lint exceptions with a reason each (A3-AND-12); android/app/build.gradle.kts turns every other warning into an error. -->
+<lint>
+    <!-- In BouncyCastle's bcpkix (brought by sshj), not reachable from the app: sshj never builds a TLS trust manager. -->
+    <issue id="TrustAllX509TrustManager">
+        <ignore regexp="bcpkix-jdk18on" />
+    </issue>
+    <!-- The adaptive icon's folder keeps its -v26: without it (as lint suggests for minSdk 29) the build no longer finds R.mipmap. -->
+    <issue id="ObsoleteSdkInt">
+        <ignore path="src/main/res/mipmap-anydpi-v26" />
+    </issue>
+</lint>

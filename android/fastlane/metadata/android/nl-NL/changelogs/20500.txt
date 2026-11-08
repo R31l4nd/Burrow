@@ -1,0 +1,1 @@
+Werkruimte dichter bij VS Code: een opdrachtenlijst (F1), twee bestanden naast elkaar op een breed scherm, een overzicht van het bestand, de problemen van de open bestanden in één lijst, en git-wijzigingen weggooien, van branch wisselen en gewijzigde regels gemarkeerd tegen de laatste commit.

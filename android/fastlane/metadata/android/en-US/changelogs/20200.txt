@@ -1,0 +1,1 @@
+Burrow keeps its own warnings and errors across updates (Settings -> About). IP addresses go to an AI model unmasked only when you say its server is on your own network.

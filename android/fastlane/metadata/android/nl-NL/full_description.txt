@@ -1,0 +1,20 @@
+<p>De Android-app voor <b>Burrow</b>, een self-hosted server om je homelab vanaf je telefoon te beheren. Burrow draai je zelf (Docker); deze app hoort erbij. Zonder je eigen Burrow-server doet hij niets.</p>
+<p>Wat Burrow je geeft:</p>
+<ul>
+<li>Terminals naar je hosts die doorlopen als je de app sluit, gedeeld tussen telefoon en laptop, met aanvullen, een toetsenbalk en gesplitste panelen op een breed scherm</li>
+<li>Een bestandsbeheerder voor je servers: uploaden, downloaden, kopiëren tussen hosts, een editor met taalservers</li>
+<li>Containers en logs over hosts heen, compose-stacks, image-updates met terugzetten</li>
+<li>Alerts bij crashes (push via ntfy), AI-loganalyse met je eigen model, geplande rapporten</li>
+<li>Hoststatistieken en SMART; Proxmox VE-gasten starten en stoppen via SSH</li>
+</ul>
+<p>Wat de app toevoegt aan de webapp:</p>
+<ul>
+<li>Inloggen met je vingerafdruk (een sleutel in de beveiligde hardware van je telefoon)</li>
+<li>Een eigen WireGuard: buitenshuis bereikt hij Burrow, je hosts en je webapps via je tunnel, zonder VPN-app; ingesteld met een QR-code</li>
+<li>Meldingen zonder Google-diensten (UnifiedPush)</li>
+<li>Openen met en Delen: bestanden uit elke app naar een host, een bestand in een andere app bewerken en terugzetten</li>
+<li>App-tabbladen: je andere webapps, elk apart ingelogd</li>
+<li>Een directe SSH-route naar je hosts voor als je Burrow-server niet bereikbaar is</li>
+<li>Schermafbeeldingen standaard geblokkeerd</li>
+</ul>
+<p>Burrow is bedoeld voor je LAN of VPN, nooit voor het open internet. Broncode, installatie en documentatie: zie de website van het project.</p>

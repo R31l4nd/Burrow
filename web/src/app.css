@@ -1,0 +1,2076 @@
+/* Burrow - mobile first, the "Werkbank" look (1.8.0): a light ground with a
+   dark side rail that holds the mark and the hosts, IBM Plex for text and
+   data. Dark when the system (or the person) asks for it. Every colour is
+   a token. */
+
+/* Theme: dark or light, following the system unless the user picks one in
+   Settings (html[data-theme]). Accent: one of a few presets
+   (html[data-accent]); each preset has a dark and a light variant so text on
+   it stays readable in both themes. */
+
+:root {
+  --radius: 8px;
+  --radius-sm: 6px;
+  --font: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --nav-h: 60px;
+  /* The side rail on a wide screen (0 on a phone, where the bar is below). */
+  --rail-w: 0px;
+  /* Motion: three durations and one curve, used by every transition and
+     animation (web/src/conventions.test.ts). Quick and quiet: things react
+     and arrive, nothing bounces. All of it is off when the system asks for
+     less motion. */
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 320ms;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-1: 0ms;
+    --dur-2: 0ms;
+    --dur-3: 0ms;
+  }
+}
+
+/* ---- dark (default) */
+:root {
+  --bg: color-mix(in srgb, #0d0d0d 94%, var(--tint));
+  --bg-raised: color-mix(in srgb, #151515 93%, var(--tint));
+  --bg-sunken: color-mix(in srgb, #0a0a0a 94%, var(--tint));
+  --bg-hover: color-mix(in srgb, #1b1b1b 90%, var(--tint));
+  --border: color-mix(in srgb, #252525 90%, var(--tint));
+  --text: #e4eae6;
+  --text-dim: color-mix(in srgb, #a3a3a3 86%, var(--tint));
+  --danger: #e5675c;
+  /* Text on a --danger fill: white on this lighter red was under 4.5:1 (AUDIT2 UX-07). */
+  --on-danger: #1f0d0b;
+  --danger-bg: #341c1a;
+  --warn: #d9a13f;
+  --warn-bg: #2e2617;
+  --ok: #5faf86;
+  /* Focus and field borders follow the chosen accent (Settings -> Appearance). */
+  --focus: var(--accent);
+  --info: #7fa6e6;
+  /* One colour per log source, readable on the log's background. */
+  --src-0: #58a6ff;
+  --src-1: #f78166;
+  --src-2: #7ee787;
+  --src-3: #d2a8ff;
+  --src-4: #ffa657;
+  --src-5: #56d4dd;
+  --src-6: #ff9bce;
+  --src-7: #e3b341;
+  /* Code colours (the editors), readable on --bg-sunken. */
+  --syn-keyword: #ff7b72;
+  --syn-key: #7ee787;
+  --syn-string: #a5d6ff;
+  --syn-number: #79c0ff;
+  --syn-comment: #8b949e;
+  --syn-type: #ffa657;
+  --syn-fn: #d2a8ff;
+  --syn-meta: #79c0ff;
+  /* ANSI colours (terminal, coloured log lines): 0-7 normal, 8-15 bright. */
+  --ansi-0: #848d97;
+  --ansi-1: #ff7b72;
+  --ansi-2: #3fb950;
+  --ansi-3: #d29922;
+  --ansi-4: #58a6ff;
+  --ansi-5: #bc8cff;
+  --ansi-6: #39c5cf;
+  --ansi-7: #b1bac4;
+  --ansi-8: #8b949e;
+  --ansi-9: #ffa198;
+  --ansi-10: #56d364;
+  --ansi-11: #e3b341;
+  --ansi-12: #79c0ff;
+  --ansi-13: #d2a8ff;
+  --ansi-14: #56d4dd;
+  --ansi-15: #ffffff;
+  --shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+  --border-soft: color-mix(in srgb, #1c1c1c 91%, var(--tint));
+  --warn-dot: #d9a13f;
+  /* The side rail: dark in both themes, the anchor of the page. */
+  --side: color-mix(in srgb, #090909 95%, var(--tint));
+  --side-text: color-mix(in srgb, #c7c7c7 86%, var(--tint));
+  /* At least 4.5:1 on the rail for every accent: #707070 gave 4.19 (A3-WEB-04). */
+  --side-dim: color-mix(in srgb, #848484 85%, var(--tint));
+  --side-hover: color-mix(in srgb, #101010 90%, var(--tint));
+  --side-active: color-mix(in srgb, #131313 85%, var(--tint));
+  color-scheme: dark;
+}
+
+/* ---- light: system preference, unless dark was chosen; or chosen explicitly */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']):not([data-theme='black']) {
+    --bg: color-mix(in srgb, #f7f7f7 98%, var(--tint));
+    --bg-raised: #ffffff;
+    --bg-sunken: color-mix(in srgb, #f1f1f1 98%, var(--tint));
+    --bg-hover: color-mix(in srgb, #f0f0f0 98%, var(--tint));
+    --border: color-mix(in srgb, #e5e5e5 98%, var(--tint));
+    --text: #17201b;
+    --text-dim: color-mix(in srgb, #636363 84%, var(--tint));
+    --danger: #b42318;
+    --on-danger: #fff;
+    --danger-bg: #fcebe9;
+    --warn: #8a5a0b;
+    --warn-bg: #fbf1df;
+    --ok: #287047;
+    --focus: var(--accent);
+    --info: #2f5fb3;
+    --src-0: #0550ae;
+    --src-1: #9b2c12;
+    --src-2: #116329;
+    --src-3: #6639ba;
+    --src-4: #7a4100;
+    --src-5: #0f5d63;
+    --src-6: #99286e;
+    --src-7: #6e5600;
+    --syn-keyword: #b3141f;
+    --syn-key: #116329;
+    --syn-string: #0a3069;
+    --syn-number: #0550ae;
+    --syn-comment: #57606a;
+    --syn-type: #953800;
+    --syn-fn: #6639ba;
+    --syn-meta: #0550ae;
+    --ansi-0: #24292f;
+    --ansi-1: #b3141f;
+    --ansi-2: #116329;
+    --ansi-3: #6f4600;
+    --ansi-4: #0550ae;
+    --ansi-5: #6639ba;
+    --ansi-6: #0f5d63;
+    --ansi-7: #57606a;
+    --ansi-8: #424a53;
+    --ansi-9: #8c1020;
+    --ansi-10: #0e5a23;
+    --ansi-11: #5c3a00;
+    --ansi-12: #033d8b;
+    --ansi-13: #512a97;
+    --ansi-14: #0b4a4f;
+    --ansi-15: #32383f;
+    --shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+    --border-soft: color-mix(in srgb, #f3f3f3 97%, var(--tint));
+    --warn-dot: #b7791f;
+    --side: color-mix(in srgb, #131313 85%, var(--tint));
+    --side-text: color-mix(in srgb, #e4e4e4 85%, var(--tint));
+    --side-dim: color-mix(in srgb, #919191 80%, var(--tint));
+    --side-hover: color-mix(in srgb, #212121 80%, var(--tint));
+    --side-active: color-mix(in srgb, #2b2b2b 80%, var(--tint));
+    color-scheme: light;
+  }
+}
+:root[data-theme='light'] {
+  --bg: color-mix(in srgb, #f7f7f7 98%, var(--tint));
+  --bg-raised: #ffffff;
+  --bg-sunken: color-mix(in srgb, #f1f1f1 98%, var(--tint));
+  --bg-hover: color-mix(in srgb, #f0f0f0 98%, var(--tint));
+  --border: color-mix(in srgb, #e5e5e5 98%, var(--tint));
+  --text: #17201b;
+  --text-dim: color-mix(in srgb, #636363 84%, var(--tint));
+  --danger: #b42318;
+  --on-danger: #fff;
+  --danger-bg: #fcebe9;
+  --warn: #8a5a0b;
+  --warn-bg: #fbf1df;
+  --ok: #287047;
+  --focus: var(--accent);
+  --info: #2f5fb3;
+  --src-0: #0550ae;
+  --src-1: #9b2c12;
+  --src-2: #116329;
+  --src-3: #6639ba;
+  --src-4: #7a4100;
+  --src-5: #0f5d63;
+  --src-6: #99286e;
+  --src-7: #6e5600;
+  --syn-keyword: #b3141f;
+  --syn-key: #116329;
+  --syn-string: #0a3069;
+  --syn-number: #0550ae;
+  --syn-comment: #57606a;
+  --syn-type: #953800;
+  --syn-fn: #6639ba;
+  --syn-meta: #0550ae;
+  --ansi-0: #24292f;
+  --ansi-1: #b3141f;
+  --ansi-2: #116329;
+  --ansi-3: #6f4600;
+  --ansi-4: #0550ae;
+  --ansi-5: #6639ba;
+  --ansi-6: #0f5d63;
+  --ansi-7: #57606a;
+  --ansi-8: #424a53;
+  --ansi-9: #8c1020;
+  --ansi-10: #0e5a23;
+  --ansi-11: #5c3a00;
+  --ansi-12: #033d8b;
+  --ansi-13: #512a97;
+  --ansi-14: #0b4a4f;
+  --ansi-15: #32383f;
+  --shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+    --border-soft: color-mix(in srgb, #f3f3f3 97%, var(--tint));
+    --warn-dot: #b7791f;
+    --side: color-mix(in srgb, #131313 85%, var(--tint));
+    --side-text: color-mix(in srgb, #e4e4e4 85%, var(--tint));
+    --side-dim: color-mix(in srgb, #919191 80%, var(--tint));
+    --side-hover: color-mix(in srgb, #212121 80%, var(--tint));
+    --side-active: color-mix(in srgb, #2b2b2b 80%, var(--tint));
+  color-scheme: light;
+}
+
+/* Black for an OLED screen: the dark theme with true black behind
+   everything (a lit pixel costs power and glows at night); cards and rows
+   stand apart by their borders, not by a lighter grey. */
+:root[data-theme='black'] {
+  --bg: #000000;
+  --bg-raised: #000000;
+  --bg-sunken: #000000;
+  --bg-hover: #141414;
+  --border: color-mix(in srgb, #262626 93%, var(--tint));
+  --border-soft: #1c1c1c;
+  --side: #000000;
+  --side-hover: #121212;
+  --side-active: #1c1c1c;
+  --shadow: 0 0 0 1px #2a2a2a;
+  color-scheme: dark;
+}
+/* With every surface black, a chosen segment needs a fill of its own. */
+:root[data-theme='black'] .segmented button.on {
+  background: var(--bg-hover);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+/* ---- accents: --accent-d/-dt for dark, --accent-l/-lt for light. Not bound
+   to :root so the swatches in Settings can show every preset. */
+:root,
+[data-accent='green'] { --accent-d: #5faf86; --accent-dt: #0c1410; --accent-l: #2e6b4e; --accent-lt: #ffffff; }
+[data-accent='blue'] { --accent-d: #79c0ff; --accent-dt: #0a1a2e; --accent-l: #0969da; --accent-lt: #ffffff; }
+[data-accent='purple'] { --accent-d: #d2a8ff; --accent-dt: #1f1030; --accent-l: #8250df; --accent-lt: #ffffff; }
+[data-accent='orange'] { --accent-d: #ffa657; --accent-dt: #2b1400; --accent-l: #bc4c00; --accent-lt: #ffffff; }
+[data-accent='pink'] { --accent-d: #ff9bce; --accent-dt: #2e0a1c; --accent-l: #bf3989; --accent-lt: #ffffff; }
+[data-accent='teal'] { --accent-d: #56d4dd; --accent-dt: #032326; --accent-l: #1b7c83; --accent-lt: #ffffff; }
+
+:root {
+  /* The neutrals lean a little to the chosen accent (report 5d820e: they stayed green). */
+  --tint: var(--accent-d);
+  --accent: var(--accent-d);
+  --accent-text: var(--accent-dt);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']):not([data-theme='black']) {
+    --tint: var(--accent-l);
+    --accent: var(--accent-l);
+    --accent-text: var(--accent-lt);
+  }
+}
+:root[data-theme='light'] {
+  --tint: var(--accent-l);
+  --accent: var(--accent-l);
+  --accent-text: var(--accent-lt);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.45 var(--font);
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  min-height: 100dvh;
+}
+
+a {
+  color: var(--focus);
+}
+
+/* A button that reads as text ("Check now"): underlined, so it looks like
+   something to tap. */
+.link {
+  border: 0;
+  background: none;
+  padding: 4px 0;
+  color: var(--accent);
+  font: 600 0.85rem var(--font);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.link:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+h1 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+h2 {
+  font-size: 1.05rem;
+  margin: 1.5rem 0 0.5rem;
+}
+
+/* h2.group: a page's own groups (straight under its h1), looking like h3. */
+/* Sentence case, in the text colour: a heading, not a small label. */
+h3,
+h2.group {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 1.25rem 0 0.4rem;
+}
+
+p {
+  margin: 0.4rem 0;
+}
+
+.dim {
+  color: var(--text-dim);
+}
+
+.small {
+  font-size: 0.85rem;
+}
+
+.mono {
+  font-family: var(--mono);
+  /* Long words break where they must, but a line breaks at its spaces first
+     ("sudo apt install smartmontool s" broke the last word). */
+  overflow-wrap: anywhere;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------- layout */
+
+.page {
+  padding: 12px 16px calc(var(--nav-h) + 24px + env(safe-area-inset-bottom));
+}
+/* A page that lays its parts out as a column of flex items: the centring's
+   auto margins must not shrink them to their content (the watch page's
+   terminal ran past the screen). */
+.page > :not(.topbar, .full-bleed, .btn, .fab, .actionbar, .bulkbar) {
+  width: 100%;
+}
+/* A phone or tablet: the content a centred column, the bar across the whole
+   screen (on a tablet it stopped 20 px short of both edges). */
+@media (max-width: 899px) {
+  .page > :not(.topbar, .full-bleed) {
+    max-width: 760px;
+    margin-inline: auto;
+  }
+  /* Its title and buttons over the column's edges. */
+  .page > .topbar {
+    padding-left: calc(max(0px, (100% - 760px) / 2) + 12px);
+    padding-right: calc(max(0px, (100% - 760px) / 2) + 12px);
+  }
+}
+/* Room below the list for the floating add button: scrolled to the end,
+   it must not sit on the last row's menu. */
+.page.with-fab {
+  padding-bottom: calc(var(--nav-h) + 96px + env(safe-area-inset-bottom));
+}
+/* On a wide screen a page uses the room beside the rail: its bar across the
+   whole width, its content from the left up to a width that still reads
+   well; forms (.page.narrow) stay a column. */
+@media (min-width: 900px) {
+  .page {
+    --content-w: 1240px;
+    max-width: none;
+    margin: 0;
+    padding: 0 28px 32px;
+  }
+  .page.narrow {
+    --content-w: 760px;
+  }
+  /* Bars (the page's own, a row of tabs under it) span the whole width;
+     the content is centred in the room beside the rail, the bar's title and
+     buttons over its edges (decision 26: up to 1100 px stayed empty on the
+     right at 2560, UIB-06). */
+  .page > :not(.topbar, .full-bleed) {
+    max-width: var(--content-w);
+    margin-inline: auto;
+  }
+  .page > .topbar {
+    margin: 0 -28px 20px;
+    padding: 0 calc(28px + max(0px, (100% - var(--content-w)) / 2));
+    min-height: 64px;
+  }
+}
+
+/* A part of a page in parts (.cols) keeps its heading's room as padding: at the top of a column a
+   margin is cut off, so side by side the second column's heading stood higher, against the search
+   (report dc0352). */
+.page > .cols > :has(> h2.group:first-child) {
+  padding-top: 1.25rem;
+}
+.page > .cols > * > h2.group:first-child {
+  margin-top: 0;
+}
+
+/* A very wide screen (1700 px and more): lists of groups (stacks, host
+   groups) run in two columns, and pages with a side part use the whole
+   width, rather than one column with half the screen empty (report ac7481). */
+@media (min-width: 1700px) {
+  .page > .cols {
+    max-width: none;
+    columns: 2;
+    column-gap: 24px;
+  }
+  .page > .cols > * {
+    break-inside: avoid;
+  }
+  .page > .spread {
+    max-width: none;
+  }
+  /* Then the rest of such a page as wide as them: the search row stopped
+     at two thirds above two columns of stacks (report 5fee2b). */
+  .page:has(> .cols, > .spread) {
+    --content-w: 100%;
+  }
+  .page:has(> .cols, > .spread) > :not(.topbar, .full-bleed) {
+    max-width: none;
+  }
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: env(safe-area-inset-top) 4px 0;
+  margin: -12px -16px 8px;
+  padding-left: 12px;
+  padding-right: 12px;
+  background: color-mix(in srgb, var(--bg-raised) 94%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+
+/* A page that fills the screen (.detail: logs, a container, the phone's files) has no top padding
+   for the bar's negative margin to take back: it held at the top, the content started under it and
+   the logs' search touched its lower edge (report dc7a4c). Its sides as that page's own. */
+.detail > .topbar {
+  margin: 0 -12px 8px;
+}
+
+.topbar h1 {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.card {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+
+.list {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* A card or a list and what comes right after it in a plain page (not a
+   stack or row with a gap of its own): room between them ("Sign out
+   everywhere else" stuck to the list of devices). */
+:not(.stack, .row) > :is(.card, .list) + :is(.btn, .btnrow, .card, .list) {
+  margin-top: 12px;
+}
+
+/* A line between rows. Stronger than a row's own reset (.list-item's border: 0
+   took it away in every list, report 4af102). */
+.list > :not(:first-child) {
+  border-top: 1px solid var(--border);
+}
+
+.list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  min-height: 56px;
+  width: 100%;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+button.list-item {
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  button.list-item:hover {
+    background: var(--bg-hover);
+  }
+}
+
+.list-item .main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Blocks also when written as spans (inside a button, where divs are invalid). */
+.list-item .title,
+.list-item .sub {
+  display: block;
+}
+
+.list-item .title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* A row whose text can run to several lines: its icon and buttons at its
+   top, not in the middle of a tall block (paired phones in Dutch). */
+.list-item.top {
+  align-items: flex-start;
+}
+
+/* A title with a badge that must stay readable: wraps instead, a long
+   word too ("Twin phone sdk_gphone64_x86_64" ran under the buttons). */
+.list-item .title.wrap {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.list-item .sub {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  /* Two lines before "...": cut at one, a meta line lost its point on a
+     small phone ("gestart 36 minuten geleden | ...", UIA-08). */
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+/* A description to read whole (what an alert rule watches), not a name to recognise. */
+.list-item .sub.whole {
+  white-space: normal;
+  display: block;
+}
+
+/* ---------------------------------------------------------------- nav */
+
+.bottomnav {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 10;
+  display: flex;
+  justify-content: space-around;
+  height: calc(var(--nav-h) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--bg-raised);
+  border-top: 1px solid var(--border);
+}
+
+.bottomnav a {
+  /* Equal fifths: without min-width 0 a long label ("Instellingen") takes
+     more room and shifts the whole row off centre. */
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 0.75rem;
+}
+
+.bottomnav a span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The icon and its count: not clipped like the label under it. */
+.bottomnav a .navicon {
+  position: relative;
+  display: inline-flex;
+  overflow: visible;
+  max-width: none;
+}
+
+.bottomnav a .navicon .navbadge {
+  overflow: visible;
+  max-width: none;
+}
+
+.bottomnav .navdot {
+  position: absolute;
+  bottom: -2px;
+  right: -6px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--bg-raised);
+}
+
+.bottomnav .navbadge.bad {
+  background: var(--danger);
+  color: var(--on-danger);
+}
+
+.bottomnav .navbadge {
+  position: absolute;
+  top: -4px;
+  right: -10px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font: 700 0.68rem/18px var(--font);
+  text-align: center;
+}
+
+.bottomnav a[aria-current='page'] {
+  color: var(--accent);
+}
+
+.bottomnav svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* The mark and name: only in the rail on a wide screen. */
+.rail-brand {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 10px 18px;
+  color: #f2f5f3;
+  font: 600 1.05rem var(--font);
+  text-decoration: none;
+}
+
+/* The rail's hosts: only on a wide screen. */
+.rail-hosts {
+  display: none;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 18px;
+  min-height: 0;
+  overflow: hidden;
+}
+.rail-sub {
+  padding: 0 12px 6px;
+  font-size: 0.8rem;
+  color: var(--side-dim);
+}
+.rail-host {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--side-text);
+  font: 0.9rem var(--font);
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+@media (hover: hover) {
+  .rail-host:hover {
+    background: var(--side-hover);
+    color: #fff;
+  }
+}
+.rail-host .dot {
+  flex-shrink: 0;
+}
+.rail-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* On a wide screen the navigation is a rail on the left, not a phone's
+   tab bar across the bottom: the same links, their badges beside them.
+   From a tablet up (720 px): there as icons only (.compact, App.svelte),
+   with its words from 900 px (decision 27). */
+@media (min-width: 720px) {
+  :root {
+    --nav-h: 0px;
+    --rail-w: 208px;
+  }
+  /* The rail: dark in both themes, with the mark at the top. */
+  .bottomnav {
+    inset: 0 auto 0 0;
+    width: var(--rail-w);
+    height: auto;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 2px;
+    padding: 16px 12px;
+    border-top: 0;
+    background: var(--side);
+  }
+  .bottomnav .rail-brand,
+  .bottomnav .rail-hosts {
+    display: flex;
+  }
+  .bottomnav a {
+    flex: none;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 9px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 0.95rem;
+    color: var(--side-text);
+  }
+  @media (hover: hover) {
+    .bottomnav a:hover {
+      background: var(--side-hover);
+      color: #fff;
+    }
+  }
+  /* The current page: a lighter row, white text. */
+  .bottomnav a[aria-current='page'] {
+    background: var(--side-active);
+    color: #fff;
+    font-weight: 600;
+  }
+  .bottomnav a[aria-current='page'] svg {
+    color: #fff;
+  }
+  .bottomnav svg {
+    width: 20px;
+    height: 20px;
+  }
+  /* The count and the update dot at the row's end, one beside the other
+     (on the small icon they sat on top of each other). */
+  .bottomnav a {
+    position: relative;
+  }
+  .bottomnav a .navicon {
+    position: static;
+  }
+  .bottomnav .navbadge {
+    top: 50%;
+    right: 12px;
+    transform: translateY(-50%);
+  }
+  .bottomnav .navdot {
+    top: 50%;
+    bottom: auto;
+    right: 40px;
+    transform: translateY(-50%);
+  }
+  /* The pages sit beside the rail (main is display: contents, so the body
+     makes the room); without the rail (terminal, editor) there is none. */
+  body:has(.bottomnav) {
+    padding-left: var(--rail-w);
+  }
+  body:not(:has(.bottomnav)) {
+    --rail-w: 0px;
+  }
+  /* Beside a terminal, an editor or an app: the icons only, narrow. */
+  body:has(.bottomnav.compact) {
+    --rail-w: 56px;
+  }
+  .bottomnav.compact {
+    padding: 14px 8px;
+    align-items: stretch;
+  }
+  .bottomnav.compact .rail-word {
+    display: none;
+  }
+  /* Icons only, their words still the links' names (a tablet's rail had links without one, axe). */
+  .bottomnav.compact .navlabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .bottomnav.compact .rail-brand {
+    justify-content: center;
+    padding: 0 0 14px;
+  }
+  .bottomnav.compact a {
+    justify-content: center;
+    padding: 10px 0;
+  }
+  .bottomnav.compact .navbadge {
+    top: 2px;
+    right: 2px;
+    transform: none;
+  }
+  .bottomnav.compact .navdot {
+    top: auto;
+    bottom: 4px;
+    right: 8px;
+    transform: none;
+  }
+}
+/* A computer is read closer than a phone: a size down. */
+@media (min-width: 900px) {
+  html,
+  body {
+    font-size: 15px;
+  }
+}
+/* A phone: such a page has the whole screen; its own bar leads back. */
+@media (max-width: 719px) {
+  .bottomnav.compact {
+    display: none;
+  }
+}
+
+/* A phone: the title bar dark, as the rail is on a computer (and the
+   phone's status bar above it follows: theme-color, and the app's own
+   bar through the bridge). Its contents take the bar's colours. */
+@media (max-width: 719px) {
+  .topbar,
+  .term-top,
+  .appbar {
+    --text: #eef2ef;
+    --text-dim: var(--side-text);
+    --bg-raised: var(--side-hover);
+    --bg-hover: var(--side-active);
+    --bg-sunken: var(--side-active);
+    --border: rgb(255 255 255 / 0.16);
+    background: var(--side);
+    color: var(--text);
+    border-bottom-color: var(--side);
+    backdrop-filter: none;
+  }
+}
+
+/* Only on a wide screen, or only on a narrow one. */
+.wide-only {
+  display: none !important;
+}
+/* From a tablet up (720 px): a list's table columns (A3-WEB-15). */
+.from-tablet {
+  display: none !important;
+}
+@media (min-width: 720px) {
+  .from-tablet {
+    display: revert !important;
+  }
+  .until-tablet {
+    display: none !important;
+  }
+}
+@media (min-width: 900px) {
+  .wide-only {
+    display: revert !important;
+  }
+  .btn.wide-only {
+    display: inline-flex !important;
+  }
+  .narrow-only {
+    display: none !important;
+  }
+  /* A bar's icon button with its word beside it: an ordinary button there. */
+  .icon-btn.labeled {
+    width: auto;
+    min-height: 36px;
+    height: auto;
+    gap: 8px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-raised);
+    font: 500 0.9rem var(--font);
+    color: var(--text);
+  }
+  .icon-btn.labeled svg {
+    width: 18px;
+    height: 18px;
+  }
+  .page.with-fab {
+    padding-bottom: 32px;
+  }
+}
+/* Rows and icon buttons for a mouse: tighter than for a finger. */
+@media (pointer: fine) and (min-width: 900px) {
+  .list-item {
+    min-height: 44px;
+  }
+  .icon-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-sm);
+  }
+  .icon-btn svg {
+    width: 19px;
+    height: 19px;
+  }
+  .list-item .title {
+    font-weight: 500;
+  }
+}
+
+/* ---------------------------------------------------------------- forms */
+
+label.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.9rem;
+}
+
+label.field > span:first-child {
+  color: var(--text-dim);
+}
+
+.help {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  background: var(--bg-raised);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+}
+/* A mouse needs less: compact fields, as in any desktop tool. */
+@media (pointer: fine) and (min-width: 900px) {
+  input:not([type='checkbox'], [type='radio'], [type='range'], [type='color']),
+  select {
+    min-height: 38px;
+    padding-top: 7px;
+    padding-bottom: 7px;
+  }
+}
+
+/* A field in use: its border and a soft ring in the chosen accent (the
+   browser's own blue did not match it). */
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+input[type='checkbox']:focus,
+input[type='radio']:focus {
+  box-shadow: none;
+}
+input[type='checkbox']:focus-visible,
+input[type='radio']:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* A search field: the browser's clear (x) button only once there is text,
+   so an empty field's hint is not cut off early for a button that is not
+   there; a hint too long for the field ends in "...". */
+input[type='search']:placeholder-shown::-webkit-search-cancel-button {
+  display: none;
+}
+input::placeholder {
+  text-overflow: ellipsis;
+}
+
+/* Our own arrow, a comfortable distance from the edge: the browser's native
+   one sits against the border (and on Android almost off it). */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 38px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%238b929c' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 12px 8px;
+  text-overflow: ellipsis;
+}
+
+textarea {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  min-height: 140px;
+  resize: vertical;
+}
+
+/* Tick boxes and radio buttons: their own small size, not a text field's. */
+input[type='checkbox'],
+input[type='radio'] {
+  flex: none;
+  width: 22px;
+  min-height: 22px;
+  height: 22px;
+  padding: 0;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+input[type='color'] {
+  padding: 4px;
+  width: 64px;
+}
+
+label.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+
+/* A checkbox with its help tip: the tip stays beside the label, whose text
+   wraps on a narrow screen instead of pushing the tip to a line below. */
+.row:has(> label.check + .helptip) {
+  flex-wrap: nowrap;
+}
+
+.row > label.check {
+  min-width: 0;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  /* A label that wraps on a narrow screen must not push its field down:
+     the fields of a row line up at the bottom. */
+  align-items: end;
+}
+
+.grid-addr {
+  display: grid;
+  grid-template-columns: 1fr 96px;
+  gap: 12px;
+}
+
+/* A section that opens and closes looks like a button, with a chevron that
+   turns when open, so it is clear it can be tapped. */
+/* Its words break onto a second line where they must, the arrow always at the right edge: a long
+   version name with its tags pushed the arrow off a phone's screen (report d0da1c). */
+details > summary {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  position: relative;
+  min-height: 44px;
+  padding: 6px 36px 6px 14px;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+details > summary::-webkit-details-marker {
+  display: none;
+}
+
+details > summary::after {
+  content: '';
+  position: absolute;
+  right: 16px;
+  top: calc(50% - 6px);
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--text-dim);
+  border-bottom: 2px solid var(--text-dim);
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform var(--dur-2) var(--ease);
+}
+
+details[open] > summary::after {
+  transform: rotate(-135deg) translateY(-2px);
+}
+
+@media (hover: hover) {
+  details > summary:hover {
+    background: var(--bg-hover);
+  }
+}
+
+details[open] > summary {
+  margin-bottom: 12px;
+}
+
+/* ---------------------------------------------------------------- buttons */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--text);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+}
+/* An icon keeps its size beside a long label (report cb6da8: squeezed to a dot). */
+.btn > svg,
+.icon-btn > svg,
+.chip > svg {
+  flex: none;
+}
+
+@media (hover: hover) {
+  .btn:hover {
+    background: var(--bg-hover);
+  }
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.btn.danger {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}
+
+/* One rule for width: an action button in page or dialog content spans the
+   full width, stacked under the previous one. Exceptions are structural, not
+   per button: a trailing action in a list row, in the top bar or in a
+   toolbar row is compact, and buttons in a dialog footer share the row
+   equally. */
+.btn {
+  width: 100%;
+}
+/* The end of a form on a page: one row, the main button last at the right,
+   a Delete at the left, a note between (UIB-08: a full-width Save here, a
+   small left one there). On a phone each button takes the row. */
+.form-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.form-end > .btn {
+  width: auto;
+  min-width: 120px;
+}
+.form-end > .btn.danger {
+  margin-right: auto;
+}
+.form-end > span {
+  flex: 1 1 auto;
+}
+/* A phone's layout (the tab bar at the bottom, under 720 px): each button takes the row, also on a
+   wide phone or a folded-open one (report 9d013e: Save words-wide at the right at 698 px). */
+@media (max-width: 719px) {
+  .form-end > .btn {
+    flex: 1 1 100%;
+  }
+}
+/* A wide screen with a mouse: buttons as wide as their words, compact. */
+@media (pointer: fine) and (min-width: 900px) {
+  .btn {
+    width: auto;
+    min-height: 36px;
+    padding: 0 14px;
+  }
+  /* Except a button alone on its line in a column (a card, a form): as wide as the column, as on a
+     phone. Words-wide at its left it looked forgotten beside the full-width fields (report d4ba33). */
+  .stack > .btn,
+  .card > .btn,
+  .btn.block {
+    width: 100%;
+  }
+  /* In a centred column: centred like the rest. */
+  .center-screen.stack > .btn {
+    align-self: center;
+  }
+}
+
+.list-item .btn {
+  width: auto;
+  flex: none;
+  /* One line: the row's text gives way (it has its ellipsis), not the
+     button ("Hosts kiezen" on two lines). */
+  white-space: nowrap;
+}
+
+.topbar .btn,
+.toolbar .btn {
+  width: auto;
+  flex: none;
+  /* As wide as its words, on one line: a sub-pixel short of them broke
+     "Nu controleren" beside its title over two lines (report 1d821b). */
+  white-space: nowrap;
+}
+/* A title row's button or switch: beside the title while it fits, else on a line of its own under
+   it, filling that line as a lone button does on a phone (reports e67a3f, 3c862b: words-wide at the
+   left, a switch's halves one under the other). The spacer takes the free room while they share a line. */
+.toolbar:has(> .spacer) > :is(.btn, .segmented, select) {
+  flex-grow: 1;
+}
+/* A select in a title row (a history's range): as wide as its words beside the title, the line's
+   width under it (report a6548d), as high as a small button there. */
+.toolbar > select {
+  width: auto;
+  max-width: 100%;
+  min-height: 36px;
+  padding-block: 4px;
+}
+.toolbar:has(> .spacer) > .spacer {
+  flex-grow: 1000;
+}
+.toolbar > .segmented {
+  flex-wrap: nowrap;
+}
+
+dialog footer .btn,
+.row > .btn {
+  width: auto;
+  flex: 1;
+}
+
+/* A dialog's footer: each button its words on one line, a longer one taking
+   more of the row; when they do not fit side by side, each on a row of its
+   own ("Vertrouwen en verbinden" broke over two lines in an even half). */
+dialog footer .btn {
+  flex: 1 1 auto;
+  /* Its words never broken: a button that does not fit goes to a row of its
+     own instead of shrinking ("3 verwijderen" over two lines at 343 px). */
+  white-space: nowrap;
+}
+
+/* Side by side, the same height (a longer label does not make one taller). */
+.row > .btn {
+  align-self: stretch;
+}
+
+/* Actions side by side under what they act on: as wide as their words on a
+   computer; on a phone or tablet they fill the line together, evenly, as
+   the full-width buttons around them do (Pull, Up, Restart and Down sat
+   small under a full-width Edit). Evenly is one width each, not each its
+   words plus a share ("New snippet" beside "A command on several hosts" on
+   a tablet, report 1d821b): from nothing, never narrower than their words
+   on one line (unless those are wider than the row). */
+.btnrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.btnrow > .btn {
+  width: auto;
+  flex: 1 1 0;
+  min-width: fit-content;
+}
+/* Three or more that do not fit on a phone's line: one under the other, not
+   a ragged second line. */
+@media (max-width: 599px) {
+  .btnrow.stacks {
+    flex-direction: column;
+  }
+}
+/* A row of actions, buttons only, fills its line with one width each on a tablet and a computer
+   too, as on a phone: words-wide at the left beside a card whose row filled it looked untidy (report 71a779,
+   a stack's Edit and Review and deploy beside its full-width Pull, Up, Restart, Down). A dialog's
+   footer, a list row's, a title bar's or a toolbar's buttons keep their own rules. */
+@media (min-width: 720px) {
+  :is(.btnrow, .form-end, .row):not(:is(dialog, .list-item, .topbar, .toolbar) *):not(:has(> :not(.btn))) > .btn {
+    flex: 1 1 0;
+    min-width: fit-content;
+  }
+}
+
+/* Four actions of one rank (a stack's Pull, Up, Restart and Down): one
+   width each, four on a line where each gets 7rem, else two by two; never
+   three and one. Each was as wide as its word, four widths in one row
+   (report 1d821b). The least column: a quarter of the row when that is
+   7rem or more, else half of it. */
+.btnrow.even {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(calc((100% - 25px) / 4), min(calc((100% - 9px) / 2), calc((28rem + 24px - 100%) * 999))), 1fr));
+}
+.btnrow.even > .btn {
+  width: auto;
+  white-space: nowrap;
+}
+
+/* Settings' parts on a computer: laid out as on a phone, each button alone on its line as wide as
+   the column, side by side ones sharing the line evenly, a view switch the line's width. Words-wide
+   they sat lost beside full-width fields and lists (reports c7665e, c75bda, 46158b, c07d68, bc933c,
+   a08646, 23a0b1, 7107f7, f6bfd6). A list row's or a title bar's own button stays words-wide, and
+   so do a dialog's (its own rules) and one beside a search box (its All and None). */
+@media (pointer: fine) and (min-width: 900px) {
+  .fill-controls .btn:not(:is(.list-item, .toolbar, .topbar, dialog) .btn, :has(> input:not([type='checkbox'], [type='radio'], [type='range']), > select) > .btn) {
+    width: 100%;
+  }
+  .fill-controls :is(.btnrow, .form-end, .row) > .btn:not(dialog .btn) {
+    flex: 1 1 0;
+  }
+  .fill-controls .segmented:not(dialog .segmented) {
+    width: auto;
+    align-self: stretch;
+  }
+  .fill-controls .segmented:not(dialog .segmented) > button {
+    flex: 1 1 0;
+  }
+}
+
+.btn.small {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 0.9rem;
+}
+
+/* Beside a text field or a dropdown (a search box and its All/None), a
+   button is as tall as the field: side by side, one height. */
+:where(:has(> input:not([type='checkbox'], [type='radio'], [type='range']), > select)) > .btn.small {
+  min-height: 44px;
+}
+@media (pointer: fine) and (min-width: 900px) {
+  :where(:has(> input:not([type='checkbox'], [type='radio'], [type='range']), > select)) > :is(.btn, .btn.small) {
+    min-height: 38px;
+  }
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .icon-btn:hover {
+    background: var(--bg-hover);
+  }
+}
+
+/* A button that switches something on (a panel, a mode): it shows when it is. */
+.icon-btn[aria-pressed='true'] {
+  background: var(--bg-sunken);
+  color: var(--accent);
+}
+
+.icon-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.fab {
+  position: fixed;
+  right: 16px;
+  bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom));
+  z-index: 9;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  border: 0;
+  background: var(--accent);
+  color: var(--accent-text);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fab svg {
+  width: 26px;
+  height: 26px;
+}
+
+/* ---------------------------------------------------------------- bits */
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  /* Unknown: faint. A page's own state classes set the background only. */
+  background: color-mix(in srgb, var(--text-dim) 50%, transparent);
+}
+
+.dot.up {
+  background: var(--ok);
+}
+
+.dot.down {
+  background: var(--danger);
+}
+
+.chip {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 5px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+/* A state in a few words beside a name (a disk's verdict, a run's outcome, a report's status): small
+   capitals, coloured by how it is. One look everywhere; it was copied into six components. */
+.pill {
+  font: 700 0.72rem var(--font);
+  text-transform: uppercase;
+}
+.pill.ok {
+  color: var(--ok);
+}
+.pill.bad {
+  color: var(--danger);
+}
+.pill.warn {
+  color: var(--warn);
+}
+.pill.dim {
+  color: var(--text-dim);
+}
+/* A tinted label beside a name: an update waiting, a check that could not be made. */
+.flag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 5px;
+  padding: 1px 8px;
+}
+.flag.upd {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  /* Small bold text on its own tint (and on a picked row's): the accent a shade towards the text colour, for contrast in light and dark. */
+  color: color-mix(in srgb, var(--accent) 75%, var(--text));
+}
+.flag.unk {
+  background: color-mix(in srgb, var(--warn) 18%, transparent);
+  color: color-mix(in srgb, var(--warn) 70%, var(--text));
+}
+.badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: var(--bg-sunken);
+  color: var(--text-dim);
+}
+
+.alert {
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  background: var(--bg-sunken);
+}
+
+.alert :is(a, .link) {
+  /* On a tinted box the accent is too pale to read: the text's colour, underlined. */
+  color: inherit;
+}
+
+.alert.error {
+  border-color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.alert.warn {
+  border-color: var(--warn);
+  background: var(--warn-bg);
+}
+
+.alert.ok {
+  border-color: var(--ok);
+}
+
+.codes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(21ch, 1fr));
+  gap: 6px 16px;
+  font-family: var(--mono);
+  font-size: 1rem;
+  padding: 12px;
+  background: var(--bg-sunken);
+  border-radius: var(--radius-sm);
+}
+
+/* Each code whole on its line: "VVDQ-R73H-" over "RKGH-3DYE" read as two half-codes (UIA-10). */
+.codes > * {
+  white-space: nowrap;
+}
+
+/* A name or a model number kept on one line (a disk's "ST10000DM006-3GD" broke at its hyphen, UIA-09). */
+.nowrap {
+  white-space: nowrap;
+}
+
+.empty {
+  text-align: center;
+  /* Room around its words, not half a phone's screen (reports 812166, 232696). */
+  padding: 20px 16px;
+  color: var(--text-dim);
+}
+
+.toasts {
+  position: fixed;
+  left: calc(50% + var(--rail-w) / 2);
+  transform: translateX(-50%);
+  bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom));
+  z-index: 50;
+  /* Undo the popover's default look: no frame, no centring, no backdrop. */
+  inset: auto auto calc(var(--nav-h) + 16px + env(safe-area-inset-bottom)) calc(50% + var(--rail-w) / 2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(92vw, 420px);
+}
+
+.toast {
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  /* Arrives from below, quickly. */
+  animation: rise-in var(--dur-2) var(--ease);
+}
+
+.toast.error {
+  border-color: var(--danger);
+}
+
+.center-screen {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+}
+
+/* The sign-in over a page kept with its unsaved work (App.svelte): the page out of sight and reach. */
+dialog.signin-over {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  overflow: auto;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.brand img {
+  width: 44px;
+  height: 44px;
+}
+
+/* As tall as what stands beside it in a row (a filter, a button): the box
+   is the field, stretched with its wrapper (report 5fee2b: lower than the
+   filter beside it). */
+.search {
+  position: relative;
+  display: flex;
+}
+
+.search input {
+  flex: 1;
+  min-width: 0;
+  padding-left: 38px;
+}
+
+.search svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  color: var(--text-dim);
+}
+
+.color-bar {
+  width: 4px;
+  align-self: stretch;
+  border-radius: 2px;
+  flex: none;
+}
+
+/* ---------------------------------------------------------------- appearance */
+
+/* Too narrow for all its options on one row (Dutch on a 343 px phone):
+   a second row, each option whole on one line; it broke over two lines
+   past the edge. */
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  gap: 3px;
+}
+
+.segmented button {
+  /* Even shares of the line, the split between two in the middle; one whose words need more
+     keeps them (min-width: auto). Its words plus a share put "Open (2) | Solved (195)" off
+     centre (reports 86756d, 4d0518). */
+  flex: 1 1 0;
+  white-space: nowrap;
+  padding: 0 10px;
+  min-height: 38px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* A computer: a view switch as wide as its words, not stretched over the page (A3-WEB-15: Reports). */
+@media (pointer: fine) and (min-width: 900px) {
+  .segmented {
+    width: fit-content;
+    min-width: min(100%, 320px);
+    align-self: flex-start;
+  }
+}
+
+.segmented button.on {
+  background: var(--bg-raised);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
+}
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  /* In the middle of their card, under the full-width fields (report 9a3a92). */
+  justify-content: center;
+  gap: 12px;
+}
+/* A small phone: the six on one line (the sixth sat alone under five, UIA-19). */
+@media (max-width: 400px) {
+  .swatches {
+    gap: 6px;
+  }
+}
+
+.swatch {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  cursor: pointer;
+  padding: 0;
+}
+
+.swatch[aria-checked='true'] {
+  outline: 3px solid var(--text);
+  outline-offset: 2px;
+}
+
+/* Each swatch shows its preset as it looks in the current theme. */
+.swatch {
+  background: var(--accent-d);
+}
+:root[data-theme='light'] .swatch {
+  background: var(--accent-l);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) .swatch {
+    background: var(--accent-l);
+  }
+}
+
+/* A help tip belongs next to a field's caption but must stay outside the
+   <label>: a label names its first labelable child, which would otherwise be
+   the tip's button instead of the input. */
+.field-wrap {
+  position: relative;
+}
+
+.field-help {
+  position: absolute;
+  top: -4px;
+  right: 0;
+}
+/* The label's words keep clear of the "?" at its end: a label as wide as
+   the field ran under it ("voorstell(?)n", UIA-05). */
+.field-wrap > label.field > span:first-child {
+  padding-right: 36px;
+}
+
+/* The page's landmark, without a box of its own. */
+main.contents {
+  display: contents;
+}
+
+/* Problems in an open file, in the top bar: only when there are any. */
+.probs-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--warn);
+  border-radius: 999px;
+  background: var(--warn-bg);
+  color: var(--text);
+  font: 600 0.85rem var(--font);
+  cursor: pointer;
+  flex: none;
+}
+.probs-badge.bad {
+  border-color: var(--danger);
+  background: var(--danger-bg);
+}
+/* In a phone's dark title bar: a dark tint behind its light words (light on light, its "1" could not be read). */
+@media (max-width: 719px) {
+  :is(.topbar, .term-top, .appbar) .probs-badge {
+    background: color-mix(in srgb, var(--warn) 30%, var(--side));
+  }
+  :is(.topbar, .term-top, .appbar) .probs-badge.bad {
+    background: color-mix(in srgb, var(--danger) 30%, var(--side));
+  }
+}
+
+/* A line with a problem: a tinted band across its side, its number in the problem's colour, bold,
+   with a bar at its left (lib/editor/problems.ts). No column of its own: its dot was too small to see (report
+   279f73), the empty column too wide (f15675), and one there only with problems moved the text
+   (413d6f). */
+.cm-editor .cm-gutterElement.cm-problem {
+  background: color-mix(in srgb, var(--problem) 22%, transparent);
+}
+.cm-editor .cm-lineNumbers .cm-gutterElement.cm-problem {
+  font-weight: 700;
+  box-shadow: inset 3px 0 0 var(--problem);
+  color: var(--problem);
+}
+.cm-editor .cm-gutterElement.cm-problem-error {
+  --problem: var(--danger);
+}
+.cm-editor .cm-gutterElement.cm-problem-warning {
+  --problem: var(--warn);
+}
+.cm-editor .cm-gutterElement:is(.cm-problem-info, .cm-problem-hint) {
+  --problem: var(--accent);
+}
+
+/* The editor on a phone. */
+@media (max-width: 600px) {
+  /* The side with the line numbers narrow (report 202777: a log's four-digit numbers, the fold
+     arrows and the change marks took a fifth of a 343 px phone): the numbers smaller with less
+     room around them, on the row height of the text (14px, lib/editor/theme.ts), so each stays
+     beside its line; the fold and change columns narrower. */
+  .cm-editor .cm-gutters .cm-lineNumbers .cm-gutterElement {
+    /* Room for two digits: a short file's one digit left a problem's band too narrow to see (report 279f73). */
+    min-width: 17px;
+    padding: 0 1px 0 3px;
+    font-size: 11px;
+    line-height: calc(14px * 1.4);
+  }
+  .cm-editor .cm-gutters .cm-foldGutter .cm-gutterElement {
+    width: 10px;
+  }
+  .cm-editor .cm-gutters .cm-changes {
+    margin-right: 0;
+  }
+}
+
+/* Not saved yet: a dot before the file's name (in the title and tabs). */
+.dirty-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
+}
+
+/* Every native control (sliders, ticks, progress bars) in the chosen accent,
+   never the browser's blue. */
+input,
+progress,
+meter {
+  accent-color: var(--accent);
+}
+
+/* A keyboard shortcut means nothing on a touch screen. */
+.kbd-hint {
+  color: var(--text-dim);
+}
+@media (pointer: coarse) {
+  .kbd-hint {
+    display: none;
+  }
+}
+
+/* Read by a screen reader, not shown. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Markdown as read (lib/markdown.ts): the editor's preview, and a table
+   wherever Markdown is shown. A wide table scrolls in its own box. */
+.md-preview {
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.md-preview h2,
+.md-preview h3,
+.md-preview h4 {
+  margin: 1em 0 0.4em;
+  line-height: 1.3;
+}
+/* A long document read beside its text: its headings tell its parts apart. */
+.md-preview h2 {
+  font-size: 1.3rem;
+}
+.md-preview h3 {
+  font-size: 1.1rem;
+}
+.md-preview h4 {
+  font-size: 1rem;
+}
+.md-preview pre {
+  overflow-x: auto;
+  padding: 8px;
+  border-radius: 6px;
+  background: var(--bg-sunken);
+}
+.md-preview code {
+  font-family: var(--mono);
+  font-size: 0.9em;
+}
+.md-preview img {
+  max-width: 100%;
+  height: auto;
+}
+.md-preview blockquote {
+  margin: 0;
+  padding-left: 10px;
+  border-left: 3px solid var(--border);
+  color: var(--text-dim);
+}
+.md-table {
+  overflow-x: auto;
+  margin: 8px 0;
+}
+.md-table table {
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+.md-table th,
+.md-table td {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+.md-table th {
+  background: var(--bg-sunken);
+}
+
+/* A sideways row with more out of sight (lib/scrollcue.ts): faded at that edge. */
+[data-more='end'] {
+  mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+}
+[data-more='start'] {
+  mask-image: linear-gradient(to left, #000 calc(100% - 32px), transparent);
+}
+[data-more='both'] {
+  mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+}
+
+/* ---------------------------------------------------------------- motion */
+
+/* Controls answer the pointer: colours ease, a pressed button gives a little. */
+.btn,
+.icon-btn,
+.chip,
+.chip-btn,
+.list-item,
+.bottomnav a,
+input,
+select,
+textarea {
+  transition:
+    background-color var(--dur-1) var(--ease),
+    border-color var(--dur-1) var(--ease),
+    color var(--dur-1) var(--ease),
+    box-shadow var(--dur-1) var(--ease),
+    opacity var(--dur-1) var(--ease),
+    transform var(--dur-1) var(--ease);
+}
+.btn:active:not(:disabled),
+.icon-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* A page arrives: a short fade, not a jump (no movement: the floating
+   button and bars inside it stay where they are). */
+.page,
+.detail {
+  animation: fade-in var(--dur-2) var(--ease);
+}
+
+/* Rows of a list arrive softly (once, when they are made; a live list's
+   rows are kept, so they do not flicker). */
+.list > .list-item {
+  animation: fade-in var(--dur-2) var(--ease);
+}
+
+/* A folded part opens and closes by its height (where the browser can). */
+:root {
+  interpolate-size: allow-keywords;
+}
+details::details-content {
+  block-size: 0;
+  overflow-y: clip;
+  transition:
+    block-size var(--dur-2) var(--ease),
+    content-visibility var(--dur-2) allow-discrete;
+}
+details[open]::details-content {
+  block-size: auto;
+}
+
+/* Bars and meters grow to their value. */
+progress::-webkit-progress-value {
+  transition: inline-size var(--dur-3) var(--ease);
+}
+
+/* Something waited for: a calm shimmer in the shape of what comes (Skeleton). */
+.skeleton {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--bg-hover) 0%, color-mix(in srgb, var(--bg-hover) 50%, var(--bg-raised)) 50%, var(--bg-hover) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+  /* The editor's cursor stays lit instead of blinking. */
+  .cm-editor .cm-cursorLayer {
+    animation: none !important;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}

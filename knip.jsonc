@@ -1,0 +1,25 @@
+// Unused files, exports and dependencies fail the gate (scripts/gate.sh, step "unused").
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  // An export used only in its own file is still used.
+  "ignoreExportsUsedInFile": true,
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/*.mjs", "android/test/*.mjs"]
+    },
+    "shared": {},
+    "server": {
+      // The test hosts' Docker filter is run as a program (scripts/docker-lib.sh).
+      "entry": ["test/**/*.ts", "test/sshd/*.mjs"],
+      // Started as programs by the editor's language servers (src/lsp), never imported.
+      "ignoreDependencies": ["bash-language-server", "dockerfile-language-server-nodejs", "vscode-langservers-extracted", "yaml-language-server"]
+    },
+    "web": {
+      // The service worker is loaded by its URL.
+      "entry": ["src/**/*.test.ts", "public/push-sw.js"]
+    },
+    "e2e": {
+      "entry": ["tests/**/*.ts", "*.mjs"]
+    }
+  }
+}

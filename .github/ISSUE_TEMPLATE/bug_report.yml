@@ -1,0 +1,31 @@
+name: Problem report
+description: Something in Burrow does not work as it should.
+title: "Problem: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting. Burrow can fill this in for you: Settings -> Report a problem -> Reports received -> Report on GitHub.
+        Leave out anything private (host names, addresses, keys, log lines with secrets): an issue is public.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What did you do, what did you expect, what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: where
+    attributes:
+      label: Where
+      description: Burrow version (Settings -> About), web app or Android app and its version, browser, screen size.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: The page, errors in the page and failed requests, if you know them. Screenshots help; check them for anything private first.
+      render: text

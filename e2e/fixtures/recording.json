@@ -1,0 +1,578 @@
+{
+  "version": 1,
+  "withText": true,
+  "viewport": {
+    "width": 412,
+    "height": 839
+  },
+  "terminal": {
+    "compose": false,
+    "mode": "memory",
+    "cols": 40,
+    "rows": 30
+  },
+  "entries": [
+    {
+      "t": 100,
+      "e": "keydown",
+      "keyCode": 229
+    },
+    {
+      "t": 101,
+      "e": "beforeinput",
+      "inputType": "insertText",
+      "text": "e"
+    },
+    {
+      "t": 102,
+      "e": "input",
+      "inputType": "insertText",
+      "text": "e",
+      "len": 1,
+      "value": "e"
+    },
+    {
+      "t": 103,
+      "e": "sent",
+      "text": "e"
+    },
+    {
+      "t": 160,
+      "e": "keydown",
+      "keyCode": 229
+    },
+    {
+      "t": 161,
+      "e": "beforeinput",
+      "inputType": "insertText",
+      "text": "c"
+    },
+    {
+      "t": 162,
+      "e": "input",
+      "inputType": "insertText",
+      "text": "c",
+      "len": 2,
+      "value": "ec"
+    },
+    {
+      "t": 163,
+      "e": "sent",
+      "text": "c"
+    },
+    {
+      "t": 220,
+      "e": "keydown",
+      "keyCode": 229
+    },
+    {
+      "t": 221,
+      "e": "beforeinput",
+      "inputType": "insertText",
+      "text": "h"
+    },
+    {
+      "t": 222,
+      "e": "input",
+      "inputType": "insertText",
+      "text": "h",
+      "len": 3,
+      "value": "ech"
+    },
+    {
+      "t": 223,
+      "e": "sent",
+      "text": "h"
+    },
+    {
+      "t": 280,
+      "e": "keydown",
+      "keyCode": 229
+    },
+    {
+      "t": 281,
+      "e": "beforeinput",
+      "inputType": "insertText",
+      "text": "o"
+    },
+    {
+      "t": 282,
+      "e": "input",
+      "inputType": "insertText",
+      "text": "o",
+      "len": 4,
+      "value": "echo"
+    },
+    {
+      "t": 283,
+      "e": "sent",
+      "text": "o"
+    },
+    {
+      "t": 340,
+      "e": "keydown",
+      "keyCode": 229
+    },
+    {
+      "t": 341,
+      "e": "beforeinput",
+      "inputType": "insertText",
+      "text": " "
+    },
+    {
+      "t": 342,
+      "e": "input",
+      "inputType": "insertText",
+      "text": " ",
+      "len": 5,
+      "value": "echo "
+    },
+    {
+      "t": 343,
+      "e": "sent",
+      "text": " "
+    },
+    {
+      "t": 400,
+      "e": "keydown",
+      "keyCode": 229
+    },
+    {
+      "t": 401,
+      "e": "beforeinput",
+      "inputType": "insertText",
+      "text": "r"
+    },
+    {
+      "t": 402,
+      "e": "input",
+      "inputType": "insertText",
+      "text": "r",
+      "len": 6,
+      "value": "echo r"
+    },
+    {
+      "t": 403,
+      "e": "sent",
+      "text": "r"
+    },
+    {
+      "t": 460,
+      "e": "keydown",
+      "keyCode": 229
+    },
+    {
+      "t": 461,
+      "e": "beforeinput",
+      "inputType": "insertText",
+      "text": "e"
+    },
+    {
+      "t": 462,
+      "e": "input",
+      "inputType": "insertText",
+      "text": "e",
+      "len": 7,
+      "value": "echo re"
+    },
+    {
+      "t": 463,
+      "e": "sent",
+      "text": "e"
+    },
+    {
+      "t": 520,
+      "e": "keydown",
+      "keyCode": 229
+    },
+    {
+      "t": 521,
+      "e": "beforeinput",
+      "inputType": "insertText",
+      "text": "p"
+    },
+    {
+      "t": 522,
+      "e": "input",
+      "inputType": "insertText",
+      "text": "p",
+      "len": 8,
+      "value": "echo rep"
+    },
+    {
+      "t": 523,
+      "e": "sent",
+      "text": "p"
+    },
+    {
+      "t": 580,
+      "e": "keydown",
+      "keyCode": 229
+    },
+    {
+      "t": 581,
+      "e": "beforeinput",
+      "inputType": "insertText",
+      "text": "l"
+    },
+    {
+      "t": 582,
+      "e": "input",
+      "inputType": "insertText",
+      "text": "l",
+      "len": 9,
+      "value": "echo repl"
+    },
+    {
+      "t": 583,
+      "e": "sent",
+      "text": "l"
+    },
+    {
+      "t": 640,
+      "e": "keydown",
+      "keyCode": 229
+    },
+    {
+      "t": 641,
+      "e": "beforeinput",
+      "inputType": "insertText",
+      "text": "a"
+    },
+    {
+      "t": 642,
+      "e": "input",
+      "inputType": "insertText",
+      "text": "a",
+      "len": 10,
+      "value": "echo repla"
+    },
+    {
+      "t": 643,
+      "e": "sent",
+      "text": "a"
+    },
+    {
+      "t": 700,
+      "e": "keydown",
+      "keyCode": 229
+    },
+    {
+      "t": 701,
+      "e": "beforeinput",
+      "inputType": "insertText",
+      "text": "y"
+    },
+    {
+      "t": 702,
+      "e": "input",
+      "inputType": "insertText",
+      "text": "y",
+      "len": 11,
+      "value": "echo replay"
+    },
+    {
+      "t": 703,
+      "e": "sent",
+      "text": "y"
+    },
+    {
+      "t": 760,
+      "e": "keydown",
+      "keyCode": 229
+    },
+    {
+      "t": 761,
+      "e": "beforeinput",
+      "inputType": "insertText",
+      "text": "e"
+    },
+    {
+      "t": 762,
+      "e": "input",
+      "inputType": "insertText",
+      "text": "e",
+      "len": 12,
+      "value": "echo replaye"
+    },
+    {
+      "t": 763,
+      "e": "sent",
+      "text": "e"
+    },
+    {
+      "t": 820,
+      "e": "keydown",
+      "keyCode": 229
+    },
+    {
+      "t": 821,
+      "e": "beforeinput",
+      "inputType": "insertText",
+      "text": "d"
+    },
+    {
+      "t": 822,
+      "e": "input",
+      "inputType": "insertText",
+      "text": "d",
+      "len": 13,
+      "value": "echo replayed"
+    },
+    {
+      "t": 823,
+      "e": "sent",
+      "text": "d"
+    },
+    {
+      "t": 880,
+      "e": "keydown",
+      "keyCode": 229
+    },
+    {
+      "t": 881,
+      "e": "beforeinput",
+      "inputType": "insertText",
+      "text": "-"
+    },
+    {
+      "t": 882,
+      "e": "input",
+      "inputType": "insertText",
+      "text": "-",
+      "len": 14,
+      "value": "echo replayed-"
+    },
+    {
+      "t": 883,
+      "e": "sent",
+      "text": "-"
+    },
+    {
+      "t": 940,
+      "e": "keydown",
+      "keyCode": 229
+    },
+    {
+      "t": 941,
+      "e": "beforeinput",
+      "inputType": "insertText",
+      "text": "$"
+    },
+    {
+      "t": 942,
+      "e": "input",
+      "inputType": "insertText",
+      "text": "$",
+      "len": 15,
+      "value": "echo replayed-$"
+    },
+    {
+      "t": 943,
+      "e": "sent",
+      "text": "$"
+    },
+    {
+      "t": 1000,
+      "e": "keydown",
+      "keyCode": 229
+    },
+    {
+      "t": 1001,
+      "e": "beforeinput",
+      "inputType": "insertText",
+      "text": "("
+    },
+    {
+      "t": 1002,
+      "e": "input",
+      "inputType": "insertText",
+      "text": "(",
+      "len": 16,
+      "value": "echo replayed-$("
+    },
+    {
+      "t": 1003,
+      "e": "sent",
+      "text": "("
+    },
+    {
+      "t": 1060,
+      "e": "keydown",
+      "keyCode": 229
+    },
+    {
+      "t": 1061,
+      "e": "beforeinput",
+      "inputType": "insertText",
+      "text": "("
+    },
+    {
+      "t": 1062,
+      "e": "input",
+      "inputType": "insertText",
+      "text": "(",
+      "len": 17,
+      "value": "echo replayed-$(("
+    },
+    {
+      "t": 1063,
+      "e": "sent",
+      "text": "("
+    },
+    {
+      "t": 1120,
+      "e": "keydown",
+      "keyCode": 229
+    },
+    {
+      "t": 1121,
+      "e": "beforeinput",
+      "inputType": "insertText",
+      "text": "4"
+    },
+    {
+      "t": 1122,
+      "e": "input",
+      "inputType": "insertText",
+      "text": "4",
+      "len": 18,
+      "value": "echo replayed-$((4"
+    },
+    {
+      "t": 1123,
+      "e": "sent",
+      "text": "4"
+    },
+    {
+      "t": 1180,
+      "e": "keydown",
+      "keyCode": 229
+    },
+    {
+      "t": 1181,
+      "e": "beforeinput",
+      "inputType": "insertText",
+      "text": "0"
+    },
+    {
+      "t": 1182,
+      "e": "input",
+      "inputType": "insertText",
+      "text": "0",
+      "len": 19,
+      "value": "echo replayed-$((40"
+    },
+    {
+      "t": 1183,
+      "e": "sent",
+      "text": "0"
+    },
+    {
+      "t": 1240,
+      "e": "keydown",
+      "keyCode": 229
+    },
+    {
+      "t": 1241,
+      "e": "beforeinput",
+      "inputType": "insertText",
+      "text": "+"
+    },
+    {
+      "t": 1242,
+      "e": "input",
+      "inputType": "insertText",
+      "text": "+",
+      "len": 20,
+      "value": "echo replayed-$((40+"
+    },
+    {
+      "t": 1243,
+      "e": "sent",
+      "text": "+"
+    },
+    {
+      "t": 1300,
+      "e": "keydown",
+      "keyCode": 229
+    },
+    {
+      "t": 1301,
+      "e": "beforeinput",
+      "inputType": "insertText",
+      "text": "2"
+    },
+    {
+      "t": 1302,
+      "e": "input",
+      "inputType": "insertText",
+      "text": "2",
+      "len": 21,
+      "value": "echo replayed-$((40+2"
+    },
+    {
+      "t": 1303,
+      "e": "sent",
+      "text": "2"
+    },
+    {
+      "t": 1360,
+      "e": "keydown",
+      "keyCode": 229
+    },
+    {
+      "t": 1361,
+      "e": "beforeinput",
+      "inputType": "insertText",
+      "text": ")"
+    },
+    {
+      "t": 1362,
+      "e": "input",
+      "inputType": "insertText",
+      "text": ")",
+      "len": 22,
+      "value": "echo replayed-$((40+2)"
+    },
+    {
+      "t": 1363,
+      "e": "sent",
+      "text": ")"
+    },
+    {
+      "t": 1420,
+      "e": "keydown",
+      "keyCode": 229
+    },
+    {
+      "t": 1421,
+      "e": "beforeinput",
+      "inputType": "insertText",
+      "text": ")"
+    },
+    {
+      "t": 1422,
+      "e": "input",
+      "inputType": "insertText",
+      "text": ")",
+      "len": 23,
+      "value": "echo replayed-$((40+2))"
+    },
+    {
+      "t": 1423,
+      "e": "sent",
+      "text": ")"
+    },
+    {
+      "t": 1480,
+      "e": "beforeinput",
+      "inputType": "insertLineBreak"
+    },
+    {
+      "t": 1481,
+      "e": "sent",
+      "text": "\r"
+    }
+  ]
+}

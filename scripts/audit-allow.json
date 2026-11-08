@@ -1,0 +1,7 @@
+{
+  "GHSA-vfj7-8cjw-p6xm": {
+    "package": "braces",
+    "reason": "Stack exhaustion on deeply nested glob patterns. Only reached through bash-language-server (the editor's shell support), which Burrow starts with backgroundAnalysisMaxFiles: 0 (server/src/lsp/servers.ts): it globs nothing. Its settings are Burrow's own: the bridge drops workspace/didChangeConfiguration from the browser (server/src/lsp/bridge.ts clientMessage, tested in server/test/unit/websocket.test.ts) and rebuilds the browser's initialize with the server's own initializationOptions (serverInitialize, tested in server/test/unit/lsp.test.ts), so no pattern comes from a person. No fixed braces exists yet.",
+    "until": "2026-12-31"
+  }
+}

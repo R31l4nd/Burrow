@@ -1,0 +1,1 @@
+Scrollen in less en vim zonder tmux en op de directe route, zoeken op hosts zonder ripgrep, een mislukte deploy zet ook de .env terug, en kleinere fixes in de app.

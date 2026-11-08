@@ -1,0 +1,1 @@
+The home screen widget lists your hosts, the ones down first; files chosen are handled from the title bar; old package lists can be fetched again from a host's page.

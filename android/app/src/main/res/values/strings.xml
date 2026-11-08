@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">Burrow</string>
+    <string name="apps">Burrow apps</string>
+    <string name="setup_title">Connect to your Burrow</string>
+    <string name="setup_hint">The address you open Burrow at in your browser.</string>
+    <string name="setup_continue">Continue</string>
+    <string name="setup_label">Server address</string>
+    <string name="setup_invalid">Enter an https:// address.</string>
+    <string name="lock_title">Burrow is locked</string>
+    <string name="lock_prompt">Unlock Burrow</string>
+    <string name="lock_subtitle">Burrow is a shell into your machines</string>
+    <string name="lock_retry">Unlock</string>
+    <string name="sign_title">Confirm with your fingerprint</string>
+    <string name="sign_subtitle">Signs you in to %1$s</string>
+    <string name="cancel">Cancel</string>
+    <string name="close">Close</string>
+    <string name="download_failed">Download failed: %1$s</string>
+    <string name="no_app">No app can open this file</string>
+    <!-- A delete of the phone's own files, asked by the app itself, not the page (report 6eaf00). -->
+    <string name="forget_ask_title">Forget this phone\'s keys?</string>
+    <string name="forget_ask_text">Burrow on this phone loses its device key and the key of the direct route. To use them again, pair this phone again.</string>
+    <string name="forget_ask_ok">Forget</string>
+    <string name="wg_ask_title">Use this WireGuard tunnel?</string>
+    <string name="wg_ask_text">The tunnel goes to %1$s. Only go on if you entered or chose this configuration yourself.</string>
+    <string name="wg_ask_ok">Use it</string>
+    <string name="shots_ask_title">Allow screenshots of Burrow?</string>
+    <string name="shots_ask_text">Screenshots, screen recordings and the list of recent apps then show what Burrow shows: passwords, keys and terminals included.</string>
+    <string name="shots_ask_ok">Allow</string>
+    <string name="phone_delete_title">Delete from this phone?</string>
+    <string name="phone_delete_note">This cannot be undone. A folder goes with everything in it.</string>
+    <string name="phone_delete_ok">Delete</string>
+    <string name="phone_delete_folder">%1$s (folder)</string>
+    <plurals name="phone_delete_more">
+        <item quantity="one">and %1$d more</item>
+        <item quantity="other">and %1$d more</item>
+    </plurals>
+    <string name="transfers_channel">Transfers</string>
+    <plurals name="transfers_running">
+        <item quantity="one">%1$d transfer running</item>
+        <item quantity="other">%1$d transfers running</item>
+    </plurals>
+    <string name="back_to_burrow">Burrow</string>
+    <string name="close_tab_named">Close %1$s</string>
+    <string name="reload">Reload</string>
+    <string name="change_server">Change server</string>
+    <string name="retry">Try again</string>
+    <string name="unreachable_title">Burrow cannot be reached</string>
+    <string name="wg_failed">WireGuard did not come up: %1$s</string>
+    <string name="wg_scan_prompt">Point the camera at the WireGuard QR code</string>
+    <string name="wg_scan_not">This QR code is not a WireGuard configuration.</string>
+    <string name="wg_through">Tried through WireGuard; the tunnel is up but Burrow did not answer.</string>
+    <string name="wg_refused">The tunnel refused: %1$s</string>
+    <string name="direct_route">Direct route</string>
+    <string name="direct_confirm_title">Log in to %1$s</string>
+    <string name="direct_confirm_subtitle">Direct route, with this phone\'s key</string>
+    <string name="keepalive_channel">Direct connections</string>
+    <string name="alerts_channel">Alerts and reports</string>
+    <string name="alert_public">A new alert or report</string>
+    <string name="no_distributor">Install the ntfy app (or another UnifiedPush app) for notifications in Burrow.</string>
+    <string name="keepalive_title">Burrow: connection kept open</string>
+    <string name="keepalive_text">A direct session through WireGuard stays open in the background.</string>
+    <string name="keepalive_stop">Stop</string>
+    <string name="reason_connect">The server refuses the connection: Burrow is not running, or not on this address.</string>
+    <string name="reason_lookup">This address is not known here: no network, or the name only works at home.</string>
+    <string name="reason_timeout">No answer from the server in time.</string>
+    <string name="reason_tls">The secure connection failed: the certificate is not trusted.</string>
+    <string name="reason_proxy">The proxy in front of Burrow answers (HTTP %1$d), but Burrow does not: it may be starting or updating.</string>
+    <string name="tabs_shared">This phone\'s WebView cannot keep each app\'s sign-in apart: app tabs share one store of cookies with each other. Update Android System WebView.</string>
+    <string name="auth_title">Sign in to %1$s</string>
+    <string name="auth_user">User name</string>
+    <string name="auth_password">Password</string>
+    <string name="auth_sign_in">Sign in</string>
+    <string name="leave_unsaved">This page has changes that are not saved. Leave it and lose them?</string>
+    <string name="leave">Leave</string>
+    <string name="stay">Stay</string>
+    <string name="tab_failed_title">This app cannot be reached</string>
+    <string name="tab_reason_connect">The app refuses the connection: it is not running, or not at this address.</string>
+    <string name="reason_other">The page could not be loaded.</string>
+    <string name="through_tunnel">Through your WireGuard tunnel: this app is reached from outside your home over the app\'s own tunnel.</string>
+    <string name="download_of">%1$s of %2$s</string>
+    <string name="download_seconds_left">%1$d s left</string>
+    <string name="download_minutes_left">%1$d min left</string>
+    <string name="download_stop">Stop</string>
+    <string name="download_retry">Retry</string>
+    <string name="download_dismiss">Dismiss</string>
+    <string name="downloads_channel">Downloads</string>
+    <plurals name="downloads_running">
+        <item quantity="one">%1$d download</item>
+        <item quantity="other">%1$d downloads</item>
+    </plurals>
+    <string name="download_saved_title">Saved: %1$s</string>
+    <string name="download_saved_where">In Downloads/Burrow. Tap to open.</string>
+    <string name="download_saved_in">In %1$s on this phone. Tap to open.</string>
+    <string name="download_ask_title">Download this file?</string>
+    <string name="download_ask_where">It goes to Downloads/Burrow on this phone.</string>
+    <string name="download_save">Save</string>
+    <string name="download_started">Downloading %1$s: the notification shows how far.</string>
+    <string name="update_sha_mismatch">The download does not match its SHA-256</string>
+    <plurals name="share_skipped">
+        <item quantity="one">1 shared file could not be read and was left out.</item>
+        <item quantity="other">%d shared files could not be read and were left out.</item>
+    </plurals>
+    <string name="widget_description">Your hosts, alerts and package updates at a glance</string>
+    <plurals name="widget_hosts">
+        <item quantity="one">%1$d of %2$d host up</item>
+        <item quantity="other">%1$d of %2$d hosts up</item>
+    </plurals>
+    <plurals name="widget_down">
+        <item quantity="one">%1$d down</item>
+        <item quantity="other">%1$d down</item>
+    </plurals>
+    <plurals name="widget_alerts">
+        <item quantity="one">%1$d new alert</item>
+        <item quantity="other">%1$d new alerts</item>
+    </plurals>
+    <plurals name="widget_updates">
+        <item quantity="one">updates on %1$d host</item>
+        <item quantity="other">updates on %1$d hosts</item>
+    </plurals>
+    <plurals name="widget_security">
+        <item quantity="one">%1$d security</item>
+        <item quantity="other">%1$d security</item>
+    </plurals>
+    <string name="widget_last">last known, %1$s</string>
+    <string name="widget_state_up">up</string>
+    <string name="widget_state_down">down</string>
+    <string name="widget_state_unknown">not known yet</string>
+    <plurals name="widget_host_updates">
+        <item quantity="one">%1$d update</item>
+        <item quantity="other">%1$d updates</item>
+    </plurals>
+    <plurals name="widget_more_hosts">
+        <item quantity="one">%1$d more host</item>
+        <item quantity="other">%1$d more hosts</item>
+    </plurals>
+    <string name="widget_open_host">Open %1$s</string>
+    <string name="widget_never">Open Burrow once to fill this in.</string>
+    <string name="widget_sign_in">Open Burrow to sign in again.</string>
+</resources>

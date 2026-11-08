@@ -1,0 +1,1 @@
+Widget op het startscherm met je hosts, meldingen en pakketupdates; pakketupdates per host; geplande opdrachten; Wake-on-LAN vanaf een gekozen host.

@@ -1,0 +1,14 @@
+#!/bin/sh
+# Stand-in for systemctl in the test sshd (no systemd in a container): the
+# units whose journal Burrow lists, and `cat` for one that exists.
+case "$1" in
+  list-units)
+    printf '%s\n' \
+      'burrowtest-app.service loaded active running Burrow test app' \
+      'cron.service loaded active running Regular background program processing daemon' \
+      'ssh.service loaded active running OpenBSD Secure Shell server' \
+      'wg-quick@wg0.service loaded failed failed WireGuard via wg-quick(8) for wg0' ;;
+  cat)
+    case "$3" in burrowtest-app.service|cron.service|ssh.service|wg-quick@wg0.service) echo "# /lib/systemd/system/$3" ;; *) echo "No files found for $3." >&2; exit 1 ;; esac ;;
+  *) echo "systemctl (test stand-in): $*" >&2; exit 1 ;;
+esac

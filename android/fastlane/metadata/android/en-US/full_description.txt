@@ -1,0 +1,20 @@
+<p>The Android app for <b>Burrow</b>, a self-hosted server for managing your homelab from a phone. You run Burrow yourself (Docker); this app is its companion. It does nothing without your own Burrow server.</p>
+<p>What Burrow gives you:</p>
+<ul>
+<li>Terminals to your hosts that keep running when you close the app, shared between phone and laptop, with auto-complete, a key bar and split panes on a wide screen</li>
+<li>A file manager for your servers: upload, download, copy between hosts, an editor with language servers</li>
+<li>Containers and logs across hosts, compose stacks, image updates with rollback</li>
+<li>Alerts on crashes (push through ntfy), AI log analysis with your own model, scheduled reports</li>
+<li>Host statistics and SMART; Proxmox VE guests started and stopped over SSH</li>
+</ul>
+<p>What the app adds to the web app:</p>
+<ul>
+<li>Sign in with your fingerprint (a key kept in the phone's secure hardware)</li>
+<li>Its own WireGuard: away from home it reaches Burrow, your hosts and your web apps through your tunnel, without a VPN app; set up from a QR code</li>
+<li>Notifications without Google services (UnifiedPush)</li>
+<li>Open with and Share: send files from any app to a host, edit a file in another app and put it back</li>
+<li>App tabs: your other web apps, each signed in on its own</li>
+<li>A direct SSH route to your hosts for when your Burrow server cannot be reached</li>
+<li>Screenshots blocked by default</li>
+</ul>
+<p>Burrow is meant for your LAN or VPN, never the open internet. Source code, installation and documentation: see the project's website.</p>

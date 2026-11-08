@@ -1,0 +1,60 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!.env.build.example
+secrets/*
+!secrets/README.md
+
+# Your own additions to the install (docs/INSTALL.md), and your own make
+# targets and private patterns (docs/DEV.md)
+deploy/local/
+compose.override.yaml
+compose.override.yml
+Caddyfile
+
+# Bind mounts and generated output
+data/
+backups/
+artifacts/
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+server/public/
+e2e/test-results/
+e2e/playwright-report/
+coverage/
+
+# Misc
+*.log
+__pycache__/
+*.pyc
+*.orig
+*.rej
+*.swp
+*~
+.DS_Store
+.idea/
+.vscode/
+*.db
+*.db-wal
+*.db-shm
+
+# Android: signing key and build output
+android/keystore/
+android/.gradle/
+android/.kotlin/
+android/build/
+android/app/build/
+android/local.properties
+
+web/dist-direct/
+android/app/src/main/assets/
+e2e/.state/
+.gate/
+
+# Core dumps of a crashed process (a test worker once left 5 GB in e2e/).
+core
+core.[0-9]*

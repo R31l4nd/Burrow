@@ -1,0 +1,1 @@
+De geschiedenislaag werkt ook met tmux attach in een sessie zonder Burrow's tmux. Een vinger scrollt Claude Code en andere programma's op volledig scherm rustiger.

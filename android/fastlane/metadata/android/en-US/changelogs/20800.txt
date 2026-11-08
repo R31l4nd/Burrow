@@ -1,0 +1,1 @@
+Favourite folders on the phone's Files page; a container's details no longer push its log out of reach on a phone held sideways.

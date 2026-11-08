@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Burrow's mark on the home screen widget, in the accent colour (a RemoteViews image takes no tint). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <group android:pivotX="268" android:pivotY="270" android:scaleX="1.25" android:scaleY="1.25" android:translateX="-12" android:translateY="-14">
+        <path android:strokeColor="@color/accent" android:strokeWidth="56" android:strokeLineCap="round" android:pathData="M178,110V318" />
+        <path android:strokeColor="@color/accent" android:strokeWidth="56" android:pathData="M178,318a90,90 0,1 0,180 0a90,90 0,1 0,-180 0z" />
+        <path android:fillColor="@color/accent" android:pathData="M257,324h22a3,3 0,0 1,3 3v30a3,3 0,0 1,-3 3h-22a3,3 0,0 1,-3 -3v-30a3,3 0,0 1,3 -3z" />
+    </group>
+</vector>

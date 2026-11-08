@@ -1,0 +1,16 @@
+# Trying Burrow on one machine, without a reverse proxy: Burrow listens on
+# 127.0.0.1:8080 of that machine only, and you reach it through an SSH
+# tunnel (browsers treat http://localhost as secure, so passkeys work).
+#
+#   BURROW_ORIGIN=http://localhost:8080 and
+#   COMPOSE_FILE=compose.yaml:compose.try.yaml in .env (so every later
+#   docker compose command keeps the port), then
+#   docker compose up -d --build
+#   ssh -L 8080:127.0.0.1:8080 you@that-machine   # and open http://localhost:8080
+#
+# For daily use, put Burrow behind a reverse proxy with TLS instead
+# (docs/INSTALL.md).
+services:
+  burrow:
+    ports:
+      - "127.0.0.1:8080:8080"

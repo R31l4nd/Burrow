@@ -1,0 +1,1 @@
+Bestanden op de telefoon: zip, jar, apk en tar(.gz) openen als map en pakken uit ernaast, een APK installeert; openen met, delen en eigenschappen. Scrollen in de terminal is soepel. De app vraagt zelf voor schermafbeeldingen, een WireGuard-tunnel of het vergeten van de sleutels.

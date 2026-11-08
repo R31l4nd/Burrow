@@ -1,0 +1,1 @@
+Settings in two columns on a tablet or computer; files dropped from the computer upload into a folder; comparing two files shows where they differ at once; the find bar counts matches; charts show the value under the pointer.

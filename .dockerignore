@@ -1,0 +1,21 @@
+# Only what the images copy (Dockerfile, Dockerfile.backup) goes into the
+# build context: never .env files, secrets, the signing key, the Android
+# build, test output or local copies (AUDIT2 OPS-17).
+*
+!package.json
+!package-lock.json
+!.npmrc
+!tsconfig.base.json
+!shared/
+!server/
+!web/
+!e2e/package.json
+!scripts/backup/
+!android/fastlane/metadata/android/*/changelogs/
+**/node_modules
+**/dist
+server/public
+server/coverage
+web/dist-direct
+**/__pycache__
+**/*.pyc

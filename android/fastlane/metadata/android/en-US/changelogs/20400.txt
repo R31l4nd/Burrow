@@ -1,0 +1,1 @@
+In Burrow's tmux, tmux attach and tmux ls reach your own tmux. Terminals connect again after a restart; scrolling works in less and vim. Stacks brought down stay listed and can be started again. Workspace: Windows line ends kept, files changed on the host read again, copy path, new file in a folder. About says what is new. Many fixes for logs, updates and the app's WireGuard.

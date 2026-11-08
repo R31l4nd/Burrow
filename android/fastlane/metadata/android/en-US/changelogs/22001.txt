@@ -1,0 +1,1 @@
+A finger scrolls Claude Code and other full-screen programs smoothly, a step for each line it moves. The busy list no longer covers the paste bar.

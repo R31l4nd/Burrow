@@ -1,0 +1,1 @@
+The app has a new id (io.github.r31l4nd.burrow): Android installs it beside the old one. Pair it with Burrow again, then uninstall the old Burrow app. Burrow is now on GitHub: github.com/R31l4nd/Burrow.

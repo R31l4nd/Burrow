@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="apps">Burrow-apps</string>
+    <string name="setup_title">Verbinden met je Burrow</string>
+    <string name="setup_hint">Het adres waarop je Burrow in je browser opent.</string>
+    <string name="setup_continue">Verder</string>
+    <string name="setup_label">Serveradres</string>
+    <string name="setup_invalid">Vul een https://-adres in.</string>
+    <string name="lock_title">Burrow is vergrendeld</string>
+    <string name="lock_prompt">Burrow ontgrendelen</string>
+    <string name="lock_subtitle">Burrow is een shell naar je machines</string>
+    <string name="lock_retry">Ontgrendelen</string>
+    <string name="sign_title">Bevestig met je vingerafdruk</string>
+    <string name="sign_subtitle">Logt je in bij %1$s</string>
+    <string name="cancel">Annuleren</string>
+    <string name="close">Sluiten</string>
+    <string name="download_failed">Downloaden mislukt: %1$s</string>
+    <string name="no_app">Geen app kan dit bestand openen</string>
+    <!-- A delete of the phone's own files, asked by the app itself, not the page (report 6eaf00). -->
+    <string name="forget_ask_title">De sleutels van deze telefoon vergeten?</string>
+    <string name="forget_ask_text">Burrow op deze telefoon verliest zijn apparaatsleutel en de sleutel van de directe route. Om ze weer te gebruiken, koppel je deze telefoon opnieuw.</string>
+    <string name="forget_ask_ok">Vergeten</string>
+    <string name="wg_ask_title">Deze WireGuard-tunnel gebruiken?</string>
+    <string name="wg_ask_text">De tunnel gaat naar %1$s. Ga alleen verder als je deze configuratie zelf hebt ingevoerd of gekozen.</string>
+    <string name="wg_ask_ok">Gebruiken</string>
+    <string name="shots_ask_title">Schermafbeeldingen van Burrow toestaan?</string>
+    <string name="shots_ask_text">Schermafbeeldingen, schermopnames en de lijst met recente apps tonen dan wat Burrow toont, ook wachtwoorden, sleutels en terminals.</string>
+    <string name="shots_ask_ok">Toestaan</string>
+    <string name="phone_delete_title">Van deze telefoon verwijderen?</string>
+    <string name="phone_delete_note">Dit kan niet ongedaan worden. Een map gaat met alles erin.</string>
+    <string name="phone_delete_ok">Verwijderen</string>
+    <string name="phone_delete_folder">%1$s (map)</string>
+    <plurals name="phone_delete_more">
+        <item quantity="one">en nog %1$d</item>
+        <item quantity="other">en nog %1$d</item>
+    </plurals>
+    <string name="transfers_channel">Overdrachten</string>
+    <plurals name="transfers_running">
+        <item quantity="one">%1$d overdracht bezig</item>
+        <item quantity="other">%1$d overdrachten bezig</item>
+    </plurals>
+    <string name="back_to_burrow">Burrow</string>
+    <string name="close_tab_named">%1$s sluiten</string>
+    <string name="reload">Herladen</string>
+    <string name="change_server">Andere server</string>
+    <string name="retry">Opnieuw proberen</string>
+    <string name="unreachable_title">Burrow is niet bereikbaar</string>
+    <string name="wg_failed">WireGuard kwam niet op: %1$s</string>
+    <string name="wg_scan_prompt">Richt de camera op de WireGuard-QR-code</string>
+    <string name="wg_scan_not">Deze QR-code is geen WireGuard-configuratie.</string>
+    <string name="wg_through">Via WireGuard geprobeerd; de tunnel is op maar Burrow antwoordde niet.</string>
+    <string name="wg_refused">De tunnel weigerde: %1$s</string>
+    <string name="direct_route">Directe route</string>
+    <string name="direct_confirm_title">Inloggen op %1$s</string>
+    <string name="direct_confirm_subtitle">Directe route, met de sleutel van deze telefoon</string>
+    <string name="keepalive_channel">Directe verbindingen</string>
+    <string name="alert_public">Een nieuwe alert of een nieuw rapport</string>
+    <string name="alerts_channel">Alerts en rapporten</string>
+    <string name="no_distributor">Installeer de ntfy-app (of een andere UnifiedPush-app) voor meldingen in Burrow.</string>
+    <string name="keepalive_title">Burrow: verbinding blijft open</string>
+    <string name="keepalive_text">Een directe sessie via WireGuard blijft op de achtergrond open.</string>
+    <string name="keepalive_stop">Stoppen</string>
+    <string name="reason_connect">De server weigert de verbinding: Burrow draait niet, of niet op dit adres.</string>
+    <string name="reason_lookup">Dit adres is hier onbekend: geen netwerk, of de naam werkt alleen thuis.</string>
+    <string name="reason_timeout">De server antwoordt niet op tijd.</string>
+    <string name="reason_tls">De beveiligde verbinding mislukte: het certificaat wordt niet vertrouwd.</string>
+    <string name="reason_proxy">De proxy voor Burrow antwoordt (HTTP %1$d), maar Burrow niet: het start misschien of wordt bijgewerkt.</string>
+    <string name="tabs_shared">De WebView van deze telefoon kan de aanmelding per app niet gescheiden houden: app-tabbladen delen één cookie-opslag. Werk Android System WebView bij.</string>
+    <string name="auth_title">Aanmelden bij %1$s</string>
+    <string name="auth_user">Gebruikersnaam</string>
+    <string name="auth_password">Wachtwoord</string>
+    <string name="auth_sign_in">Aanmelden</string>
+    <string name="leave_unsaved">Deze pagina heeft wijzigingen die niet zijn opgeslagen. Verlaten en ze kwijtraken?</string>
+    <string name="leave">Verlaten</string>
+    <string name="stay">Blijven</string>
+    <string name="tab_failed_title">Deze app is niet bereikbaar</string>
+    <string name="tab_reason_connect">De app weigert de verbinding: hij draait niet, of niet op dit adres.</string>
+    <string name="reason_other">De pagina kon niet worden geladen.</string>
+    <string name="through_tunnel">Via je WireGuard-tunnel: deze app wordt buitenshuis bereikt via de eigen tunnel van de app.</string>
+    <string name="download_of">%1$s van %2$s</string>
+    <string name="download_seconds_left">nog %1$d s</string>
+    <string name="download_minutes_left">nog %1$d min</string>
+    <string name="download_stop">Stoppen</string>
+    <string name="download_retry">Opnieuw</string>
+    <string name="download_dismiss">Sluiten</string>
+    <string name="downloads_channel">Downloads</string>
+    <plurals name="downloads_running">
+        <item quantity="one">%1$d download</item>
+        <item quantity="other">%1$d downloads</item>
+    </plurals>
+    <string name="download_saved_title">Opgeslagen: %1$s</string>
+    <string name="download_saved_where">In Downloads/Burrow. Tik om te openen.</string>
+    <string name="download_saved_in">In %1$s op deze telefoon. Tik om te openen.</string>
+    <string name="download_ask_title">Dit bestand downloaden?</string>
+    <string name="download_ask_where">Het komt in Downloads/Burrow op deze telefoon.</string>
+    <string name="download_save">Opslaan</string>
+    <string name="download_started">%1$s wordt gedownload: de melding laat zien hoe ver.</string>
+    <string name="update_sha_mismatch">De download klopt niet met zijn SHA-256</string>
+    <plurals name="share_skipped">
+        <item quantity="one">1 gedeeld bestand kon niet worden gelezen en is weggelaten.</item>
+        <item quantity="other">%d gedeelde bestanden konden niet worden gelezen en zijn weggelaten.</item>
+    </plurals>
+    <string name="widget_description">Je hosts, meldingen en pakketupdates in één oogopslag</string>
+    <plurals name="widget_hosts">
+        <item quantity="one">%1$d van %2$d host aan</item>
+        <item quantity="other">%1$d van %2$d hosts aan</item>
+    </plurals>
+    <plurals name="widget_down">
+        <item quantity="one">%1$d uit</item>
+        <item quantity="other">%1$d uit</item>
+    </plurals>
+    <plurals name="widget_alerts">
+        <item quantity="one">%1$d nieuwe melding</item>
+        <item quantity="other">%1$d nieuwe meldingen</item>
+    </plurals>
+    <plurals name="widget_updates">
+        <item quantity="one">updates op %1$d host</item>
+        <item quantity="other">updates op %1$d hosts</item>
+    </plurals>
+    <plurals name="widget_security">
+        <item quantity="one">%1$d beveiliging</item>
+        <item quantity="other">%1$d beveiliging</item>
+    </plurals>
+    <string name="widget_last">laatst bekend, %1$s</string>
+    <string name="widget_state_up">aan</string>
+    <string name="widget_state_down">uit</string>
+    <string name="widget_state_unknown">nog onbekend</string>
+    <plurals name="widget_host_updates">
+        <item quantity="one">%1$d update</item>
+        <item quantity="other">%1$d updates</item>
+    </plurals>
+    <plurals name="widget_more_hosts">
+        <item quantity="one">nog %1$d host</item>
+        <item quantity="other">nog %1$d hosts</item>
+    </plurals>
+    <string name="widget_open_host">%1$s openen</string>
+    <string name="widget_never">Open Burrow een keer om dit te vullen.</string>
+    <string name="widget_sign_in">Open Burrow om opnieuw aan te melden.</string>
+</resources>

@@ -1,0 +1,83 @@
+#!/bin/sh
+# Stand-in for the docker CLI in the test sshd: answers the calls that
+# Burrow's completion specs, host detection, app discovery and the container
+# pages make, with fixed containers (a "burrowtest" stack: db and cache).
+now() { date -u +%Y-%m-%dT%H:%M:%S.%NZ; }
+rand() { od -An -N1 -tu1 /dev/urandom | tr -d ' '; }
+case "$*" in
+  "info --format {{.ServerVersion}}") echo 27.0.0 ;;
+  "ps --format {{ json . }}"|"ps -a --format {{ json . }}")
+    printf '%s\n' \
+      '{"Names":"radarr","Image":"linuxserver/radarr","ID":"a1"}' \
+      '{"Names":"sonarr","Image":"linuxserver/sonarr","ID":"b2"}' ;;
+  "ps -q") printf '%s\n' a1 b2 c3 ;;
+  "ps -aq --no-trunc") printf '%s\n' f1 f2 ;;
+  # Images, volumes and networks (the resources page), kept in a state
+  # directory so a removal shows; the state starts afresh when it is removed.
+  "image ls -a --no-trunc --format {{json .}}"|"volume ls --format {{json .}}"|"network ls --no-trunc --format {{json .}}"|image\ rm\ --\ *|volume\ rm\ --\ *|network\ rm\ --\ *)
+    st=/tmp/fakedocker; mkdir -p "$st"
+    [ -f "$st/images" ] || printf '%s\n' \
+      '{"ID":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","Repository":"postgres","Tag":"17","Size":"438MB","CreatedAt":"2026-09-01 10:00:00 +0000 UTC"}' \
+      '{"ID":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","Repository":"redis","Tag":"8","Size":"117MB","CreatedAt":"2026-09-02 10:00:00 +0000 UTC"}' \
+      '{"ID":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","Repository":"busybox","Tag":"1.36","Size":"4.26MB","CreatedAt":"2026-08-01 10:00:00 +0000 UTC"}' \
+      '{"ID":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","Repository":"<none>","Tag":"<none>","Size":"95.5MB","CreatedAt":"2026-07-01 10:00:00 +0000 UTC"}' > "$st/images"
+    [ -f "$st/volumes" ] || printf '%s\n' \
+      '{"Name":"burrowtest_pgdata","Driver":"local","Labels":"com.docker.compose.project=burrowtest,com.docker.compose.volume=pgdata"}' \
+      '{"Name":"old_cache","Driver":"local","Labels":""}' > "$st/volumes"
+    [ -f "$st/networks" ] || printf '%s\n' \
+      '{"ID":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","Name":"bridge","Driver":"bridge"}' \
+      '{"ID":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0001","Name":"host","Driver":"host"}' \
+      '{"ID":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0002","Name":"none","Driver":"null"}' \
+      '{"ID":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0003","Name":"burrowtest_default","Driver":"bridge"}' \
+      '{"ID":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","Name":"oldnet","Driver":"bridge"}' > "$st/networks"
+    case "$1 $2" in
+      "image ls") cat "$st/images" ;;
+      "volume ls") cat "$st/volumes" ;;
+      "network ls") cat "$st/networks" ;;
+      *)
+        kind="$1"; id="$4"
+        # In use: Docker says no (the images and network the two containers have).
+        case "$id" in sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|burrowtest_pgdata|eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0003) echo "Error response from daemon: $kind $id is in use" >&2; exit 1 ;; esac
+        grep -v -- "$id" "$st/${kind}s" > "$st/x" || true; mv "$st/x" "$st/${kind}s"; echo "$id" ;;
+    esac ;;
+  inspect\ --format\ \{\{json\ .Id\}\}*)
+    printf '%s\n' \
+      '"f1" "/burrowtest-db" "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" [{"Type":"volume","Name":"burrowtest_pgdata"}] {"burrowtest_default":{"NetworkID":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0003"}} {"com.docker.compose.project":"burrowtest"}' \
+      '"f2" "/burrowtest-cache" "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" [] {"burrowtest_default":{"NetworkID":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0003"}} {"com.docker.compose.project":"burrowtest"}' ;;
+  inspect\ --format\ \{\"id\"*)
+    started="$(date -u -d '-2 hours' +%Y-%m-%dT%H:%M:%S.000000000Z)"
+    printf '%s\n' \
+      "{\"id\":\"f1\",\"name\":\"/burrowtest-db\",\"image\":\"postgres:17\",\"state\":{\"Status\":\"running\",\"ExitCode\":0,\"OOMKilled\":false,\"StartedAt\":\"$started\",\"FinishedAt\":\"0001-01-01T00:00:00Z\",\"Health\":{\"Status\":\"healthy\"}},\"restarts\":1,\"created\":\"$started\",\"labels\":{\"com.docker.compose.project\":\"burrowtest\",\"com.docker.compose.service\":\"db\"}}" \
+      "{\"id\":\"f2\",\"name\":\"/burrowtest-cache\",\"image\":\"redis:8\",\"state\":{\"Status\":\"running\",\"ExitCode\":0,\"OOMKilled\":false,\"StartedAt\":\"$started\",\"FinishedAt\":\"0001-01-01T00:00:00Z\"},\"restarts\":0,\"created\":\"$started\",\"labels\":{\"com.docker.compose.project\":\"burrowtest\",\"com.docker.compose.service\":\"cache\"}}" ;;
+  "inspect --format "*)
+    printf '%s\n' \
+      '"/radarr" {"swag":"enable","swag_url":"radarr.local.*"}' \
+      '"/sonarr" {"homepage.href":"https://sonarr.example.com/","homepage.name":"Sonarr","homepage.group":"Media"}' \
+      '"/postgres" {"maintainer":"x"}' ;;
+  "stats --no-stream --no-trunc --format {{json .}}")
+    printf '{"ID":"f1","CPUPerc":"%s.%s%%","MemUsage":"%sMiB / 1.9GiB"}\n' "$(rand)" "$(rand)" "$((200 + $(rand)))"
+    printf '{"ID":"f2","CPUPerc":"0.%s%%","MemUsage":"%sMiB / 1.9GiB"}\n' "$(rand)" "$((20 + $(rand) / 10))" ;;
+  logs\ -t*)
+    # The container is the last argument; -f keeps going.
+    for c in "$@"; do name="$c"; done
+    follow=0; case "$*" in *" -f "*) follow=1 ;; esac
+    echo "$(now) {\"level\":30,\"msg\":\"$name ready\"}"
+    echo "$(now) WARN $name slow query" >&2
+    # A container whose name says so logs a Java stack trace (the log view folds it).
+    # Its own times, the same each time it is asked (as docker's are).
+    case "$name" in *trace*)
+      t=2026-01-01T00:00:00
+      echo "$t.000000001Z ERROR java.lang.IllegalStateException: boom"
+      printf '%s \tat a.B.c(B.java:1)\n' "$t.000000002Z"
+      printf '%s \tat a.B.d(B.java:2)\n' "$t.000000003Z"
+      echo "$t.000000004Z Caused by: java.io.IOException: disk"
+      echo "$t.000000005Z INFO next" ;;
+    esac
+    i=0
+    while [ "$follow" = 1 ]; do
+      i=$((i + 1))
+      echo "$(now) {\"level\":30,\"msg\":\"$name tick $i\"}"
+      sleep 1
+    done ;;
+  *) echo "fake docker: $*" ;;
+esac

@@ -1,0 +1,1 @@
+Burrow bewaart zijn eigen waarschuwingen en fouten over updates heen (Instellingen -> Over Burrow). IP-adressen gaan alleen ongemaskeerd naar een AI-model als je aangeeft dat de server op je eigen netwerk draait.

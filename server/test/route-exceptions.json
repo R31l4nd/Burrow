@@ -1,0 +1,3 @@
+{
+  "GET /api/changelog/image": "Fetches a release note's picture from GitHub, which the test machines cannot reach. The fetching, GitHub's redirects, the type and size limits are tested with a stand-in fetch in test/unit/changelog-image.test.ts; the page showing it in e2e/tests/workspace-stacks.spec.ts (answered by a stub)."
+}

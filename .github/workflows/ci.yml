@@ -1,0 +1,206 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    steps:
+      # No token left in .git/config while the gate's packages run (A3-OPS-14).
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      # The same gate as the pre-push hook; everything runs in Docker.
+      - name: Gate
+        run: bash scripts/gate.sh
+        env:
+          CI: 'true'
+      - name: Playwright report
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+          retention-days: 7
+
+  # A release tag is the version the packages and the changelog say, else
+  # nothing is published; "latest" only for the newest stable release.
+  version:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    outputs:
+      latest: ${{ steps.tag.outputs.latest }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: tag
+        run: bash scripts/release-tag.sh "$GITHUB_REF_NAME"
+
+  image:
+    needs: [gate, version]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      # amd64 and arm64 (a Raspberry Pi 4/5, an ARM mini PC): the Dockerfile
+      # fetches its tools per architecture.
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: repo
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      # v1.10.0 -> 1.10.0, 1.10 and latest: pin a release, follow its fixes,
+      # or always the newest (latest: only the newest stable one).
+      - id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: ${{ steps.repo.outputs.name }}
+          flavor: latest=false
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ !contains(github.ref_name, '-') }}
+            type=raw,value=latest,enable=${{ needs.version.outputs.latest == 'true' }}
+      # Built once and pushed by digest only, under no tag anyone pulls: the
+      # checks below run on exactly these bytes, and only then do they get
+      # their tags. Pushed with the tags first, a release that failed the
+      # arm64 start or the scan was public already (A3-OPS-04). With an SBOM
+      # and full build provenance attached (A3-OPS-15).
+      - id: app
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ steps.repo.outputs.name }},push-by-digest=true,name-canonical=true,push=true
+          sbom: true
+          provenance: mode=max
+      # The backup sidecar (compose profile "backup") the same way.
+      - id: backup
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: Dockerfile.backup
+          platforms: linux/amd64,linux/arm64
+          outputs: type=image,name=${{ steps.repo.outputs.name }}-backup,push-by-digest=true,name-canonical=true,push=true
+          sbom: true
+          provenance: mode=max
+      # The arm64 image starts and answers as well (the gate runs amd64):
+      # under qemu, so it may take a few minutes to become healthy.
+      - name: Start the arm64 image
+        env:
+          IMAGE: ${{ steps.repo.outputs.name }}@${{ steps.app.outputs.digest }}
+        run: |
+          docker run -d --name burrow-arm64 --platform linux/arm64 -e BURROW_ORIGIN=http://localhost:8080 "$IMAGE" >/dev/null
+          for _ in $(seq 1 90); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' burrow-arm64)" = healthy ] && break
+            [ "$(docker inspect -f '{{.State.Running}}' burrow-arm64)" = true ] || break
+            sleep 4
+          done
+          status="$(docker inspect -f '{{.State.Health.Status}}' burrow-arm64)"
+          docker logs burrow-arm64 2>&1 | tail -20
+          docker rm -fv burrow-arm64 >/dev/null
+          [ "$status" = healthy ] || { echo "the arm64 image did not become healthy ($status)"; exit 1; }
+      # Built again here, for two architectures: the images as pushed are
+      # scanned as the gate scans its own build, with the same exceptions
+      # (audit OP-09). A finding fails the release before anything is tagged.
+      - name: Scan the images
+        env:
+          APP: ${{ steps.repo.outputs.name }}@${{ steps.app.outputs.digest }}
+          BACKUP: ${{ steps.repo.outputs.name }}-backup@${{ steps.backup.outputs.digest }}
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          trivy="$(sed -n 's/^TRIVY_IMAGE="\(.*\)"$/\1/p' scripts/gate.sh)"
+          for image in "$APP" "$BACKUP"; do
+            for platform in linux/amd64 linux/arm64; do
+              docker run --rm -e TRIVY_USERNAME -e TRIVY_PASSWORD -v "$PWD/.trivyignore.yaml":/ignore.yaml:ro "$trivy" image --quiet --scanners vuln \
+                --severity HIGH,CRITICAL --ignore-unfixed --ignorefile /ignore.yaml --exit-code 1 --platform "$platform" "$image"
+            done
+          done
+      # Checked: now the tags users and the self-update pull.
+      - name: Tag the checked images
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          REPO: ${{ steps.repo.outputs.name }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          LATEST: ${{ needs.version.outputs.latest }}
+          APP: ${{ steps.repo.outputs.name }}@${{ steps.app.outputs.digest }}
+          BACKUP: ${{ steps.repo.outputs.name }}-backup@${{ steps.backup.outputs.digest }}
+        run: |
+          app=(); while IFS= read -r t; do [ -z "$t" ] || app+=(-t "$t"); done <<< "$TAGS"
+          [ "${#app[@]}" -gt 0 ] || { echo "no tags"; exit 1; }
+          docker buildx imagetools create "${app[@]}" "$APP"
+          # The backup image under the same tags as the application's: X.Y.Z, X.Y (not for a prerelease), latest.
+          backup=(-t "$REPO-backup:$VERSION"); [[ "$VERSION" == *-* ]] || backup+=(-t "$REPO-backup:${VERSION%.*}")
+          [ "$LATEST" = true ] && backup+=(-t "$REPO-backup:latest")
+          docker buildx imagetools create "${backup[@]}" "$BACKUP"
+
+  # The Android app, signed with the project's key (repository secrets
+  # ANDROID_KEYSTORE_BASE64 and KEYSTORE_PASSWORD), attached to the release.
+  # Without the secrets the APK is skipped: the image is released anyway.
+  release:
+    needs: image
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      # Whether there is a key, not the key: the secrets go only to the step that signs (A3-OPS-07).
+      HAS_KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      # compose needs an origin; an http one gives the public APK no
+      # suggested server (it takes https only), not the example's (A3-OPS-14).
+      - name: Settings for the build
+        if: env.HAS_KEY == 'true'
+        run: printf 'BURROW_ORIGIN=http://localhost:8080\n' > .env
+      # The APK carries the direct route's page, built from the workspaces:
+      # their packages first (a fresh checkout has none, audit OP-02). Both
+      # before the signing key exists: npm's packages and the web build's
+      # tools never run beside it (A3-OPS-07).
+      - name: Packages and the direct route's page
+        if: env.HAS_KEY == 'true'
+        run: |
+          bash scripts/node.sh npm ci --no-fund --no-audit
+          bash scripts/direct-assets.sh
+      - name: APK
+        if: env.HAS_KEY == 'true'
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          mkdir -p android/keystore
+          echo "$KEYSTORE_B64" | base64 -d > android/keystore/burrow.jks
+          printf 'KEYSTORE_PASSWORD=%s\n' "$KEYSTORE_PASSWORD" > .env.build
+          APK_DIRECT_BUILT=1 bash scripts/apk.sh
+      - name: Remove the signing key
+        if: always()
+        run: rm -f android/keystore/burrow.jks .env.build
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="$(awk -v v="${GITHUB_REF_NAME#v}" '$0 ~ "^## \\[" v "\\]" {p=1; next} /^## \[/ {p=0} p' CHANGELOG.md)"
+          files=(); [ -f artifacts/burrow.apk ] && files=(artifacts/burrow.apk artifacts/burrow.apk.json)
+          pre=(); [[ "$GITHUB_REF_NAME" == *-* ]] && pre=(--prerelease)
+          gh release create "$GITHUB_REF_NAME" --title "Burrow ${GITHUB_REF_NAME#v}" --notes "$notes" "${pre[@]}" "${files[@]}"

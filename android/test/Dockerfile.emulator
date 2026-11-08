@@ -1,0 +1,16 @@
+# The Android device test's emulator (API 35), on top of the app's build
+# image. Test tooling only: the emulator package has no version in its name,
+# but sdkmanager checks every download against its repository checksum.
+FROM burrow-android-build:local
+# Which of Burrow's images this is: an untagged one left behind by a build is found by it (scripts/gate.sh, leftovers).
+LABEL burrow.image="android-emulator"
+USER root
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libnss3 libx11-6 libxcb1 libxcomposite1 libxcursor1 libxi6 libxrandr2 libxtst6 libasound2t64 libpulse0 libglu1-mesa libgl1 libxkbfile1 libxdamage1 \
+ && rm -rf /var/lib/apt/lists/*
+RUN sdkmanager --install emulator platform-tools "system-images;android-35;google_apis;x86_64" > /dev/null
+ENV PATH=${PATH}:/opt/android-sdk/platform-tools:/opt/android-sdk/emulator \
+    ANDROID_AVD_HOME=/scratch/avd \
+    ANDROID_EMULATOR_HOME=/scratch
+COPY boot.sh /boot.sh
+ENTRYPOINT ["bash", "/boot.sh"]

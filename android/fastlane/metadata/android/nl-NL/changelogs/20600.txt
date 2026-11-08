@@ -1,0 +1,1 @@
+Vraag de AI over een bestand of de geselecteerde regels in de editor; de melding over de taalserver zegt wat die betekent en verbindt opnieuw; WireGuard-apps tellen verwijderde apps niet meer als gekozen.

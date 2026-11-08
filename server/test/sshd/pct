@@ -1,0 +1,17 @@
+#!/bin/sh
+# Stand-in for Proxmox VE's pct in the test sshd: one container, its state in
+# a file like qm's.
+[ "$(id -u)" = 0 ] || { echo 'pct: must be run as root' >&2; exit 2; }
+S=/var/lib/burrowtest-pve; mkdir -p $S
+st() { cat "$S/$1" 2>/dev/null || echo "$2"; }
+case "$1" in
+  list)
+    echo 'VMID       Status     Lock         Name'
+    echo "200        $(st 200 running)                 burrowtest-ct" ;;
+  start|stop|reboot|shutdown)
+    [ "$2" = 200 ] || { echo "Configuration file 'nodes/pve/lxc/$2.conf' does not exist" >&2; exit 2; }
+    case "$1" in start|reboot) echo running > "$S/$2" ;; *) echo stopped > "$S/$2" ;; esac ;;
+  config) [ "$2" = 200 ] && printf 'arch: amd64\nhostname: burrowtest-ct\nnet0: name=eth0,bridge=vmbr0,ip=10.99.1.200/24,gw=10.99.1.1\n' ;;
+  exec) echo '10.99.1.200' ;;
+  *) echo "pct (test stand-in): $*" >&2; exit 2 ;;
+esac

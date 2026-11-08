@@ -1,0 +1,14 @@
+# The test sshd with the real docker CLI instead of the stand-in: for tests
+# that must see real `docker inspect/stats/logs` output. The test scripts
+# mount this machine's Docker socket and start a few throwaway containers
+# (label com.docker.compose.project=burrowtest). The phase 8 tests also run
+# docker compose on it, for stacks of their own (burrowtest-*) only.
+FROM docker:29-cli@sha256:5e6baf67325a79f64ed3bed6863954d5e05d0f3d4e57cbdb14809346814bbfdb AS cli
+
+FROM burrow-test-sshd
+# Which of Burrow's images this is: an untagged one left behind by a build is found by it (scripts/gate.sh, leftovers).
+LABEL burrow.image="test-sshd-docker"
+COPY --from=cli /usr/local/bin/docker /usr/local/bin/docker
+COPY --from=cli /usr/local/libexec/docker/cli-plugins/docker-compose /usr/local/libexec/docker/cli-plugins/docker-compose
+COPY --chmod=755 docker-entrypoint.sh /docker-entrypoint.sh
+CMD ["/docker-entrypoint.sh"]

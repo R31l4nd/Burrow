@@ -1,0 +1,8 @@
+# Advisories the gate's image step (scripts/gate.sh, trivy) lets through,
+# each with why it cannot do harm here and until when; then it fails again.
+# None at the moment. An entry looks like this (trivy's .trivyignore.yaml):
+#   - id: CVE-YYYY-NNNNN
+#     paths: ["usr/local/bin/<tool>"]
+#     statement: "why it cannot do harm here"
+#     expired_at: YYYY-MM-DD
+vulnerabilities: []

@@ -1,0 +1,33 @@
+#!/bin/sh
+# Stand-in for journalctl in the test sshd: a unit's last lines in
+# short-iso-precise (two days old and fresh), then with -f a new one every
+# second. Only the journal's group may read it, as on a real host.
+unit=; n=10; follow=
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -u) unit="$2"; shift ;;
+    -n) n="$2"; shift ;;
+    -f) follow=1 ;;
+  esac
+  shift
+done
+# As the real one: outside the journal's group a hint, and no lines.
+id -nG | tr ' ' '\n' | grep -qx systemd-journal || { echo "Hint: You are currently not seeing messages from other users and the system." >&2; exit 0; }
+ts() { date -d "$1" +%Y-%m-%dT%H:%M:%S.%6N%z; }
+host=$(hostname)
+{
+  echo "$(ts '2 days ago') $host $unit[100]: started two days ago"
+  echo "$(ts '10 minutes ago') $host $unit[100]: ERROR: could not reach the database"
+  # A long line beside its level: the level stays with its first row (report 97e99b).
+  echo "$(ts '2 minutes ago') $host $unit[100]: WARN: disk usage is high on /var/lib/docker; consider pruning unused images, stopped containers and dangling build cache so that the next pull has room enough to finish"
+  # Long dotted names, as real services write them (they wrapped between two letters on a phone).
+  echo "$(ts '1 minute ago') $host $unit[100]: Emby.Server.Implementations.ScheduledTasks.TaskManager: Queued IntroSkipper.ScheduledTasks.BaseItemAnalyzerTask"
+  echo "$(ts '5 seconds ago') $host $unit[100]: listening on :8080"
+} | tail -n "$n"
+[ -n "$follow" ] || exit 0
+i=0
+while :; do
+  sleep 1
+  i=$((i + 1))
+  echo "$(ts now) $host $unit[100]: tick $i"
+done

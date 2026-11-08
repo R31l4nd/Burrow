@@ -1,0 +1,157 @@
+# Burrow, its backup service and the Android build. Reach Burrow through
+# your reverse proxy over HTTPS on your LAN or VPN. Do not expose it to the internet: it is a shell into every host
+# you add.
+#
+#   cp .env.example .env    # set BURROW_ORIGIN
+#   docker compose up -d
+#   docker compose logs burrow   # shows the one-time setup token
+
+name: burrow
+
+networks:
+  proxy:
+    name: ${PROXY_NETWORK:-proxy}
+    external: true
+
+volumes:
+  burrow-data:
+  android-gradle:
+
+x-logging: &logging
+  driver: local
+  options:
+    max-size: "${LOG_MAX_SIZE:-10m}"
+    max-file: "${LOG_MAX_FILES:-5}"
+
+services:
+  burrow:
+    build: .
+    image: ${BURROW_IMAGE:-burrow:local}
+    container_name: burrow
+    hostname: burrow
+    restart: unless-stopped
+    init: true
+    environment:
+      BURROW_ORIGIN: ${BURROW_ORIGIN:?BURROW_ORIGIN is required (see .env.example)}
+      BURROW_SECRET: ${BURROW_SECRET:-}
+      TRUST_PROXY: ${TRUST_PROXY:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TERMINAL_MAX_SESSIONS: ${TERMINAL_MAX_SESSIONS:-20}
+      TERMINAL_IDLE_MINUTES: ${TERMINAL_IDLE_MINUTES:-0}
+      STATUS_INTERVAL_SECONDS: ${STATUS_INTERVAL_SECONDS:-60}
+      APPS_BASE_DOMAIN: ${APPS_BASE_DOMAIN:-}
+      REGISTRY_ENDPOINTS: ${REGISTRY_ENDPOINTS:-}
+      UPDATE_CHECK_EXCLUDE: ${UPDATE_CHECK_EXCLUDE:-}
+      BURROW_IGNORE_LABEL: ${BURROW_IGNORE_LABEL:-burrow.ignore}
+      BURROW_ANDROID_CERT_SHA256: ${BURROW_ANDROID_CERT_SHA256:-}
+    volumes:
+      - ${BURROW_DATA:-burrow-data}:/data
+      # The backup service's archives, read-only: Settings -> Backups offers
+      # the newest as a download (encrypted with a key Burrow does not hold).
+      - ${BACKUP_DIR:-./backups}:/backups:ro
+    networks:
+      - proxy
+    # Hardening: non-root (USER node in the image), no capabilities, no
+    # privilege escalation, read-only root filesystem. Only /data and /tmp
+    # are writable.
+    cap_drop:
+      - ALL
+    security_opt:
+      - "no-new-privileges:true"
+    read_only: true
+    tmpfs:
+      - /tmp:size=${BURROW_TMP_SIZE:-256m}
+    # Bounded, so a runaway language server or fork loop cannot starve this
+    # machine and what else runs on it. /tmp is memory too.
+    mem_limit: ${BURROW_MEM_LIMIT:-2g}
+    pids_limit: ${BURROW_PIDS_LIMIT:-512}
+    labels:
+      # For SWAG with swag-auto-proxy, and only when asked for
+      # (SWAG_ENABLE=enable in .env): most SWAGs face the internet, and
+      # Burrow must not. Serve SWAG_URL to your LAN or VPN only
+      # first (docs/INSTALL.md). Other proxies ignore these labels.
+      - swag=${SWAG_ENABLE:-disable}
+      - swag_address=burrow
+      - swag_port=8080
+      - swag_url=${SWAG_URL:-burrow.local.*}
+      - swag_proto=http
+    logging: *logging
+
+  # Optional: periodic encrypted backups of the database and master key.
+  # Enable with COMPOSE_PROFILES=backup in .env (or --profile backup) after
+  # creating secrets/backup_encryption_key (see secrets/README.md).
+  backup:
+    profiles: ["backup"]
+    build:
+      context: .
+      dockerfile: Dockerfile.backup
+      # Today's date fetches the Alpine packages again (their fixes): PKG_DATE=$(date +%F).
+      args:
+        PKG_DATE: ${PKG_DATE:-}
+    image: ${BURROW_BACKUP_IMAGE:-burrow-backup:local}
+    container_name: burrow-backup
+    restart: unless-stopped
+    # Same uid as Burrow (the node user) so it can read the database.
+    user: "1000:1000"
+    network_mode: none
+    cap_drop:
+      - ALL
+    security_opt:
+      - "no-new-privileges:true"
+    read_only: true
+    # A round works in /tmp (memory): about three times the database.
+    tmpfs:
+      - /tmp
+    mem_limit: ${BACKUP_MEM_LIMIT:-2g}
+    pids_limit: ${BACKUP_PIDS_LIMIT:-64}
+    environment:
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_RETENTION_COUNT: ${BACKUP_RETENTION_COUNT:-30}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_RETENTION_MAX: ${BACKUP_RETENTION_MAX:-60}
+      BACKUP_REMOTE_ENABLED: ${BACKUP_REMOTE_ENABLED:-0}
+    volumes:
+      # Read-write because SQLite's online backup of a WAL database needs the
+      # shared-memory file; the script writes only backup-status.json there
+      # (for Settings -> Backups).
+      - ${BURROW_DATA:-burrow-data}:/data
+      - ${BACKUP_DIR:-./backups}:/backups
+      - ${BACKUP_REMOTE_DIR:-./backups}:/remote-backups
+      - type: bind
+        source: ./secrets/backup_encryption_key
+        target: /run/secrets/backup_encryption_key
+        read_only: true
+    healthcheck:
+      test: ["CMD-SHELL", "find /backups/.last-success -mmin -${BACKUP_HEALTH_MAX_AGE_MINUTES:-1560} | grep -q ."]
+      interval: 5m
+      timeout: 10s
+      retries: 2
+      start_period: 2m
+    logging: *logging
+
+  # Builds the Android app. Not part of `docker compose up`: run `make apk`.
+  # The first build downloads about 2 GB of Android SDK into the image and
+  # the gradle volume; after that a build takes a minute or two.
+  android-build:
+    profiles: ["build"]
+    build:
+      context: ./android
+      dockerfile: Dockerfile
+    image: burrow-android-build:local
+    # A build helper: no alerts when a build fails (Burrow watches this Docker too).
+    labels:
+      burrow.ignore: "true"
+    user: "${PUID:-1000}:${PGID:-1000}"
+    # Only the signing key's password, from its own file: the build has no
+    # business with the server's secrets, and the server none with this one.
+    env_file: .env.build
+    environment:
+      BURROW_VERSION: ${BURROW_VERSION:-}
+      # The address the app's setup screen suggests.
+      BURROW_ORIGIN: ${BURROW_ORIGIN:-}
+    volumes:
+      - ./android:/project
+      - ./artifacts:/out
+      - android-gradle:/gradle
+    logging: *logging
+

@@ -1,0 +1,1 @@
+Eén menuknop (drie puntjes) bij rijen met meerdere acties: kanalen, gebruikers, snippets, sleutels, telefoons, meldingen, schema's, Proxmox-gasten; lijnen tussen waarschuwingen en AI-gebruik; terminals verbinden sneller via WireGuard.

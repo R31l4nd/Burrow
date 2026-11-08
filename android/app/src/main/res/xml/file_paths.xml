@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Only the folders files are handed out from: opened and shared copies. -->
+<paths>
+    <cache-path name="open" path="open/" />
+    <cache-path name="share" path="share/" />
+    <cache-path name="update" path="update/" />
+    <!-- "All files" (report 862305): a file of the phone's storage or an SD card handed to
+         another app to show (read only), only one the person opened on the Files page. -->
+    <root-path name="storage" path="storage/" />
+</paths>

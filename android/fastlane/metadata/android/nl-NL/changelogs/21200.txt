@@ -1,0 +1,1 @@
+De widget op het startscherm blijft werken als je de app een tijd niet opent; tijden voor rapporten en geplande opdrachten op één manier ingesteld; overal dezelfde statustekens.

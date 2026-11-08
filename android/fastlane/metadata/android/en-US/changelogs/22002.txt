@@ -1,0 +1,1 @@
+The history layer also works with tmux attach in a session without Burrow's tmux. A finger scrolls Claude Code and other full-screen programs at a calmer pace.

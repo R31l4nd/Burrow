@@ -1,0 +1,1 @@
+Eerste publieke release: terminals, bestanden, containers en logs, alerts met push, AI-loganalyse, rapporten, gebruikers en single sign-on, hoststatistieken.

@@ -1,0 +1,66 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "docker:pinDigests", "helpers:pinGitHubActionDigests"],
+  "rangeStrategy": "pin",
+  "lockFileMaintenance": { "enabled": true, "schedule": ["before 6am on monday"] },
+  "packageRules": [
+    { "matchUpdateTypes": ["digest"], "groupName": "image digests", "schedule": ["before 6am on monday"] },
+    {
+      "description": "The Playwright package and its browser image move together, or the browsers do not match.",
+      "matchPackageNames": ["@playwright/test", "mcr.microsoft.com/playwright"],
+      "groupName": "playwright"
+    },
+    {
+      "description": "The image and the dev wrapper (scripts/node.sh) use the same Node: the gate checks it.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["node"],
+      "groupName": "node image"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Images pinned in the scripts (\"name:tag@sha256:...\"): the dev wrapper, e2e, the gate's Trivy and Go, the test helpers.",
+      "managerFilePatterns": ["/^scripts/[^/]+\\.sh$/", "/^android/test/[^/]+\\.sh$/", "/^server/test/sshd/[^/]+\\.sh$/"],
+      "matchStrings": ["\"?(?<depName>[a-z0-9][a-z0-9./-]*):(?<currentValue>[0-9a-z][^@\" ]*)@(?<currentDigest>sha256:[a-f0-9]{64})"],
+      "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "Versions with a '# renovate:' comment above them (the editor tools in the Dockerfile). A new version needs its SHA-256s too: the build fails until then.",
+      "managerFilePatterns": ["/^Dockerfile$/"],
+      "matchStrings": ["# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)( extractVersion=(?<extractVersion>\\S+))?\\nARG [A-Z_]+_VERSION=(?<currentValue>\\S+)"]
+    },
+    {
+      "customType": "regex",
+      "description": "govulncheck in the gate's go step.",
+      "managerFilePatterns": ["/^scripts/gate\\.sh$/"],
+      "matchStrings": ["golang\\.org/x/vuln/cmd/govulncheck@(?<currentValue>v[0-9][^ ']*)"],
+      "depNameTemplate": "golang.org/x/vuln",
+      "datasourceTemplate": "go"
+    },
+    {
+      "customType": "regex",
+      "description": "The Android build image's Go and gomobile (also in docs/fdroid, which the gate compares). Its NDK and command-line tools have no datasource: by hand.",
+      "managerFilePatterns": ["/^android/Dockerfile$/"],
+      "matchStrings": ["ARG GO_VERSION=(?<currentValue>[0-9][0-9.]*)"],
+      "depNameTemplate": "go",
+      "datasourceTemplate": "golang-version"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^android/Dockerfile$/"],
+      "matchStrings": ["ARG GOMOBILE_VERSION=(?<currentValue>v\\S+)"],
+      "depNameTemplate": "golang.org/x/mobile",
+      "datasourceTemplate": "go"
+    },
+    {
+      "customType": "regex",
+      "description": "The Android build image's Gradle; the wrapper (android/gradle/wrapper) is Renovate's own, the gate checks both agree.",
+      "managerFilePatterns": ["/^android/Dockerfile$/"],
+      "matchStrings": ["ARG GRADLE_VERSION=(?<currentValue>[0-9][0-9.]*)"],
+      "depNameTemplate": "gradle",
+      "datasourceTemplate": "gradle-version"
+    }
+  ]
+}

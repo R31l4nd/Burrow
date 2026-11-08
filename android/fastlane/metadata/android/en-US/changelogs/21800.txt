@@ -1,0 +1,1 @@
+Files on the phone: delete, rename and new folder; a delete is asked by the app itself first.

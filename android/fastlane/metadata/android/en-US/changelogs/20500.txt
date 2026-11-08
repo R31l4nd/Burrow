@@ -1,0 +1,1 @@
+Workspace closer to VS Code: a command palette (F1), two files side by side on a wide screen, an outline of the file, the open files' problems in one list, and git changes thrown away, branches switched and changed lines marked against the last commit.

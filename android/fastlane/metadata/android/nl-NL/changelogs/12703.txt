@@ -1,0 +1,1 @@
+Eigen WireGuard instellen met een QR-code; gesplitste terminals met zoom; sessies alleen-lezen delen en op verzoek opnemen; Proxmox VE-gasten; logfilters uit een vraag in woorden; downloads met voortgang; Basic-inloggen in app-tabbladen. De app sluit niet meer als een overdracht meteen na de start eindigt.

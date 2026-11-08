@@ -1,0 +1,52 @@
+{
+  "name": "burrow",
+  "version": "2.20.3",
+  "private": true,
+  "description": "Homelab management from your phone: persistent SSH terminals, files, container logs and AI analysis.",
+  "license": "AGPL-3.0-only",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "workspaces": [
+    "shared",
+    "server",
+    "web",
+    "e2e"
+  ],
+  "scripts": {
+    "build": "npm run build -w @burrow/shared && npm run build -w @burrow/server && npm run build -w @burrow/web",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "npm run typecheck -w @burrow/shared && npm run typecheck -w @burrow/server && npm run typecheck -w @burrow/web",
+    "test": "npm run test -w @burrow/shared && npm run test -w @burrow/server && npm run test -w @burrow/web",
+    "test:int": "npm run test:int -w @burrow/server",
+    "dev:server": "npm run dev -w @burrow/server",
+    "dev:web": "npm run dev -w @burrow/web"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.19.0",
+    "@vitest/coverage-v8": "5.0.5",
+    "eslint": "10.11.0",
+    "eslint-plugin-svelte": "3.23.0",
+    "globals": "17.12.0",
+    "knip": "6.39.0",
+    "otplib": "13.5.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.1",
+    "vitest": "5.0.5"
+  },
+  "allowScripts": {
+    "argon2": false,
+    "better-sqlite3": false,
+    "core-js": false,
+    "cpu-features": false,
+    "esbuild": false,
+    "ssh2": false
+  },
+  "overrides": {
+    "bash-language-server": {
+      "zod": "4.6.7"
+    }
+  },
+  "type": "module"
+}

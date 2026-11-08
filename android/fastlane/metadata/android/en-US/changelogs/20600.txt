@@ -1,0 +1,1 @@
+Ask AI about a file or the selected lines in the editor; the language server message says what it means and connects again; WireGuard apps no longer count deleted apps as chosen.

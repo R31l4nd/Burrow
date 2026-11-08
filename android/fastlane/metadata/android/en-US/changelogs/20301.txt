@@ -1,0 +1,1 @@
+Open files in a workspace can be reordered by dragging a tab or with Ctrl+Shift and an arrow. A problem report's picture covers what files, terminals and logs show unless you choose to include it. The panel under a workspace or stack can type the host's stored password at a sudo prompt.

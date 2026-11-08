@@ -1,0 +1,1 @@
+Instellingen -> Systeem voor wat alleen in het .env-bestand stond; lang drukken op een bestand kiest het alleen; verbeteringen op smalle en gedraaide telefoons.

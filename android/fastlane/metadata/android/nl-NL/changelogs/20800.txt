@@ -1,0 +1,1 @@
+Favoriete mappen op de telefoon bij Bestanden; de details van een container duwen de logs niet meer weg op een liggende telefoon.

@@ -1,0 +1,21 @@
+# Backup container: separate from the application image on purpose - a
+# restore must still work when the application no longer builds.
+FROM alpine:3.22@sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f
+# Which of Burrow's images this is: an untagged one left behind by a build is found by it (scripts/gate.sh, leftovers).
+LABEL burrow.image="backup"
+# cryptography from apk, not pip: Alpine is musl and pip's wheels expect glibc.
+# PKG_DATE (the gate and the deploy pass today's date): the packages are
+# fetched again each day with their fixes, not kept from an old build's cache
+# (a python3 with three fixed HIGH advisories was, AUDIT OP-09).
+ARG PKG_DATE=
+RUN echo "packages of ${PKG_DATE:-the cache}" && apk upgrade --no-cache && apk add --no-cache python3 py3-cryptography sqlite tar
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /app
+COPY scripts/backup /app/scripts/backup
+# Which migrations this Burrow knows: a restore refuses a database from a newer one.
+COPY server/migrations /app/migrations
+RUN chmod 0555 /app/scripts/backup/*
+# The uid compose and the scripts run it as (Burrow's node user, to read the database): a plain
+# docker run is no root either (audit 2026-11).
+USER 1000:1000
+CMD ["/app/scripts/backup/backup.sh", "--loop"]
