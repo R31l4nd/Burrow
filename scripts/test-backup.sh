@@ -56,8 +56,10 @@ docker exec "$APP" cat /data/backup-status.json | grep -q '"ok":false' || { echo
 
 # Back up now, asked by Burrow: the loop takes the request within seconds,
 # not at the end of its interval, and removes it. The last round long ago:
-# the loop's first round is due at once.
-touch -d '2 days ago' "$WORK/backups/.last-success"
+# the loop's first round is due at once. Set as the backup container's user,
+# whose file it is: on CI the runner is not uid 1000 and may not set the time
+# of another user's file (the first CI run on GitHub, 2026-11-08).
+run_backup "$WORK/key" touch -t "$(date -u -d '2 days ago' +%Y%m%d%H%M)" /backups/.last-success
 before="$(ls "$WORK/backups"/burrow-*.tar.gz.enc | wc -l)"
 docker run -d --label burrow.ignore=true --name "$APP-loop" --user 1000:1000 --network none --read-only --tmpfs /tmp \
   -e BACKUP_INTERVAL_SECONDS=86400 -e BACKUP_POLL_SECONDS=1 \
@@ -123,7 +125,8 @@ run_backup "$WORK/key" /app/scripts/backup/backup.sh >/dev/null &
 run_backup "$WORK/key" /app/scripts/backup/backup.sh >/dev/null &
 wait
 [ "$(ls "$WORK/backups"/burrow-*.tar.gz.enc | wc -l)" -eq $((before + 2)) ] || { echo "two rounds at once did not make two archives"; ls -la "$WORK/backups"; exit 1; }
-(cd "$WORK/backups" && for f in burrow-*.tar.gz.enc; do sha256sum -c "$f.sha256" >/dev/null || { echo "checksum does not match: $f"; exit 1; }; done)
+# Read as the backup container's user: the archives are private to it.
+run_backup "$WORK/key" sh -c 'cd /backups && for f in burrow-*.tar.gz.enc; do sha256sum -c "$f.sha256" >/dev/null || { echo "checksum does not match: $f"; exit 1; }; done'
 [ -z "$(ls "$WORK/backups" | grep partial)" ] || { echo "a partial file was left"; exit 1; }
 for f in $(cd "$WORK/backups" && ls -t burrow-*.tar.gz.enc | head -2); do run_backup "$WORK/key" /app/scripts/backup/verify.sh "/backups/$f" >/dev/null || { echo "$f does not verify"; exit 1; }; done
 
@@ -170,7 +173,8 @@ rm -f "$WORK/backups"/bad-*.tar.gz.enc
 # (audit OP-03, OP-04).
 run_backup "$WORK/key" sh -c "sqlite3 /data/burrow.db 'CREATE TABLE after_backup(x)'"
 ODD="burrow it's \$(touch pwned) \`touch pwned2\`.tar.gz.enc"
-cp "$WORK/backups/$ARCHIVE" "$WORK/backups/$ODD"
+# Copied as the backup container's user: archives are its own and private (umask 077).
+run_backup "$WORK/key" cp "/backups/$ARCHIVE" "/backups/$ODD"
 # Run in the backups folder: a name that ran as a command would leave its file there.
 docker run --rm --label burrow.ignore=true --user 1000:1000 --network none --read-only --tmpfs /tmp -w /backups \
   -v "$VOL":/data -v "$WORK/backups":/backups -v "$WORK/key":/run/secrets/backup_encryption_key:ro \
