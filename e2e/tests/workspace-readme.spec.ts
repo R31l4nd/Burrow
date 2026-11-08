@@ -25,11 +25,11 @@ const host = (id: number, name: string, address: string, groupId: number | null,
   id, name, address, groupId, port: null, username: null, authMethod: null, keyId: null, hasPassword: false, startupCommand: null, tmux: null, term: null, encoding: null, tags, color: null, icon: null, favorite: false, lastUsedAt: iso(2 * HOUR), facts: f,
 });
 const HOSTS = [
-  host(901, 'nas', '192.168.1.10', 1, ['storage', 'docker'], facts('Debian GNU/Linux 13 (trixie)')),
-  host(902, 'media', '192.168.1.20', 1, ['docker'], facts('Ubuntu 24.04.3 LTS')),
-  host(903, 'pve', '192.168.1.5', 2, ['proxmox'], facts('Debian GNU/Linux 13 (trixie)', { hasDocker: false, proxmox: true })),
-  host(904, 'pihole', '192.168.1.3', 2, ['dns'], facts('Raspbian GNU/Linux 12 (bookworm)', { hasDocker: false })),
-  host(905, 'backup-box', '192.168.1.30', null, ['offsite'], facts('Alpine Linux v3.22', { hasDocker: false, shell: '/bin/ash' })),
+  host(901, 'nas', '10.0.0.10', 1, ['storage', 'docker'], facts('Debian GNU/Linux 13 (trixie)')),
+  host(902, 'media', '10.0.0.20', 1, ['docker'], facts('Ubuntu 24.04.3 LTS')),
+  host(903, 'pve', '10.0.0.5', 2, ['proxmox'], facts('Debian GNU/Linux 13 (trixie)', { hasDocker: false, proxmox: true })),
+  host(904, 'pihole', '10.0.0.3', 2, ['dns'], facts('Raspbian GNU/Linux 12 (bookworm)', { hasDocker: false })),
+  host(905, 'backup-box', '10.0.0.30', null, ['offsite'], facts('Alpine Linux v3.22', { hasDocker: false, shell: '/bin/ash' })),
 ];
 const GROUPS = [
   { id: 1, name: 'Home', parentId: null, defaults: { username: 'admin' }, sort: 0 },
@@ -188,7 +188,7 @@ function logLines(): { i: number; s: 'o' | 'e'; ts: string; text: string }[] {
     [0, '[INF] Playback stopped after 41 minutes'],
     [2, 'Removed 3 finished torrents'],
     [1, '[Error] DownloadClient qBittorrent: Connection refused, retrying in 30s'],
-    [2, 'WebUI: login from 192.168.1.42'],
+    [2, 'WebUI: login from 10.0.0.42'],
     [1, '[Info] DownloadClient qBittorrent: connected again'],
     [0, '[INF] Library scan finished: 1 new item'],
   ];

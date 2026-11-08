@@ -110,7 +110,7 @@ describe('push', () => {
 
 describe('models', () => {
   it('knows which servers are on this network', () => {
-    for (const u of ['http://ollama:11434', 'http://localhost:8000/v1', 'http://192.168.1.10:11434', 'http://nas.local:1', 'http://[::1]:8000']) expect(isLocalUrl(u), u).toBe(true);
+    for (const u of ['http://ollama:11434', 'http://localhost:8000/v1', 'http://10.0.0.20:11434', 'http://nas.local:1', 'http://[::1]:8000']) expect(isLocalUrl(u), u).toBe(true);
     for (const u of ['https://api.openai.com/v1', 'https://llm.example.com', 'http://8.8.8.8']) expect(isLocalUrl(u), u).toBe(false);
     // A public IPv6 address has no dot, and a name may start like a private address: neither is local.
     for (const u of ['https://[2001:4860:4860::8888]', 'https://10.public.example', 'https://192.168.attacker.example', 'http://172.16.example.com']) expect(isLocalUrl(u), u).toBe(false);

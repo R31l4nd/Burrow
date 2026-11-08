@@ -79,7 +79,7 @@ describe('image references', () => {
       return new Response(null, { status: 200, headers: { 'docker-content-digest': D2 } });
     };
     // Inside Burrow's networks, another scheme, another domain: never asked.
-    for (const realm of ['http://socket-proxy:2375/containers/json', 'https://192.168.1.10/admin', 'file:///etc/passwd', 'https://evil.example/token', 'http://ghcr.io/token']) {
+    for (const realm of ['http://socket-proxy:2375/containers/json', 'https://10.0.0.20/admin', 'file:///etc/passwd', 'https://evil.example/token', 'http://ghcr.io/token']) {
       asked.length = 0;
       await expect(remoteDigest(parseImageRef('ghcr.io/a/b:1')!, { fetch: registry(realm) }), realm).rejects.toThrow(/token service Burrow does not ask/);
       expect(asked, realm).toEqual(['https://ghcr.io/v2/a/b/manifests/1']);

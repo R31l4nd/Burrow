@@ -78,7 +78,7 @@ const MASKS: [RegExp, string][] = [
   [/\bxapp-[\w-]{10,}\b/g, '<secret>'],
   // An e-mail address with a password after it (user@example.com:pw): the password too.
   [/(\b[\w.+-]+@(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}):(?!\d+\b)(?!\/)[^\s@]+/g, '$1:<secret>'],
-  // E-mail addresses: a name ending in letters, so a login at an address (debian@192.168.1.10) is not one.
+  // E-mail addresses: a name ending in letters, so a login at an address (debian@10.0.0.20) is not one.
   [/\b[\w.+-]+@(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}\b/g, '<email>'],
   // Long random-looking strings (hex or base64 of 32+ characters).
   [/\b[A-Fa-f0-9]{40,}\b/g, '<hex>'],

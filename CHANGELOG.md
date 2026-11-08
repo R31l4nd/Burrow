@@ -81,18 +81,22 @@ says how it was verified.
   notices through the channels, the heartbeat) and of the master key
   check against what Burrow seals; the gate; the Android test; a fresh
   install.
+- Example addresses in the docs, tests and README pictures are no
+  machine's real ones (10.0.0.x); the pictures made again.
 - The image's tool stage built without cache while GitHub's release
   downloads answered 504: ShellCheck came through the API with its
   pinned SHA-256; CI's gate on GitHub built and tested the whole image.
 
 ## [2.20.3] - 2026-11-08
 
-The first release on GitHub (https://github.com/R31l4nd/Burrow).
+Made for GitHub (https://github.com/R31l4nd/Burrow); not tagged there,
+as GitHub's release downloads failed its image build. 2.21.0 is the first
+release built there.
 
 ### Breaking
 
-- The Android app has a new id, `io.github.r31l4nd.burrow` (it was
-  `cc.steeghs.burrow`). Android sees it as another app: install this one,
+- The Android app has a new id, `io.github.r31l4nd.burrow`. Android
+  sees it as another app: install this one,
   pair it with Burrow again, then uninstall the old one. Passkeys inside
   the app follow the new id by themselves.
 
@@ -1317,7 +1321,7 @@ The review's last points (2026-10-24):
   under the pointer in a tooltip beside it, chosen by time so a gap in the
   samples does not shift it (report af0eec).
 - Burrow's own warnings no longer keep refused requests (a step-up asked,
-  a page not found); a login at an address (`user@192.168.1.10`) is no
+  a page not found); a login at an address (`user@10.0.0.20`) is no
   longer masked as an e-mail address.
 
 ### Fixed
@@ -4714,7 +4718,7 @@ Phase 4: the Android app, and app tabs.
 
 ### Fixed
 
-- **Files: host name and address ran together** ("Debian192.168.1.10") in
+- **Files: host name and address ran together** ("Debian10.0.0.20") in
   the host picker; they are on two lines again, as in every other list.
 - **"step up required" after confirming with a passkey.** Two requests that
   needed a confirmation at once (a double tap on a host, for one) each

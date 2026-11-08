@@ -9,7 +9,7 @@ describe('masking addresses for a model outside the network', () => {
     expect(maskText(line, { ips: false })).toBe(line);
   });
 
-  it('a login at an address is no e-mail address: user@192.168.1.10 keeps its user, the address masked as one', () => {
+  it('a login at an address is no e-mail address: user@10.0.0.20 keeps its user, the address masked as one', () => {
     expect(maskText('ssh debian@192.168.1.20:22 failed: unreachable', { ips: false })).toBe('ssh debian@192.168.1.20:22 failed: unreachable');
     expect(maskText('ssh debian@192.168.1.20:22 failed: unreachable', { ips: true })).toBe('ssh debian@<ip>:22 failed: unreachable');
     expect(maskText('mail to alex@example.com bounced', { ips: false })).toBe('mail to <email> bounced');

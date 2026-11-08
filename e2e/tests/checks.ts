@@ -28,7 +28,7 @@ export async function accessible(page: Page, where: string) {
 }
 
 /**
- * Titles and subtitles in lists never run together ("Debian192.168.1.10"):
+ * Titles and subtitles in lists never run together ("Debian10.0.0.20"):
  * two lines in a list, or two columns apart in a row laid out as a table
  * (a grid, on a wide screen).
  */

@@ -166,12 +166,12 @@ burrow.home.example.com {
 }
 CADDY
 docker run -d --name caddy --restart unless-stopped --network proxy \
-  -p 192.168.1.10:443:443 -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" \
+  -p 10.0.0.20:443:443 -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" \
   -v caddy-data:/data caddy:2
 docker compose up -d --build
 ```
 
-Put the machine's LAN address in place of `192.168.1.10`, make
+Put the machine's LAN address in place of `10.0.0.20`, make
 `burrow.home.example.com` point at it in your LAN's DNS, and set
 `TRUST_PROXY` to the `proxy` network's subnet as above (then
 `docker compose up -d`). Each device then

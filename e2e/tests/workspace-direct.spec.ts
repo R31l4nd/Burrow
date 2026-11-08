@@ -29,7 +29,7 @@ async function openDirect(page: Page, prefs: Record<string, string>) {
     const cache = {
       generatedAt: new Date(Date.now() - 3_600_000).toISOString(),
       deviceId: 1,
-      hosts: [host(1, 'nas', '192.168.1.10', true), host(2, 'pve-node-with-a-rather-long-name', '192.168.1.11'), host(3, 'pi', '192.168.1.12')],
+      hosts: [host(1, 'nas', '10.0.0.20', true), host(2, 'pve-node-with-a-rather-long-name', '192.168.1.11'), host(3, 'pi', '192.168.1.12')],
       snippets: [{ id: 1, name: 'Disk space', command: 'df -h', description: null, hostId: null, groupId: null }],
       groups: [],
     };

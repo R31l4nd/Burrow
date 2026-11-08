@@ -829,7 +829,7 @@ Install it from *Settings -> Android app*. The app:
   (`nas.lan`, Burrow's own) is looked up only through the tunnel's DNS (the
   configuration's `DNS =` line, your home's DNS server), never through the
   network the phone is on, which could send the request elsewhere: without
-  that line, give addresses (`192.168.1.10`) instead of names;
+  that line, give addresses (`10.0.0.20`) instead of names;
 - puts your favourite hosts on the icon: long-press it;
 - types into the terminal character by character, without suggestions or
   corrections (as Termux does); the text box keeps them;
