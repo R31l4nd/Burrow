@@ -9,6 +9,7 @@ import type { SftpPool } from '../files/pool.js';
 import type { DockerMonitor } from '../docker/monitor.js';
 import { EVENTS_COMMAND, EventJudge, parseEvent } from './events.js';
 import { linearMatcher } from '../linear.js';
+import { Jobs } from '../jobs.js';
 import type { Notifier } from '../notify/channels.js';
 import { endsWithChannel, exec } from '../ssh/connect.js';
 import { shellQuote } from '../ssh/quote.js';
@@ -22,6 +23,11 @@ import { throwaway } from './throwaway.js';
 
 const RECONCILE_MS = 60_000;
 const RETRY_MS = 10_000;
+/** Longest wait between connects to a host that keeps failing them. */
+const RETRY_MAX_MS = 30 * 60_000;
+/** Refused for who Burrow is or what the host's key is: not better in seconds, and each try is a failed login to fail2ban. */
+const REFUSED_RETRY_MS = 5 * 60_000;
+const REFUSED = new Set(['auth_failed', 'unknown_host_key', 'host_key_mismatch']);
 const BUNDLE_MS = 10 * 60_000;
 /** Longest line looked at (bytes of text). */
 export const MAX_LINE = 64 * 1024;
@@ -52,6 +58,17 @@ export function toRule(r: typeof alertRules.$inferSelect): AlertRule {
   };
 }
 
+/**
+ * How long to wait before connecting again after `failures` failed connects in a row: from ten
+ * seconds (five minutes when the host refused Burrow itself), doubled each time up to half an hour,
+ * a little spread. Every ten seconds, a wrong password got Burrow banned by fail2ban within minutes,
+ * terminals and files with it, and a host that was off filled the log.
+ */
+export function retryAfter(failures: number, code: string | undefined, random: () => number = Math.random): number {
+  const first = code && REFUSED.has(code) ? REFUSED_RETRY_MS : RETRY_MS;
+  return Math.min(RETRY_MAX_MS, Math.round(first * 2 ** Math.max(0, failures - 1) * (1 + random() * 0.1)));
+}
+
 /** Does a rule cover this container? */
 export function covers(r: AlertRule, hostId: number, container: string, project: string | null): boolean {
   return (r.hostId === null || r.hostId === hostId) && (!r.container || r.container === container) && (!r.project || r.project === project);
@@ -70,6 +87,15 @@ interface Followed {
 
 export interface EngineOptions {
   reconcileMs?: number;
+  /** The spread of the waits between connects (tests: none). */
+  random?: () => number;
+}
+
+/** A host whose connects fail: how many in a row, and the wait before the next one (shared by its streams). */
+interface Down {
+  failures: number;
+  wait: Promise<void>;
+  waiting: boolean;
 }
 
 export class AlertEngine {
@@ -85,6 +111,9 @@ export class AlertEngine {
   #stopped = false;
   /** Called after an alert is stored (tests wait on it). */
   onAlert: ((a: Alert) => void) | null = null;
+  /** Where a host's failed connects are said, once per change (the app's, or one of its own). */
+  jobs: Jobs | null = null;
+  readonly #down = new Map<number, Down>();
 
   /** A stack Burrow is working on (OpRunner.quiet): its containers raise no alerts meanwhile. */
   quiet: ((hostId: number, project: string) => boolean) | null = null;
@@ -193,7 +222,7 @@ export class AlertEngine {
       s.stop();
       this.#events.delete(id);
     }
-    for (const id of wantEvents) if (!this.#events.has(id)) this.#events.set(id, this.#stream(id, EVENTS_COMMAND, (line) => this.onEvent(id, line)));
+    for (const id of wantEvents) if (!this.#events.has(id)) this.#events.set(id, this.#stream(id, 'events', EVENTS_COMMAND, (line) => this.onEvent(id, line)));
     // Log followers: per host one stream for all it follows, the
     // containers' own output and their log files (and the host's for a rule
     // on the whole host), so a host with many containers does not run out
@@ -210,11 +239,15 @@ export class AlertEngine {
     // and started again without the containers, then with them once more, at tail 0: what the
     // containers logged in between was never looked at (audit 2026-11-05).
     const unread = new Set<number>();
-    for (const h of this.#allHosts()) {
+    const all = this.#allHosts();
+    // A host deleted while it waited: forgotten.
+    for (const id of this.#down.keys()) if (!all.some((h) => h.id === id)) this.#down.delete(id);
+    for (const h of all) {
       if (!logRules.some((r) => r.hostId === null || r.hostId === h.id)) continue;
       const list: Followed[] = [];
       if (docker.has(h.id)) {
-        const snap = await this.monitor.poll(h.id).catch(() => null);
+        // A host waiting out failed connects is not asked every minute here either.
+        const snap = this.#down.get(h.id)?.waiting ? null : await this.monitor.poll(h.id).catch(() => null);
         if (!snap || snap.error) unread.add(h.id);
         if (snap && !snap.error) {
           const running = snap.containers.filter((c) => c.state === 'running' && !c.ignored && !throwaway(c.name, c.project) && logRules.some((r) => covers(r, h.id, c.name, c.project)));
@@ -249,6 +282,7 @@ export class AlertEngine {
       let read = scriptLines();
       const stream = this.#stream(
         hostId,
+        'logs',
         async (client) => ((read = scriptLines()), logsScript(await Promise.all(list.map(async (x, i) => ({ i, command: x.file ? await fileTailCommand(client, { container: x.container, file: x.file }, opts) : logsCommand(x.container, opts) }))))),
         (raw) => {
           const l = read(raw);
@@ -274,18 +308,34 @@ export class AlertEngine {
     }
   }
 
-  /** A long-running command on a host, line by line; started again when it ends. */
-  #stream(hostId: number, command: string | ((client: Client) => Promise<string>), onLine: (line: string) => void): Stream {
+  /**
+   * A long-running command on a host, line by line; started again when it ends, and after a
+   * failed connect only once the host's wait is over (retryAfter). Failures are said once per
+   * change (Jobs), not at every try.
+   */
+  #stream(hostId: number, label: string, command: string | ((client: Client) => Promise<string>), onLine: (line: string) => void): Stream {
     let stopped = false;
     let close: (() => void) | null = null;
+    const done = () => stopped || this.#stopped;
     const run = async () => {
-      while (!stopped && !this.#stopped) {
+      while (!done()) {
+        await this.#down.get(hostId)?.wait;
+        if (done()) break;
+        let connected = false;
         try {
-          await this.pool.with(hostId, async ({ client }) => this.#lines(client, typeof command === 'string' ? command : await command(client), onLine, (c) => (close = c), () => stopped || this.#stopped));
+          await this.pool.with(hostId, async ({ client }) => {
+            connected = true;
+            this.#up(hostId);
+            return this.#lines(client, typeof command === 'string' ? command : await command(client), onLine, (c) => ((close = c), this.#told().fine('alerts', `${this.#hostName(hostId)} ${label}`, { hostId })), done);
+          });
         } catch (err) {
-          this.ctx.log.warn({ hostId }, `alerts: stream failed: ${(err as Error).message}`);
+          if (!connected) {
+            this.#failedConnect(hostId, err as Error & { code?: unknown });
+            continue;
+          }
+          this.#told().failed('alerts', `${this.#hostName(hostId)} ${label}`, `stream failed: ${(err as Error).message}`, { hostId });
         }
-        if (stopped || this.#stopped) break;
+        if (done()) break;
         await new Promise((r) => setTimeout(r, RETRY_MS).unref());
       }
     };
@@ -296,6 +346,54 @@ export class AlertEngine {
         close?.();
       },
     };
+  }
+
+  #told(): Jobs {
+    return (this.jobs ??= new Jobs(this.ctx));
+  }
+
+  #hostName(hostId: number): string {
+    return this.ctx.db.select({ name: hosts.name }).from(hosts).where(eq(hosts.id, hostId)).get()?.name ?? String(hostId);
+  }
+
+  /** Connected: the host's wait is over, and its failure, if one was said, is said to be over. */
+  #up(hostId: number): void {
+    if (!this.#down.delete(hostId)) return;
+    this.#told().fine('alerts', this.#hostName(hostId), { hostId });
+  }
+
+  /** A connect failed: the host waits longer before the next one. Its other stream failing on the same try (the pool's shared connect) adds no wait. */
+  #failedConnect(hostId: number, err: Error & { code?: unknown }): void {
+    const was = this.#down.get(hostId);
+    if (was?.waiting) return;
+    const code = typeof err.code === 'string' ? err.code : undefined;
+    const down: Down = { failures: (was?.failures ?? 0) + 1, wait: Promise.resolve(), waiting: true };
+    const ms = retryAfter(down.failures, code, this.opts.random);
+    down.wait = this.#waitOut(hostId, down, ms).finally(() => (down.waiting = false));
+    this.#down.set(hostId, down);
+    this.#told().failed('alerts', this.#hostName(hostId), `cannot connect (${err.message}); trying again less often while it lasts, at most every ${RETRY_MAX_MS / 60_000} min`, { hostId });
+  }
+
+  /** The wait, ended early when what a connect is made with changed (another password, key or trust: worth a try now) or the engine stopped. */
+  async #waitOut(hostId: number, down: Down, ms: number): Promise<void> {
+    const identity = this.#identity(hostId);
+    for (let left = ms; left > 0; left -= RETRY_MS) {
+      await new Promise((r) => setTimeout(r, Math.min(left, RETRY_MS)).unref());
+      if (this.#stopped || this.#down.get(hostId) !== down) return;
+      if (this.#identity(hostId) !== identity) {
+        this.#down.delete(hostId);
+        return;
+      }
+    }
+  }
+
+  #identity(hostId: number): string | null {
+    try {
+      return this.pool.identity(hostId);
+    } catch {
+      // The host gone meanwhile: its streams are stopped by the next round.
+      return null;
+    }
   }
 
   #lines(client: Client, command: string, onLine: (line: string) => void, setClose: (c: () => void) => void, cancelled: () => boolean): Promise<void> {

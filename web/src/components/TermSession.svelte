@@ -133,6 +133,8 @@
       },
       alt: (on) => (altScreen = on),
       history: (answer) => v.showHistory(answer),
+      // A recording that stopped by itself (its size limit): the owner's checkbox and dot follow at once (2026-11-07).
+      recording: (on) => (terms.list = terms.list.map((x) => (x.id === id ? { ...x, recording: on } : x))),
       notice: (code) => toast(code === 'password_sent' ? t('term.passwordSent') : code === 'password_refused' ? t('term.passwordRefused') : t('term.noPassword'), code === 'password_sent' ? 'info' : 'error'),
       state(s, message) {
         connState = s;

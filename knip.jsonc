@@ -10,7 +10,8 @@
     "shared": {},
     "server": {
       // The test hosts' Docker filter is run as a program (scripts/docker-lib.sh).
-      "entry": ["test/**/*.ts", "test/sshd/*.mjs"],
+      // The console admin invite (docs/DEPLOY.md, Locked out): run in the container, never imported.
+      "entry": ["test/**/*.ts", "test/sshd/*.mjs", "src/invite-admin.ts"],
       // Started as programs by the editor's language servers (src/lsp), never imported.
       "ignoreDependencies": ["bash-language-server", "dockerfile-language-server-nodejs", "vscode-langservers-extracted", "yaml-language-server"]
     },

@@ -62,6 +62,35 @@ describe('the five-minute CPU check', () => {
   });
 });
 
+describe('a host that never answers (OPS-W-06)', () => {
+  it('no longer holds the round: the others are sampled again, the hung one is not asked again on top', async () => {
+    const { Jobs } = await import('../../src/jobs.js');
+    const { STATS_HOST_MS } = await import('../../src/hosts/stats.js');
+    const hung = await t.json<Host>('POST', '/api/hosts', { name: 'hung', address: 'hung.lan', username: 'me' });
+    const fine = await t.json<Host>('POST', '/api/hosts', { name: 'fine', address: 'fine.lan', username: 'me' });
+    for (const h of [hung, fine]) t.ctx.db.update(hosts).set({ facts: JSON.stringify({ checkedAt: new Date(t.clock.now).toISOString() }) }).where(eq(hosts.id, h.id)).run();
+    const s = new HostStatsService(t.ctx, {} as never);
+    s.jobs = new Jobs(t.ctx);
+    const warn = vi.spyOn(t.ctx.log, 'warn');
+    const asked: number[] = [];
+    // The hung host's sample never ends (a stale NFS home under its SSH, say).
+    s.sample = (id) => (asked.push(id), id === hung.id ? new Promise(() => {}) : Promise.resolve({} as never));
+    s.smart = async () => ({}) as never;
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      let ended = false;
+      void s.tick().then(() => (ended = true));
+      await vi.advanceTimersByTimeAsync(STATS_HOST_MS + 1000);
+      expect(ended).toBe(true);
+      await s.tick();
+      expect(asked).toEqual([hung.id, fine.id, fine.id]);
+      expect(warn.mock.calls.filter((c) => String(c.at(-1)).includes('hung: no answer in 4 min'))).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe('a disk asleep at a SMART check (decision 5)', () => {
   it('is not woken: smartctl -n standby; its last reading stands, said from when, and no trouble from it', async () => {
     const { smartCommand } = await import('../../src/hosts/stats.js');

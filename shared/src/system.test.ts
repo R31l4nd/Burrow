@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseRegistryEndpoints, systemSettingsInput } from './system.js';
 
-const none = { terminalMaxSessions: null, terminalIdleMinutes: null, statusIntervalSeconds: null, updateCheckExclude: null, registryEndpoints: null, appsBaseDomain: null };
+const none = { terminalMaxSessions: null, terminalIdleMinutes: null, statusIntervalSeconds: null, updateCheckExclude: null, registryEndpoints: null, appsBaseDomain: null, heartbeatUrl: null };
 
 describe('Settings -> System', () => {
   it('registries: name=address pairs, comma separated; anything else is not one', () => {

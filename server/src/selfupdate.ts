@@ -226,7 +226,12 @@ export async function findTarget(ctx: Ctx, docker: DockerMonitor, me: string | n
 /** How long "Burrow's own container was not found" holds before the hosts are read again. */
 const NOT_FOUND_MS = 5 * 60_000;
 
-export function registerSelfUpdateRoutes(app: FastifyInstance, ctx: Ctx, docker: DockerMonitor, pool: SftpPool): void {
+/** Burrow's own update check, for the routes and the self-watch: null when its container is not found. */
+export interface SelfUpdates {
+  check(): Promise<UpdateCheck | null>;
+}
+
+export function registerSelfUpdateRoutes(app: FastifyInstance, ctx: Ctx, docker: DockerMonitor, pool: SftpPool): SelfUpdates {
   let target: UpdateTarget | null = null;
   // Not found is kept a while too (for the same hosts): every visit of Settings read every Docker host again (OPS-W-11).
   let missed: { at: number; hosts: string } | null = null;
@@ -239,11 +244,15 @@ export function registerSelfUpdateRoutes(app: FastifyInstance, ctx: Ctx, docker:
     return target;
   };
 
-  app.get('/api/system/update', async (): Promise<UpdateCheck> => {
+  const checkNow = async (): Promise<UpdateCheck | null> => {
     const t = await locate();
-    if (!t) return { target: null, running: SERVER_VERSION, mode: null, available: null, behind: null, subject: null, last: null, problem: 'not_found', breaking: [] };
+    if (!t) return null;
     const r = await pool.with(t.hostId, ({ client }) => exec(client, checkScript(t.dir), 60_000));
     return { target: t, running: SERVER_VERSION, ...readCheck(r) };
+  };
+
+  app.get('/api/system/update', async (): Promise<UpdateCheck> => {
+    return (await checkNow()) ?? { target: null, running: SERVER_VERSION, mode: null, available: null, behind: null, subject: null, last: null, problem: 'not_found', breaking: [] };
   });
 
   // Replaces what runs everything: confirmed as the person first (AUDIT2 AUTH-09).
@@ -264,4 +273,5 @@ export function registerSelfUpdateRoutes(app: FastifyInstance, ctx: Ctx, docker:
     audit(ctx, actor(req), 'burrow.update', host.name, { from: SERVER_VERSION, to: check.available, dir: t.dir });
     return { started: true, from: SERVER_VERSION };
   });
+  return { check: checkNow };
 }

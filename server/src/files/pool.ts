@@ -11,6 +11,11 @@ import { storedKeys } from '../ssh/knownhosts.js';
 // sessions: browsing files needs no open shell.
 
 const IDLE_MS = 60_000;
+/**
+ * Longest a connection may take to be of use, SFTP and its home included. A home on an NFS
+ * mount gone stale hung `realpath('.')` for good, and every call for the host waited on it.
+ */
+export const CONNECT_MS = 30_000;
 
 interface Opened {
   client: Client;
@@ -31,12 +36,18 @@ interface Slot {
   identity: string;
 }
 
-async function openSftp(ctx: Ctx, hostId: number): Promise<Opened> {
+async function openSftp(ctx: Ctx, hostId: number, signal: AbortSignal): Promise<Opened> {
   const conn = await openSsh(ctx, resolveTarget(ctx, hostId));
   if (!('client' in conn)) {
     throw new HttpError(conn.status === 'auth_failed' ? 401 : 502, conn.status, 'message' in conn ? conn.message : `host key: ${conn.status}`);
   }
   const client = conn.client;
+  // Out of time (the pool gave up on it): ended, so a hung SFTP start or realpath goes with it.
+  if (signal.aborted) {
+    client.end();
+    throw new HttpError(504, 'connect_timeout', 'The host did not get ready in time.');
+  }
+  signal.addEventListener('abort', () => client.end(), { once: true });
   const sftp = await new Promise<SFTPWrapper>((resolve, reject) => client.sftp((err, s) => (err ? reject(err) : resolve(s)))).catch((err: Error) => {
     client.end();
     throw new HttpError(502, 'sftp_unavailable', `SFTP is not available on this host: ${err.message}`);
@@ -61,12 +72,33 @@ function identityOf(ctx: Ctx, hostId: number): string {
 
 export class SftpPool {
   readonly #conns = new Map<number, Slot>();
-  readonly #connect: (hostId: number) => Promise<Opened>;
+  readonly #connect: (hostId: number, signal: AbortSignal) => Promise<Opened>;
   readonly #identity: (hostId: number) => string;
 
-  constructor(ctx: Ctx, deps: { connect?: (hostId: number) => Promise<Opened>; identity?: (hostId: number) => string } = {}) {
-    this.#connect = deps.connect ?? ((id) => openSftp(ctx, id));
+  constructor(ctx: Ctx, deps: { connect?: (hostId: number, signal: AbortSignal) => Promise<Opened>; identity?: (hostId: number) => string } = {}) {
+    this.#connect = deps.connect ?? ((id, signal) => openSftp(ctx, id, signal));
     this.#identity = deps.identity ?? ((id) => identityOf(ctx, id));
+  }
+
+  /** What a connection to the host is made with now (see identityOf): changed, a connection that failed may succeed. */
+  identity(hostId: number): string {
+    return this.#identity(hostId);
+  }
+
+  /** The host's connection made, in time: one not of use in CONNECT_MS is ended and failed, so the next call tries again. */
+  #connectInTime(hostId: number): Promise<Opened> {
+    const abort = new AbortController();
+    let timer: NodeJS.Timeout | undefined;
+    const late = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        abort.abort();
+        reject(new HttpError(504, 'connect_timeout', `The host did not get ready in ${CONNECT_MS / 1000} s (SSH, SFTP and the home folder).`));
+      }, CONNECT_MS);
+    });
+    const opening = this.#connect(hostId, abort.signal);
+    // Made after all, once given up on: nobody has it, so it is ended.
+    void opening.then((o) => abort.signal.aborted && o.client.end(), () => {});
+    return Promise.race([opening, late]).finally(() => clearTimeout(timer));
   }
 
   /** Forget the slot only while it is still this one: a replacement stays (audit BE-19). */
@@ -76,7 +108,7 @@ export class SftpPool {
 
   #open(hostId: number, identity: string): Slot {
     const slot: Slot = { identity, entry: null as unknown as Promise<Entry> };
-    slot.entry = this.#connect(hostId).then((o) => {
+    slot.entry = this.#connectInTime(hostId).then((o) => {
       const entry: Entry = { ...o, timer: null, users: 0 };
       // A dropped connection is forgotten, so the next call opens a new one.
       const gone = () => {

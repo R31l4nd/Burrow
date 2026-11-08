@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Host } from '@burrow/shared';
 import { eq } from 'drizzle-orm';
-import { AlertEngine, lineSplitter, MAX_LINE } from '../../src/alerts/engine.js';
+import { AlertEngine, lineSplitter, MAX_LINE, retryAfter } from '../../src/alerts/engine.js';
 import { alertCounts, alertMutes, alerts } from '../../src/db/schema.js';
 import { makeApp, setupAdmin, type TestApp } from '../helpers.js';
 
@@ -214,6 +214,113 @@ describe('the log followers of a host', () => {
     await new Promise((r) => setTimeout(r, 20));
     // Whatever the slow round started, the round after it stopped again.
     expect(n.closed).toBe(n.started);
+    e.stop();
+  });
+});
+
+describe('a host that does not let Burrow in', () => {
+  /** A pool whose connects fail as `fail` says (null: connected, a stream that stays open); how many were tried, and when. */
+  function failing(fail: () => { code: string; message: string } | null, identity: () => string = () => 'same') {
+    const tries: number[] = [];
+    const open: EventEmitter[] = [];
+    let elapsed = 0;
+    const pool = {
+      identity,
+      with: async (_h: number, fn: (c: { client: unknown }) => unknown) => {
+        tries.push(elapsed);
+        const f = fail();
+        if (f) throw Object.assign(new Error(f.message), { code: f.code });
+        return fn({ client: { exec: (_cmd: string, cb: (e: null, ch: unknown) => void) => cb(null, open[open.push(Object.assign(new EventEmitter(), { stderr: new EventEmitter(), close: () => {} })) - 1]) } });
+      },
+    };
+    return { pool, tries, open, now: () => elapsed, tick: (ms: number) => (elapsed += ms) };
+  }
+  async function watched(pool: unknown) {
+    const { hosts } = await import('../../src/db/schema.js');
+    t.ctx.db.update(hosts).set({ facts: JSON.stringify({ hasDocker: true }) }).run();
+    const e = new AlertEngine(t.ctx, pool as never, { poll: async () => ({ error: 'down', containers: [] }) } as never, { notify, lang: () => 'en' } as never, { random: () => 0 });
+    await e.reconcile();
+    return e;
+  }
+  async function wait(f: { tick: (ms: number) => void }, minutes: number) {
+    for (let s = 0; s < minutes * 6; s++) {
+      f.tick(10_000);
+      await vi.advanceTimersByTimeAsync(10_000);
+    }
+  }
+  afterEach(() => vi.useRealTimers());
+
+  it('waits longer after each failed connect: ten seconds doubled up to half an hour, five minutes first when refused (fail2ban)', () => {
+    expect([1, 2, 3, 4, 8, 9, 20].map((n) => retryAfter(n, 'unreachable', () => 0) / 1000)).toEqual([10, 20, 40, 80, 1280, 1800, 1800]);
+    expect([1, 2, 3, 4].map((n) => retryAfter(n, 'auth_failed', () => 0) / 60_000)).toEqual([5, 10, 20, 30]);
+    expect(retryAfter(1, 'host_key_mismatch', () => 0)).toBe(5 * 60_000);
+    // Spread a little, never past the longest wait.
+    expect(retryAfter(1, 'unreachable', () => 1)).toBe(11_000);
+    expect(retryAfter(30, 'unreachable', () => 1)).toBe(30 * 60_000);
+  });
+
+  it('a wrong password is tried again after 5, 10, 20, 30 minutes, not every ten seconds, and said once', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const f = failing(() => ({ code: 'auth_failed', message: 'The host rejected the credentials.' }));
+    const warn = vi.spyOn(t.ctx.log, 'warn');
+    const e = await watched(f.pool);
+    await wait(f, 70);
+    e.stop();
+    expect(f.tries.map((ms) => ms / 60_000)).toEqual([0, 5, 15, 35, 65]);
+    expect(warn.mock.calls.filter((c) => String(c.at(-1)).includes('rejected the credentials'))).toHaveLength(1);
+  });
+
+  it('a host that is off is tried less and less often; once it answers, the next failure starts from ten seconds again', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    let down = true;
+    const f = failing(() => (down ? { code: 'unreachable', message: 'connect EHOSTUNREACH' } : null));
+    const info = vi.spyOn(t.ctx.log, 'info');
+    const e = await watched(f.pool);
+    await wait(f, 10);
+    expect(f.tries.map((ms) => ms / 1000)).toEqual([0, 10, 30, 70, 150, 310]);
+    down = false;
+    await wait(f, 11);
+    expect(f.tries).toHaveLength(7);
+    expect(info.mock.calls.filter((c) => String(c.at(-1)).includes('h: fine again'))).toHaveLength(1);
+    // Off again: its stream ends, and the waits start over.
+    down = true;
+    const at = f.now();
+    f.open.at(-1)!.emit('close');
+    await wait(f, 1);
+    expect(f.tries.slice(7).map((ms) => (ms - at) / 1000)).toEqual([10, 20, 40]);
+    e.stop();
+  });
+
+  it('its two streams, Docker events and the logs followed, wait together: one try for both, not a wait each', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const { alertRules } = await import('../../src/db/schema.js');
+    t.ctx.db.insert(alertRules).values({ name: 'errors', kind: 'pattern', hostId: null, container: null, project: null, events: '[]', pattern: 'ERROR', threshold: null, windowMinutes: null, enabled: true, builtin: false, createdAt: t.clock.now } as typeof alertRules.$inferInsert).run();
+    const f = failing(() => ({ code: 'unreachable', message: 'connect EHOSTUNREACH' }));
+    const { hosts } = await import('../../src/db/schema.js');
+    t.ctx.db.update(hosts).set({ facts: JSON.stringify({ hasDocker: true }) }).run();
+    const polls: number[] = [];
+    const monitor = { poll: async () => (polls.push(0), { error: null, containers: [{ id: 'c1', name: 'web', state: 'running', project: null }] }) };
+    const e = new AlertEngine(t.ctx, f.pool as never, monitor as never, { notify, lang: () => 'en' } as never, { random: () => 0 });
+    await e.reconcile();
+    await wait(f, 1);
+    // The logs' stream starts while the events' first try has failed already: it waits from the start.
+    expect(f.tries.map((ms) => ms / 1000)).toEqual([0, 10, 10, 30, 30]);
+    // A round meanwhile does not ask the waiting host for its containers either.
+    await e.reconcile();
+    expect(polls).toHaveLength(1);
+    e.stop();
+  });
+
+  it('another password or key for the host is tried within ten seconds, whatever the wait was', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    let who = 'old password';
+    const f = failing(() => (who === 'old password' ? { code: 'auth_failed', message: 'The host rejected the credentials.' } : null), () => who);
+    const e = await watched(f.pool);
+    await wait(f, 1);
+    expect(f.tries).toHaveLength(1);
+    who = 'new password';
+    await wait(f, 1 / 6);
+    expect(f.tries).toHaveLength(2);
     e.stop();
   });
 });

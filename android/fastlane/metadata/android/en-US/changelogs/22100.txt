@@ -1,0 +1,1 @@
+Burrow tells you about itself on your notification channels: a job that keeps failing, its disk getting full, a channel that fails, a new version. A heartbeat address lets an outside service notice when Burrow is down. Settings -> Backups shows how to put a backup back.

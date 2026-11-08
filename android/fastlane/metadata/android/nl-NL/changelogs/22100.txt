@@ -1,0 +1,1 @@
+Burrow meldt zichzelf via je meldingskanalen: een taak die blijft mislukken, een volle schijf, een kanaal dat faalt, een nieuwe versie. Met een hartslagadres merkt een dienst buiten Burrow wanneer Burrow uit de lucht is. Instellingen -> Back-ups laat zien hoe je een back-up terugzet.

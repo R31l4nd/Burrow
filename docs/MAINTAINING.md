@@ -107,7 +107,8 @@ Fix on `main` and release `X.Y.Z+1`.
 
 Installations update from Settings -> About (the self-update): a git
 checkout pulls `main` and builds, an install on the prebuilt images pulls
-them.
+them. Burrow checks once a day and tells the channels for image updates
+when a new version is out.
 
 ## Signing the Android app
 

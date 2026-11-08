@@ -30,6 +30,16 @@ export function freeBytesOf(dir: string): number | null {
   }
 }
 
+/** Free and total bytes of the disk that holds a folder (nulls when it cannot be told). */
+export function diskOf(dir: string): { free: number | null; total: number | null } {
+  try {
+    const s = statfsSync(dir);
+    return { free: s.bavail * s.bsize, total: s.blocks * s.bsize };
+  } catch {
+    return { free: null, total: null };
+  }
+}
+
 export class DiskWatch {
   notifier: Notifier | null = null;
   /** Said on the channels already, until there is room again. */

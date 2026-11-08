@@ -35,10 +35,11 @@ through: the terminal uses them. SWAG's default `proxy.conf` does this.
 | `REGISTRY_ENDPOINTS` | Where Burrow reaches a registry whose name means something else inside its container, e.g. `localhost:5000=http://172.17.0.1:5000`. Comma separated. |
 | `LOG_LEVEL` | Burrow's log level (default `info`; `debug` adds every read). Warnings and errors are also kept in Burrow's database for 30 days (Settings -> About). |
 | `LOG_MAX_SIZE`, `LOG_MAX_FILES` | Docker's log of each container: the size of one file (default `10m`) and how many are kept (`5`). |
+| `HEARTBEAT_URL` | A dead-man switch: Burrow calls this address (a plain GET) every five minutes while it runs well, and a service there, such as Healthchecks or an Uptime Kuma push monitor, tells you when the calls stop: Burrow down, stuck, its data disk full, or its host gone. Burrow's own notifications cannot tell you that. |
 | `BACKUP_DIR` | Where the backups go (default `./backups`, owned by uid 1000). |
 | `BURROW_ANDROID_CERT_SHA256` | Signing certificate fingerprint(s) of the Android app for `assetlinks.json`. Only needed for passkeys in the app on a public hostname; leave empty. |
 
-`TERMINAL_MAX_SESSIONS`, `TERMINAL_IDLE_MINUTES`, `STATUS_INTERVAL_SECONDS`, `APPS_BASE_DOMAIN`, `UPDATE_CHECK_EXCLUDE` and `REGISTRY_ENDPOINTS` can also be set by an admin in Settings -> System, without a restart. A value set there goes before the `.env`'s; a field left empty there keeps the `.env`'s value, and says what it is.
+`TERMINAL_MAX_SESSIONS`, `TERMINAL_IDLE_MINUTES`, `STATUS_INTERVAL_SECONDS`, `APPS_BASE_DOMAIN`, `UPDATE_CHECK_EXCLUDE`, `REGISTRY_ENDPOINTS` and `HEARTBEAT_URL` can also be set by an admin in Settings -> System, without a restart. A value set there goes before the `.env`'s; a field left empty there keeps the `.env`'s value, and says what it is.
 
 ### The master key as a file
 
@@ -247,6 +248,26 @@ What you need is listed under [What to keep to recover](#what-to-keep-to-recover
 4. `bash scripts/restore.sh backups/burrow-<timestamp>.tar.gz.enc`.
 5. Sign in and open a host's terminal or a stored password: that proves
    the master key matches.
+
+### Locked out
+
+When nobody can sign in any more (the last admin lost the passkey, the
+recovery codes and the password), whoever can run a command on Burrow's
+host gets a new admin account, without losing anything:
+
+```sh
+docker compose exec burrow node dist/invite-admin.js
+```
+
+It prints a one-time invite link (valid seven days, in the audit log).
+Open it, make the new admin, and in Settings -> Users set the old account
+right or remove it. `scripts/reset.sh` is only for starting over: it
+removes everything.
+
+Burrow refuses to start when its master key does not open the database
+(a lost `secret.key`, a changed `BURROW_SECRET`): its log says so. Put the
+key back (`secret.key` is in every backup; `BURROW_SECRET` is not), do not
+start it with a new one, or every stored password and key is lost.
 
 ### Prebuilt images
 

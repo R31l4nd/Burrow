@@ -207,3 +207,14 @@ describe('refused before it opens: the sign-in gone (audit 2026-11-05)', () => {
     onSessionDoubt(() => {});
   });
 });
+
+describe('a recording that stops by itself (2026-11-07)', () => {
+  it("is passed on, so the owner's checkbox and red dot follow without a reload", () => {
+    const seen: boolean[] = [];
+    const c = new TerminalConnection('s9', { ...events(), recording: (on) => seen.push(on) });
+    FakeSocket.all[0]!.open();
+    FakeSocket.all[0]!.onmessage?.({ data: JSON.stringify({ t: 'recording', on: false }) });
+    expect(seen).toEqual([false]);
+    c.close();
+  });
+});

@@ -20,11 +20,15 @@ const FINE_MS = 2 * 86_400_000;
 const HOUR = 3_600_000;
 /** Hosts read at once: one that hangs holds up only its own turn. */
 const AT_ONCE = 4;
+/** Longest a host holds the round (a read is one docker command, timed out well before). */
+export const HISTORY_HOST_MS = 2 * 60_000;
 
 export class ContainerHistory {
   #timer: NodeJS.Timeout | null = null;
   #first: NodeJS.Timeout | null = null;
   #busy = false;
+  /** Hosts whose sample is under way, maybe still from a round that went on without them. */
+  readonly #sampling = new Set<number>();
   #stopped = false;
 
   constructor(
@@ -124,16 +128,30 @@ export class ContainerHistory {
       await eachLimited(
         withDocker,
         AT_ONCE,
-        (h) =>
-          this.sample(h.id).then(
+        async (h) => {
+          // Still at it from a round before (a host that hangs): not asked again on top.
+          if (this.#sampling.has(h.id)) return;
+          this.#sampling.add(h.id);
+          await this.sample(h.id).then(
             () => this.jobs?.fine('container history', h.name, { hostId: h.id }),
             (err: Error) => {
               // Said once per host and message, at warn: at debug nobody saw it (OPS-W-14).
               failure ??= `${h.name}: ${err.message}`;
               this.jobs?.failed('container history', h.name, err.message, { hostId: h.id });
             },
-          ),
+          );
+          this.#sampling.delete(h.id);
+        },
         () => this.#stopped,
+        // A host that does not answer in time no longer holds the round: the others are sampled again next time.
+        {
+          itemMs: HISTORY_HOST_MS,
+          late: (h) => {
+            const msg = `no answer in ${HISTORY_HOST_MS / 60_000} min`;
+            failure ??= `${h.name}: ${msg}`;
+            this.jobs?.failed('container history', h.name, msg, { hostId: h.id });
+          },
+        },
       );
       if (this.#stopped) return;
       this.downsample();

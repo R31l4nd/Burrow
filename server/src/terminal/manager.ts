@@ -13,6 +13,7 @@ import { exec, openSsh } from '../ssh/connect.js';
 import { shellQuote } from '../ssh/quote.js';
 import { deviceLabel, LiveSession, mouseEncoding, screenModes, type Row, type Viewer, type ViewerSocket } from './live.js';
 import { Recorder } from './recorder.js';
+import { closeOrphanRecordings } from './recordings.js';
 import { DETACHED, GONE, TMUX, tmuxAttachScript, tmuxCreateScript } from './tmux.js';
 import { typeWhenReady } from './ready.js';
 
@@ -34,6 +35,9 @@ const HISTORY_BYTES = 3 << 20;
 const HISTORY_ALT = 47;
 // No tmux of the person's own attached in a session without Burrow's tmux (ownTmuxHistoryCommand).
 const OWN_NONE = 48;
+// Output not yet parsed by the server's copy of the screen at which the channel pauses, and resumes.
+const PENDING_HIGH = 4 << 20;
+const PENDING_LOW = 1 << 20;
 
 /**
  * The history layer's lines on the host. Burrow's tmux: its pane's history. A tmux of the person's own
@@ -90,18 +94,29 @@ export class TerminalManager {
   // masked, the newest AI_TURNS_KEPT; forgotten with the session.
   readonly #ai = new Map<string, AiTurn[]>();
   #idleTimer: NodeJS.Timeout | null = null;
+  /** A database write failed (the data disk full, OPS-W-02): for the disk watch to be told. */
+  onWriteFailed: ((err: unknown) => void) | null = null;
+  // Said once until a write works again: not a log line per keystroke.
+  #writeFailing = false;
 
   constructor(
     private readonly ctx: Ctx,
     private readonly opts: ManagerOptions,
   ) {}
 
-  /** At start-up: memory sessions died with the previous process. */
+  /**
+   * At start-up: memory sessions died with the previous process, and so did whatever recorded.
+   * Not fatal when it cannot be written (the data disk full): it threw out of start, and Burrow
+   * never got to say the disk is full, started again, and threw again.
+   */
   start(): void {
-    const lost = this.ctx.db.delete(terminalSessions).where(eq(terminalSessions.mode, 'memory')).returning().all();
-    for (const r of lost) {
-      audit(this.ctx, { userId: r.userId, username: null, ip: null }, 'terminal.lost', r.id, { hostId: r.hostId });
-    }
+    this.#safely('the sessions of the last run', () => {
+      const lost = this.ctx.db.delete(terminalSessions).where(eq(terminalSessions.mode, 'memory')).returning().all();
+      for (const r of lost) {
+        audit(this.ctx, { userId: r.userId, username: null, ip: null }, 'terminal.lost', r.id, { hostId: r.hostId });
+      }
+    });
+    this.#safely('the recordings of the last run', () => closeOrphanRecordings(this.ctx));
     // Always swept: the limit can be set while Burrow runs (Settings -> System); 0 closes nothing.
     this.#idleTimer = setInterval(() => this.#closeIdle(), 60_000);
     this.#idleTimer.unref();
@@ -118,7 +133,28 @@ export class TerminalManager {
       s.client?.end();
     }
     this.#live.clear();
-    this.ctx.db.delete(terminalSessions).where(eq(terminalSessions.mode, 'memory')).run();
+    this.#safely('the sessions at shutdown', () => this.ctx.db.delete(terminalSessions).where(eq(terminalSessions.mode, 'memory')).run());
+  }
+
+  /**
+   * A database write from an SSH or WebSocket event (a keystroke, output, a channel that closed)
+   * or start-up: one that throws (the data disk full) is said, never thrown there, where it ended
+   * the process and every session in it.
+   */
+  #safely(what: string, write: () => unknown): void {
+    try {
+      write();
+      this.#writeFailing = false;
+    } catch (err) {
+      this.#writeFailed(what, err);
+    }
+  }
+
+  #writeFailed(what: string, err: unknown): void {
+    this.onWriteFailed?.(err);
+    if (this.#writeFailing) return;
+    this.#writeFailing = true;
+    this.ctx.log.error({ err }, `terminals: ${what} could not be saved; the sessions go on`);
   }
 
   /**
@@ -302,7 +338,7 @@ export class TerminalManager {
         live.shell = { ...live.shell, lastCommand: cmd };
         live.broadcast({ t: 'shell', shell: live.shell });
       } catch (err) {
-        this.ctx.log.warn({ err }, 'could not record command');
+        this.#writeFailed('a command for the history', err);
       }
     };
     // Broadcast from the write callback: the headless terminal parses in
@@ -311,13 +347,31 @@ export class TerminalManager {
     // Without tmux: no alternate screen, so what came before stays in the scrollback (altscreen.ts).
     const alt = live.row.mode === 'memory' ? new AltScreenFilter() : null;
     live.alt = alt;
+    // Flow control, as xterm advises: the headless terminal parses at its own pace and throws once
+    // 50 MB wait unparsed ("write data discarded"), out of the SSH event, which ended the process (a
+    // shell printing faster than it parses: `yes`, a big cat). The channel pauses meanwhile, and
+    // SSH's window holds the program on the host back.
+    let pending = 0;
+    let paused = false;
     const onData = (d: Buffer) => {
       const decoded = live.decoder.decode(d, { stream: true });
       const was = alt?.on;
       const text = alt ? alt.write(decoded) : decoded;
       const now = alt?.on;
+      pending += text.length;
+      if (pending > PENDING_HIGH && !paused) {
+        paused = true;
+        channel.pause();
+        channel.stderr.pause();
+      }
       if (text)
         live.term.write(text, () => {
+          pending -= text.length;
+          if (paused && pending < PENDING_LOW) {
+            paused = false;
+            channel.resume();
+            channel.stderr.resume();
+          }
           live.broadcast({ t: 'output', d: text });
           live.recorder?.output(text);
           if (now !== was) live.broadcast({ t: 'alt', on: !!now });
@@ -344,10 +398,10 @@ export class TerminalManager {
     // the next viewer re-attaches.
     const ended = live.row.mode === 'memory' || code === 0 || code === GONE;
     if (ended) {
-      if (row) this.ctx.db.delete(terminalSessions).where(eq(terminalSessions.id, live.row.id)).run();
+      if (row) this.#safely('an ended session', () => this.ctx.db.delete(terminalSessions).where(eq(terminalSessions.id, live.row.id)).run());
       this.#ai.delete(live.row.id);
       live.broadcast({ t: 'exit', reason: 'ended' });
-      audit(this.ctx, { userId: live.row.userId, username: null, ip: null }, 'terminal.ended', live.hostName, { session: live.row.id, code });
+      this.#safely('an ended session', () => audit(this.ctx, { userId: live.row.userId, username: null, ip: null }, 'terminal.ended', live.hostName, { session: live.row.id, code }));
     } else {
       // Kept: a viewer connects again and attaches anew (also after a detach on the host).
       live.broadcast({ t: 'exit', reason: 'lost', message: code === DETACHED ? 'Detached on the host.' : 'Connection to the host was lost.' });
@@ -391,8 +445,15 @@ export class TerminalManager {
         throw new HttpError(410, 'session_gone');
       }
       this.#wire(live, channel);
-      // Recorded before it was lost: a new recording from here on (the gap is not in one).
-      if (this.#row(row.id)?.recording) this.#record(live);
+      // Recorded before it was lost: a new recording from here on (the gap is not in one). One that
+      // cannot start (the data disk full) does not keep the session from its viewer.
+      if (this.#row(row.id)?.recording) {
+        try {
+          this.#record(live);
+        } catch (err) {
+          this.#writeFailed('a new recording', err);
+        }
+      }
       audit(this.ctx, { userId: row.userId, username: null, ip: null }, 'terminal.reattach', host.name, { session: row.id });
       return live;
     })();
@@ -611,7 +672,7 @@ export class TerminalManager {
     // into the line tracked for the history.
     this.#write(live, pw);
     live.send(v, { t: 'notice', code: 'password_sent' });
-    audit(this.ctx, who, 'terminal.password_paste', live.hostName, { session: id });
+    this.#safely('the audit of a pasted password', () => audit(this.ctx, who, 'terminal.password_paste', live.hostName, { session: id }));
   }
 
   resize(id: string, viewerId: string, cols: number, rows: number, active: boolean): void {
@@ -645,7 +706,7 @@ export class TerminalManager {
     // At most one write per 10 s; the list shows minutes, not milliseconds.
     if (now - live.row.lastActivityAt < 10_000) return;
     live.row.lastActivityAt = now;
-    this.ctx.db.update(terminalSessions).set({ lastActivityAt: now }).where(eq(terminalSessions.id, live.row.id)).run();
+    this.#safely('the last activity of a session', () => this.ctx.db.update(terminalSessions).set({ lastActivityAt: now }).where(eq(terminalSessions.id, live.row.id)).run());
   }
 
   /**
@@ -706,11 +767,24 @@ export class TerminalManager {
     // blank one; taken in the write queue's order, and the recorder takes
     // output only after it (what was queued before is in that screen already).
     live.recorder = null;
+    rec.onEnd = () => this.#recorderEnded(live, rec);
     live.term.write('', () => {
       if (!live.row.recording || live.closing) return rec.stop();
       rec.output(live.serializer.serialize({ scrollback: 0 }) + screenModes(live.term));
       live.recorder = rec;
     });
+  }
+
+  /**
+   * Its recorder stopped by itself (at its size limit, its file not writable): the session no
+   * longer records, so its viewers lose the red dot. It kept showing, and the flag stayed on.
+   */
+  #recorderEnded(live: LiveSession, rec: Recorder): void {
+    if (live.closing || !live.row.recording || (live.recorder !== null && live.recorder !== rec)) return;
+    live.recorder = null;
+    live.row.recording = false;
+    this.#safely('the end of a recording', () => this.ctx.db.update(terminalSessions).set({ recording: false }).where(eq(terminalSessions.id, live.row.id)).run());
+    live.broadcast({ t: 'recording', on: false });
   }
 
   /** A session's own name (null: its host's name again). */

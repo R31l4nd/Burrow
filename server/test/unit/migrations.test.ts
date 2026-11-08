@@ -146,3 +146,15 @@ describe('an update from every earlier schema', () => {
     }, 30_000);
   }
 });
+
+describe('the write-ahead log', () => {
+  it('shrinks back to a bounded size after a big prune (journal_size_limit), not kept at its largest', () => {
+    const db = openDb(join(work, 'wal.db'));
+    try {
+      expect(db.$client.pragma('journal_mode', { simple: true })).toBe('wal');
+      expect(db.$client.pragma('journal_size_limit', { simple: true })).toBe(64 << 20);
+    } finally {
+      db.$client.close();
+    }
+  });
+});

@@ -21,13 +21,13 @@ afterAll(async () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-const none = { terminalMaxSessions: null, terminalIdleMinutes: null, statusIntervalSeconds: null, updateCheckExclude: null, registryEndpoints: null, appsBaseDomain: null };
+const none = { terminalMaxSessions: null, terminalIdleMinutes: null, statusIntervalSeconds: null, updateCheckExclude: null, registryEndpoints: null, appsBaseDomain: null, heartbeatUrl: null };
 
 describe('Settings -> System', () => {
   it("nothing set: the .env's values, said as such", async () => {
     const s = await t.json<SystemSettings>('GET', '/api/settings/system');
     expect(s.saved).toEqual(none);
-    expect(s.env).toEqual({ terminalMaxSessions: 7, terminalIdleMinutes: 30, statusIntervalSeconds: 0, updateCheckExclude: '^registry\\.example\\.com/', registryEndpoints: 'localhost:5000=http://172.17.0.1:5000', appsBaseDomain: 'example.org' });
+    expect(s.env).toEqual({ terminalMaxSessions: 7, terminalIdleMinutes: 30, statusIntervalSeconds: 0, updateCheckExclude: '^registry\\.example\\.com/', registryEndpoints: 'localhost:5000=http://172.17.0.1:5000', appsBaseDomain: 'example.org', heartbeatUrl: '' });
     expect(s.effective).toEqual(s.env);
   });
 
@@ -45,7 +45,7 @@ describe('Settings -> System', () => {
   });
 
   it('refused: a broken pattern, an address that is not one, an interval too short; and without a fresh step-up', async () => {
-    for (const bad of [{ updateCheckExclude: '^(' }, { registryEndpoints: 'reg.lan=ftp://x' }, { registryEndpoints: 'no-equals-sign' }, { statusIntervalSeconds: 3 }, { terminalMaxSessions: 0 }, { appsBaseDomain: 'not a domain' }]) {
+    for (const bad of [{ updateCheckExclude: '^(' }, { registryEndpoints: 'reg.lan=ftp://x' }, { registryEndpoints: 'no-equals-sign' }, { statusIntervalSeconds: 3 }, { terminalMaxSessions: 0 }, { appsBaseDomain: 'not a domain' }, { heartbeatUrl: 'ftp://x' }]) {
       expect((await t.request('PUT', '/api/settings/system', { ...none, ...bad })).statusCode, JSON.stringify(bad)).toBe(400);
     }
     t.advance(60 * 60_000);

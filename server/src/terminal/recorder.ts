@@ -21,6 +21,8 @@ export class Recorder {
   #started: number;
   #bytes = 0;
   #done = false;
+  /** It stopped by itself (at its size limit, its file not writable): its session no longer records. */
+  onEnd: (() => void) | null = null;
 
   constructor(
     private readonly ctx: Ctx,
@@ -42,7 +44,7 @@ export class Recorder {
     this.#out = createWriteStream(join(dir, file), { flags: 'wx', mode: 0o600 });
     this.#out.on('error', (err) => {
       ctx.log.warn({ err, recording: this.id }, 'recording could not be written');
-      this.stop();
+      this.#ended();
     });
     this.#line({ version: 2, width: cols, height: rows, timestamp: Math.floor(this.#started / 1000), title: session.title ?? session.hostName });
   }
@@ -56,8 +58,8 @@ export class Recorder {
     const text = `${JSON.stringify(v)}\n`;
     this.#bytes += Buffer.byteLength(text);
     if (this.#bytes > MAX_RECORDING_BYTES) {
-      this.ctx.db.update(recordings).set({ truncated: true }).where(eq(recordings.id, this.id)).run();
-      return this.stop();
+      this.#save({ truncated: true });
+      return this.#ended();
     }
     this.#out.write(text);
   }
@@ -79,6 +81,22 @@ export class Recorder {
     if (this.#done) return;
     this.#done = true;
     this.#out.end();
-    this.ctx.db.update(recordings).set({ endedAt: this.ctx.now(), bytes: this.#bytes }).where(eq(recordings.id, this.id)).run();
+    this.#save({ endedAt: this.ctx.now(), bytes: this.#bytes });
+  }
+
+  #ended(): void {
+    if (this.#done) return;
+    this.stop();
+    this.onEnd?.();
+  }
+
+  // Reached from the session's output and its file's events: a write that throws there (the data
+  // disk full) ended the process. The row is closed at the next start (closeOrphanRecordings).
+  #save(set: Partial<typeof recordings.$inferInsert>): void {
+    try {
+      this.ctx.db.update(recordings).set(set).where(eq(recordings.id, this.id)).run();
+    } catch (err) {
+      this.ctx.log.warn({ err, recording: this.id }, 'recording: its row could not be saved');
+    }
   }
 }

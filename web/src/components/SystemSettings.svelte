@@ -12,7 +12,7 @@
   type Key = keyof SystemSettingsInput;
   const numbers: Key[] = ['terminalMaxSessions', 'terminalIdleMinutes', 'statusIntervalSeconds'];
   let s = $state<SystemSettings | null>(null);
-  let f = $state<Record<Key, string>>({ terminalMaxSessions: '', terminalIdleMinutes: '', statusIntervalSeconds: '', updateCheckExclude: '', registryEndpoints: '', appsBaseDomain: '' });
+  let f = $state<Record<Key, string>>({ terminalMaxSessions: '', terminalIdleMinutes: '', statusIntervalSeconds: '', updateCheckExclude: '', registryEndpoints: '', appsBaseDomain: '', heartbeatUrl: '' });
   let saved = $state('');
   let busy = $state(false);
   let loadError = $state('');
@@ -26,7 +26,7 @@
     get<SystemSettings>('/api/settings/system').then(
       (x) => {
         // Typed before the settings came: that stays (as in the other parts, AUDIT2 UI-21).
-        if (s === null && JSON.stringify(f) === JSON.stringify(asFields({ terminalMaxSessions: null, terminalIdleMinutes: null, statusIntervalSeconds: null, updateCheckExclude: null, registryEndpoints: null, appsBaseDomain: null }))) f = asFields(x.saved);
+        if (s === null && JSON.stringify(f) === JSON.stringify(asFields({ terminalMaxSessions: null, terminalIdleMinutes: null, statusIntervalSeconds: null, updateCheckExclude: null, registryEndpoints: null, appsBaseDomain: null, heartbeatUrl: null }))) f = asFields(x.saved);
         s = x;
         saved = JSON.stringify(asFields(x.saved));
       },
@@ -98,6 +98,12 @@
     <span>{t('system.appsDomain')}</span>
     <input bind:value={f.appsBaseDomain} autocapitalize="none" spellcheck="false" placeholder={example('appsBaseDomain', 'example.com')} data-testid="system-apps-domain" />
     <span class="help">{fromEnv('appsBaseDomain')}</span>
+  </label>
+  <h3 class="group">{t('system.watch')}</h3>
+  <label class="field">
+    <span>{t('system.heartbeat')}</span>
+    <input class="mono" type="url" bind:value={f.heartbeatUrl} autocapitalize="none" spellcheck="false" placeholder={example('heartbeatUrl', 'https://hc-ping.com/...')} data-testid="system-heartbeat" />
+    <span class="help">{t('system.heartbeatHelp')} {fromEnv('heartbeatUrl')}</span>
   </label>
   <div class="form-end">
     {#if dirty}<span class="dim small" data-testid="system-unsaved">{t('common.unsaved')}</span>{/if}

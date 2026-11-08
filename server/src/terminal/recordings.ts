@@ -1,7 +1,7 @@
 import { createReadStream, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import { desc, eq, lt } from 'drizzle-orm';
+import { desc, eq, isNull, lt } from 'drizzle-orm';
 import type { Recording } from '@burrow/shared';
 import { audit } from '../audit.js';
 import type { Ctx } from '../context.js';
@@ -42,6 +42,29 @@ export function pruneRecordings(ctx: Ctx): number {
     ctx.db.delete(recordings).where(eq(recordings.id, r.id)).run();
   }
   return old.length;
+}
+
+/**
+ * At start-up: a recording is written by one process only, so one not ended was cut off when the
+ * last one ended (a crash, a kill, the disk full at its stop). It stayed "still running": refused
+ * removal and never pruned. Ended as of its file's last write, at the size written; a tmux session
+ * that was recording starts a new one when it is attached again (manager.ts).
+ */
+export function closeOrphanRecordings(ctx: Ctx): number {
+  const open = ctx.db.select().from(recordings).where(isNull(recordings.endedAt)).all();
+  for (const r of open) {
+    let bytes = 0;
+    let endedAt = r.startedAt;
+    try {
+      const st = statSync(fileOf(ctx, r.file));
+      bytes = st.size;
+      endedAt = Math.max(r.startedAt, Math.floor(st.mtimeMs));
+    } catch {
+      // No file: nothing was written.
+    }
+    ctx.db.update(recordings).set({ endedAt, bytes }).where(eq(recordings.id, r.id)).run();
+  }
+  return open.length;
 }
 
 export function registerRecordingRoutes(app: FastifyInstance, ctx: Ctx): void {

@@ -20,9 +20,9 @@ RepoType: git
 Repo: https://github.com/R31l4nd/Burrow.git
 
 Builds:
-  - versionName: 2.20.3
-    versionCode: 22003
-    commit: v2.20.3
+  - versionName: 2.21.0
+    versionCode: 22100
+    commit: v2.21.0
     subdir: android/app
     sudo:
       # Node for the direct route's page, which the app carries as assets.
@@ -51,5 +51,5 @@ UpdateCheckMode: Tags ^v[0-9.]+$
 # The version code is major*10000 + minor*100 + patch (android/app/build.gradle.kts),
 # not the version itself: the checker reads it from the tag's own build file.
 UpdateCheckData: android/version-code.txt|(\d+)|package.json|"version":\s*"(\d+\.\d+\.\d+)"
-CurrentVersion: 2.20.3
-CurrentVersionCode: 22003
+CurrentVersion: 2.21.0
+CurrentVersionCode: 22100

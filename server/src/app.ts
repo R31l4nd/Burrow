@@ -39,16 +39,19 @@ import { enforceAccess, registerAuthRoutes, type SessionEvents } from './auth/ro
 import { SetupGate } from './auth/setup.js';
 import { addressKey, pruneThrottle, trustProxySuggestion, viaUnknownProxy } from './auth/throttle.js';
 import { pruneOld } from './retention.js';
-import { checkBackups, registerBackupRoutes } from './backup.js';
-import { diskFullError, DiskWatch, isDiskFull } from './diskspace.js';
+import { checkBackups, readBackupStatus, registerBackupRoutes } from './backup.js';
+import { diskFullError, diskOf, DiskWatch, isDiskFull } from './diskspace.js';
 import { Jobs } from './jobs.js';
 import { LogEvents } from './logevents.js';
 import { locateTarget, registerSelfUpdateRoutes } from './selfupdate.js';
+import { SelfWatch } from './selfwatch.js';
+import { Heartbeat } from './heartbeat.js';
 import type { Config } from './config.js';
 import type { Ctx } from './context.js';
 import type { SecretBox } from './crypto.js';
 import type { Db } from './db/index.js';
 import { registerHostRoutes } from './hosts/routes.js';
+import { listHosts } from './hosts/service.js';
 import { registerWakeRoutes } from './hosts/wake.js';
 import { PackageChecks, registerPackageRoutes } from './hosts/packages.js';
 import { CommandScheduler, registerCommandScheduleRoutes } from './schedules/commands.js';
@@ -111,6 +114,10 @@ export interface BurrowApp {
   widget: WidgetPusher;
   disk: DiskWatch;
   logEvents: LogEvents;
+  /** Burrow telling about itself (every hour by itself, outside the tests). */
+  selfWatch: SelfWatch;
+  /** The dead-man switch (every five minutes by itself, outside the tests). */
+  heartbeat: Heartbeat;
   /** Every route with its access rules, for the tests that go through all of them. */
   routes: RouteInfo[];
   /** Closes the sockets of login sessions that expired or lost the right (every minute by itself). */
@@ -199,6 +206,10 @@ export async function buildApp(deps: AppDeps): Promise<BurrowApp> {
       return config.terminalIdleMinutes;
     },
   });
+  // A terminal's write that failed for want of space: /healthz and the disk-full message, as for any other write.
+  terminals.onWriteFailed = (err) => {
+    if (isDiskFull(err)) disk.failed();
+  };
   // Signing out or revoking a login session closes its sockets (terminals,
   // containers, editors) at once; the terminals themselves keep running. One
   // that expired, or whose user lost the right, is found by the sweep.
@@ -427,6 +438,7 @@ export async function buildApp(deps: AppDeps): Promise<BurrowApp> {
   updates.jobs = jobs;
   registerReportRoutes(app, ctx, reports);
   const alerts = new AlertEngine(ctx, files, docker, notifier);
+  alerts.jobs = jobs;
   alerts.quiet = (hostId, project) => ops.quiet(hostId, project);
   const hostStats = new HostStatsService(ctx, files);
   hostStats.jobs = jobs;
@@ -465,7 +477,28 @@ export async function buildApp(deps: AppDeps): Promise<BurrowApp> {
   registerWorkspaceRoutes(app, ctx, files, fileGuard);
   registerBugReportRoutes(app, ctx, notifier);
   registerBackupRoutes(app, ctx);
-  registerSelfUpdateRoutes(app, ctx, docker, files);
+  const selfUpdates = registerSelfUpdateRoutes(app, ctx, docker, files);
+  // Burrow tells about itself over the channels (2026-11-07): see selfwatch.ts.
+  const selfWatch = new SelfWatch(ctx, {
+    send: (n) => notifier.notify(n),
+    jobs: () => jobs.list(),
+    logEvents: () => logEvents.list(),
+    disk: () => diskOf(config.dataDir),
+    failingChannels: () => notifier.failing,
+    checkUpdate: () => selfUpdates.check(),
+    summary: () => {
+      const hosts = listHosts(ctx).length;
+      const backup = readBackupStatus(ctx);
+      const en = `Version ${SERVER_VERSION}, ${hosts} ${hosts === 1 ? 'host' : 'hosts'}. Last backup: ${backup ? `${backup.at}${backup.ok ? '' : ' (failed)'}` : 'none'}.`;
+      const nl = `Versie ${SERVER_VERSION}, ${hosts} ${hosts === 1 ? 'host' : 'hosts'}. Laatste back-up: ${backup ? `${backup.at}${backup.ok ? '' : ' (mislukt)'}` : 'geen'}.`;
+      return { en, nl };
+    },
+  });
+  const watchSelf = () => void selfWatch.tick().catch((err: Error) => ctx.log.warn(`selfwatch: ${err.message}`));
+  if (config.env !== 'test') setTimeout(watchSelf, 5 * 60_000).unref();
+  // The dead-man switch: silent while the data disk is full, so the service there says so.
+  const heartbeat = new Heartbeat(ctx, { fetch: deps.fetch ?? fetch, healthy: () => !disk.check().full });
+  if (config.env !== 'test') heartbeat.start();
 
   app.all('/api/*', { config: { auth: 'public' } }, async () => {
     throw new HttpError(404, 'not_found');
@@ -510,10 +543,12 @@ export async function buildApp(deps: AppDeps): Promise<BurrowApp> {
     }
     jobs.ran('housekeeping', performance.now() - started, failure);
     void checkBackups(ctx, notifier).catch((err: Error) => ctx.log.warn(`backups: telling failed: ${err.message}`));
+    watchSelf();
   }, 3600_000);
   housekeeping.unref();
   app.addHook('onClose', async () => {
     clearInterval(housekeeping);
+    heartbeat.stop();
     clearInterval(sweeper);
     status.stop();
     terminals.stop();
@@ -530,5 +565,5 @@ export async function buildApp(deps: AppDeps): Promise<BurrowApp> {
     logEvents.stop();
   });
 
-  return { app, ctx, uptime, gate, status, terminals, files, lsp, docker, updates, updater, ops, alerts, reports, notifier, hostStats, packages, scheduled, widget, disk, logEvents, routes, sweepSockets };
+  return { app, ctx, uptime, gate, status, terminals, files, lsp, docker, updates, updater, ops, alerts, reports, notifier, hostStats, packages, scheduled, widget, disk, logEvents, selfWatch, heartbeat, routes, sweepSockets };
 }

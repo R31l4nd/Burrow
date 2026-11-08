@@ -240,7 +240,7 @@
   });
 
   // The backups' last round (the backup service writes it; admins only).
-  let backup = $state<{ ok: boolean; at: string; bytes: number | null; count: number | null; remote: boolean | null; error: string | null } | null>(null);
+  let backup = $state<{ ok: boolean; at: string; file: string | null; bytes: number | null; count: number | null; remote: boolean | null; error: string | null } | null>(null);
   let backupStaleMs = $state(2 * 86_400_000);
   let backupError = $state('');
   // Asked for one now (report 445f22): the backup service takes the request
@@ -249,6 +249,12 @@
   // The service has the request (it took the marker away): making it now.
   let backupTaken = $state(false);
   let backupDownload = $state<{ file: string; bytes: number } | null>(null);
+  // How to put one back (2026-11-07): the command to copy, run on the host in Burrow's folder.
+  const restoreCommand = $derived(`bash scripts/restore.sh backups/${backupDownload?.file ?? backup?.file ?? 'burrow-<time>.tar.gz.enc'}`);
+  async function copyRestore() {
+    if (await copyText(restoreCommand)) toast(t('backup.restoreCopied'));
+    else toast(t('backup.restoreNoCopy'), 'error');
+  }
   const readBackup = () =>
     get<{ status: typeof backup; staleAfterMs: number; requestedAt: string | null; download: typeof backupDownload }>('/api/backup/status').then(
       // A request taken by the service (its marker gone) is still ours until a
@@ -701,6 +707,15 @@
           {/if}
         </div>
         {#if !backupDownload}<p class="dim small" data-testid="backup-no-download">{t('backup.noDownload')}</p>{/if}
+        <details class="restore" data-testid="backup-restore">
+          <summary>{t('backup.restoreTitle')}</summary>
+          <p class="dim">{t('backup.restoreSteps')}</p>
+          <div class="restore-cmd">
+            <code class="mono" data-testid="backup-restore-cmd">{restoreCommand}</code>
+            <button type="button" class="btn" onclick={copyRestore} data-testid="backup-restore-copy"><Icon name="copy" size={16} /> {t('common.copy')}</button>
+          </div>
+          <p class="dim">{t('backup.restoreAfter')}</p>
+        </details>
       {/if}
     </div>
     {/if}
@@ -846,6 +861,25 @@
   }
   .backup-actions {
     margin-top: 12px;
+  }
+  .restore {
+    margin-top: 12px;
+  }
+  .restore summary {
+    cursor: pointer;
+  }
+  /* The command wraps inside its line (a long file name on a phone), the button beside or under it. */
+  .restore-cmd {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 8px 0;
+  }
+  .restore-cmd code {
+    flex: 1 1 16rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
   /* Under the update button, not against it. */
   .jobs-title {

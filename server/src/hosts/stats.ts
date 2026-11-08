@@ -336,6 +336,8 @@ export function smartTrouble(disks: SmartDisk[], before: SmartDisk[], t: Thresho
 
 const SAMPLE_MS = 5 * 60_000;
 const SMART_MS = 6 * 3600_000;
+/** Longest a host holds the round: within a round's five minutes, the SMART check (two minutes) and package check included. */
+export const STATS_HOST_MS = 4 * 60_000;
 const KEEP_MS = 31 * 86_400_000;
 const SMART_KEEP_MS = 90 * 86_400_000;
 
@@ -613,21 +615,25 @@ export class HostStatsService {
         all,
         4,
         async (h) => {
+          // Still at it from a round before (a host that hangs): not asked again on top.
+          if (this.#sampling.has(h.id)) return;
+          this.#sampling.add(h.id);
           try {
-            await this.sample(h.id);
-            this.jobs?.fine('host statistics', h.name, { hostId: h.id });
-          } catch (err) {
-            // At warn, once per host and message: at debug nobody saw it (OPS-W-14).
-            failure ??= `${h.name}: ${(err as Error).message}`;
-            this.jobs?.failed('host statistics', h.name, (err as Error).message, { hostId: h.id });
+            await this.#hostRound(h, (msg) => (failure ??= `${h.name}: ${msg}`));
+          } finally {
+            this.#sampling.delete(h.id);
           }
-          if (this.#stopped) return;
-          const last = this.ctx.db.select().from(hostSmart).where(eq(hostSmart.hostId, h.id)).get();
-          if (!last || this.ctx.now() - last.checkedAt > SMART_MS) await this.smart(h.id).catch(() => {});
-          if (this.#stopped) return;
-          await this.packages?.checkIfDue(h.id).catch(() => {});
         },
         () => this.#stopped,
+        // A host that does not answer in time no longer holds the round: the others are sampled again next time.
+        {
+          itemMs: STATS_HOST_MS,
+          late: (h) => {
+            const msg = `no answer in ${STATS_HOST_MS / 60_000} min`;
+            failure ??= `${h.name}: ${msg}`;
+            this.jobs?.failed('host statistics', h.name, msg, { hostId: h.id });
+          },
+        },
       );
       if (this.#stopped) return;
       this.ctx.db.delete(hostSamples).where(lt(hostSamples.at, this.ctx.now() - KEEP_MS)).run();
@@ -637,5 +643,24 @@ export class HostStatsService {
       if (!this.#stopped) this.jobs?.ran('host-stats', performance.now() - started, failure);
     }
   }
-}
 
+  /** Hosts whose sampling is under way, maybe still from a round that went on without them. */
+  readonly #sampling = new Set<number>();
+
+  /** One host's part of a round: its sample, then SMART and its packages when due. */
+  async #hostRound(h: { id: number; name: string }, failed: (message: string) => void): Promise<void> {
+    try {
+      await this.sample(h.id);
+      this.jobs?.fine('host statistics', h.name, { hostId: h.id });
+    } catch (err) {
+      // At warn, once per host and message: at debug nobody saw it (OPS-W-14).
+      failed((err as Error).message);
+      this.jobs?.failed('host statistics', h.name, (err as Error).message, { hostId: h.id });
+    }
+    if (this.#stopped) return;
+    const last = this.ctx.db.select().from(hostSmart).where(eq(hostSmart.hostId, h.id)).get();
+    if (!last || this.ctx.now() - last.checkedAt > SMART_MS) await this.smart(h.id).catch(() => {});
+    if (this.#stopped) return;
+    await this.packages?.checkIfDue(h.id).catch(() => {});
+  }
+}

@@ -18,6 +18,9 @@ export function openDb(file: string, migrationsDir = MIGRATIONS_DIR): Db {
   sqlite.pragma('foreign_keys = ON');
   sqlite.pragma('busy_timeout = 5000');
   sqlite.pragma('synchronous = NORMAL');
+  // The WAL is truncated back to this after a checkpoint: without it, it stayed as large as the
+  // biggest prune ever made it (hundreds of MB on the data disk).
+  sqlite.pragma(`journal_size_limit = ${64 << 20}`);
   migrate(sqlite, migrationsDir);
   return drizzle(sqlite, { schema }) as Db;
 }

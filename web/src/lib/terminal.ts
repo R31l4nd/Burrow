@@ -21,6 +21,8 @@ export interface TerminalEvents {
   alt?(on: boolean): void;
   /** The answer to a history request (the history layer). */
   history?(answer: { data: string; alt?: boolean; failed?: boolean }): void;
+  /** Recording turned on or off (by the owner, or by itself at its size limit). */
+  recording?(on: boolean): void;
 }
 
 const BACKOFF_MS = [500, 1000, 2000, 4000, 8000];
@@ -101,6 +103,8 @@ export class TerminalConnection {
           return this.on.notice(m.code);
         case 'history':
           return this.on.history?.(m);
+        case 'recording':
+          return this.on.recording?.(m.on);
         case 'exit':
           if (m.reason === 'closed' || m.reason === 'ended') {
             this.#stopped = true;

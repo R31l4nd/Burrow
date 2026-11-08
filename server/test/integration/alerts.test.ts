@@ -1,6 +1,6 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Alert, AlertMute, ConnectResult, Host, RunResult } from '@burrow/shared';
 import { makeApp, setupAdmin, type TestApp } from '../helpers.js';
 
@@ -336,4 +336,35 @@ describe('analysis', () => {
     expect(audit.find((x) => x.action === 'ai.file')).toBeTruthy();
     expect((await t.request('DELETE', `/api/ai/analyses/${id}`)).statusCode).toBe(204);
   });
+});
+
+describe('a host that refuses Burrow (2026-11-07 audit)', () => {
+  it('a wrong password: one failed login, then a wait instead of a try every ten seconds (fail2ban banned Burrow), said once; the right password connects again within seconds', async () => {
+    const password = process.env.DOCKER_SSHD_PASSWORD ?? 'burrow-test-password';
+    const body = { name: 'docker-refusing', address: SSHD_HOST, port: PORT, username: 'tester', authMethod: 'password' };
+    const w = await t.json<Host>('POST', '/api/hosts', { ...body, password });
+    const r = await t.json<ConnectResult>('POST', `/api/hosts/${w.id}/test`);
+    if (r.status === 'unknown_host_key') await t.json('POST', `/api/hosts/${w.id}/trust`, { fingerprint: r.fingerprint });
+    expect(await t.json<ConnectResult>('POST', `/api/hosts/${w.id}/test`)).toMatchObject({ status: 'ok' });
+    const connects = vi.spyOn(t.files, 'with');
+    const tries = () => connects.mock.calls.filter(([id]) => id === w.id).length;
+    const said = () => t.logEvents.list().filter((e) => e.example.includes('docker-refusing: cannot connect'));
+    try {
+      await t.json('PUT', `/api/hosts/${w.id}`, { ...body, password: 'not the password' });
+      await t.alerts.reconcile();
+      await expect.poll(() => said().length, { timeout: 15_000 }).toBe(1);
+      const after = tries();
+      // Longer than the ten seconds it used to try again after.
+      await new Promise((res) => setTimeout(res, 12_000));
+      expect(tries()).toBe(after);
+      expect(said()[0]!.count).toBe(1);
+      // The right password: worth a try at once, not after the wait.
+      await t.json('PUT', `/api/hosts/${w.id}`, { ...body, password });
+      await expect.poll(() => tries(), { timeout: 15_000 }).toBeGreaterThan(after);
+    } finally {
+      connects.mockRestore();
+      await t.request('DELETE', `/api/hosts/${w.id}`);
+      await t.alerts.reconcile();
+    }
+  }, 60_000);
 });

@@ -193,6 +193,15 @@ test('Settings -> Backups: one made now, and the newest downloaded', async ({ pa
   await page.route('**/api/backup/download', (r) => r.fulfill({ body: 'encrypted', headers: { 'content-type': 'application/octet-stream', 'content-disposition': 'attachment; filename="burrow-20261007T090000Z.tar.gz.enc"' } }));
   const [file] = await Promise.all([page.waitForEvent('download'), link.click()]);
   expect(file.suggestedFilename()).toBe('burrow-20261007T090000Z.tar.gz.enc');
+  // Putting one back (2026-11-07): the steps, and the command for the newest, to copy.
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await backups.getByTestId('backup-restore').locator('summary').click();
+  await expect(backups.getByTestId('backup-restore')).toContainText('.before-restore/');
+  await expect(backups.getByTestId('backup-restore-cmd')).toHaveText('bash scripts/restore.sh backups/burrow-20261007T090000Z.tar.gz.enc');
+  await backups.getByTestId('backup-restore-copy').click();
+  await expect(page.getByTestId('toasts')).toContainText('Command copied');
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('bash scripts/restore.sh backups/burrow-20261007T090000Z.tar.gz.enc');
+  await lookAt(page, 'settings-backup-restore');
   // Asked, never taken: after a minute the page says the service may not run.
   status = { ...status, at: new Date(Date.now() - 180_000).toISOString() };
   requestedAt = new Date(Date.now() - 120_000).toISOString();
@@ -793,6 +802,8 @@ test("Settings -> System: what was only in the .env file, set here; the .env's v
   await page.getByTestId('system-update-exclude').fill('^registry\\.lan/');
   await page.getByTestId('system-registries').fill('registry.lan:5000=http://10.0.0.5:5000');
   await page.getByTestId('system-apps-domain').fill('home.example');
+  // The dead-man switch's address (2026-11-07): kept like the others (its calls: server/test/unit/heartbeat.test.ts).
+  await page.getByTestId('system-heartbeat').fill('https://hc-ping.example.invalid/burrow-e2e');
   await expect(page.getByTestId('system-unsaved')).toBeVisible();
   await page.getByTestId('system-save').click();
   await expect(page.getByTestId('toasts')).toContainText('System settings saved.');
@@ -802,9 +813,10 @@ test("Settings -> System: what was only in the .env file, set here; the .env's v
   await page.reload();
   await expect(page.getByTestId('system-registries')).toHaveValue('registry.lan:5000=http://10.0.0.5:5000');
   await expect(page.getByTestId('system-update-exclude')).toHaveValue('^registry\\.lan/');
+  await expect(page.getByTestId('system-heartbeat')).toHaveValue('https://hc-ping.example.invalid/burrow-e2e');
   await lookAt(page, 'desktop-settings-system');
   // Emptied: the .env's values again, a session opens.
-  for (const id of ['system-max-sessions', 'system-idle-minutes', 'system-status-interval', 'system-update-exclude', 'system-registries', 'system-apps-domain']) await page.getByTestId(id).fill('');
+  for (const id of ['system-max-sessions', 'system-idle-minutes', 'system-status-interval', 'system-update-exclude', 'system-registries', 'system-apps-domain', 'system-heartbeat']) await page.getByTestId(id).fill('');
   await page.getByTestId('system-save').click();
   await expect(page.getByTestId('toasts')).toContainText('System settings saved.');
   expect(Object.values((await call('GET', '/api/settings/system')).body.saved!).every((v) => v === null)).toBe(true);

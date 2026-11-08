@@ -6,7 +6,7 @@ import { audit } from '../audit.js';
 import type { Ctx } from '../context.js';
 import { randomToken, sha256 } from '../crypto.js';
 import { removeDeviceEverywhere, removeKeys, takeGrants } from '../android/direct.js';
-import { devices, invites, passkeys, sessions, users } from '../db/schema.js';
+import { auditLog, devices, invites, passkeys, sessions, users } from '../db/schema.js';
 import { actor, HttpError, idParam, noContent, parse, requireAuth } from '../http.js';
 import type { SessionEvents } from './routes.js';
 
@@ -16,6 +16,32 @@ import type { SessionEvents } from './routes.js';
 // valid for a week; only its hash is stored.
 
 const INVITE_DAYS = 7;
+
+/** A one-time invite link (the token is only in the link; the database keeps its hash). */
+export function createInvite(ctx: Pick<Ctx, 'db' | 'now' | 'config'>, role: 'admin' | 'operator', createdBy: number | null): Invite {
+  const token = randomToken(24);
+  const now = ctx.now();
+  const row = ctx.db
+    .insert(invites)
+    .values({ tokenHash: sha256(token), role, createdBy, createdAt: now, expiresAt: now + INVITE_DAYS * 86_400_000 })
+    .returning()
+    .get();
+  return { id: row.id, role, createdAt: new Date(now).toISOString(), expiresAt: new Date(row.expiresAt).toISOString(), url: `${ctx.config.origin}/#/invite/${token}` };
+}
+
+/**
+ * Locked out (2026-11-07): the last admin lost every way to sign in (passkey,
+ * recovery codes, password). Whoever can run a command in Burrow's container
+ * (`docker compose exec burrow node dist/invite-admin.js`) gets an admin
+ * invite; the new admin then manages the old account. Nothing else changes,
+ * and it is in the audit log. Before, only scripts/reset.sh helped, which
+ * wipes everything.
+ */
+export function consoleAdminInvite(ctx: Pick<Ctx, 'db' | 'now' | 'config'>): Invite {
+  const invite = createInvite(ctx, 'admin', null);
+  ctx.db.insert(auditLog).values({ at: ctx.now(), userId: null, username: null, ip: 'console', action: 'invite.create', target: null, details: JSON.stringify({ role: 'admin', from: 'console' }) }).run();
+  return invite;
+}
 
 export function openInvite(ctx: Ctx, token: string): typeof invites.$inferSelect {
   const inv = ctx.db
@@ -153,15 +179,9 @@ export function registerUserRoutes(app: FastifyInstance, ctx: Ctx, events: Sessi
   /** A new invite: the link is shown once. */
   app.post('/api/invites', { config: { stepUp: true } }, async (req): Promise<Invite> => {
     const { role } = parse(z.object({ role: z.enum(['admin', 'operator']) }), req.body);
-    const token = randomToken(24);
-    const now = ctx.now();
-    const row = ctx.db
-      .insert(invites)
-      .values({ tokenHash: sha256(token), role, createdBy: requireAuth(req).user.id, createdAt: now, expiresAt: now + INVITE_DAYS * 86_400_000 })
-      .returning()
-      .get();
+    const invite = createInvite(ctx, role, requireAuth(req).user.id);
     audit(ctx, actor(req), 'invite.create', null, { role });
-    return { id: row.id, role, createdAt: new Date(now).toISOString(), expiresAt: new Date(row.expiresAt).toISOString(), url: `${ctx.config.origin}/#/invite/${token}` };
+    return invite;
   });
 
   app.delete('/api/invites/:id', async (req, reply) => {

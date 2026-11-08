@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ContainerSample, Host, HostContainers } from '@burrow/shared';
 import { eq } from 'drizzle-orm';
 import { hosts } from '../../src/db/schema.js';
-import { ContainerHistory } from '../../src/docker/history.js';
+import { ContainerHistory, HISTORY_HOST_MS } from '../../src/docker/history.js';
 import { makeApp, setupAdmin, type TestApp } from '../helpers.js';
 
 // Report 428102: a container's CPU and memory were only the last minutes the
@@ -88,6 +88,32 @@ describe('container history', () => {
     expect(hist.history(two.id, 'app', 86_400_000)).toHaveLength(2);
     expect(warn.mock.calls.filter((c) => String(c.at(-1)).includes('connection refused'))).toHaveLength(1);
     expect(jobs.list()).toEqual([expect.objectContaining({ name: 'container-history', runs: 2, ok: false, lastError: 'down: connection refused' })]);
+  });
+
+  it('a host that never answers no longer holds the round: the others are sampled again, the hung one is not asked again on top', async () => {
+    const { Jobs } = await import('../../src/jobs.js');
+    const hung = await t.json<Host>('POST', '/api/hosts', { name: 'hung', address: 'hung.lan', username: 'me' });
+    const fine = await t.json<Host>('POST', '/api/hosts', { name: 'fine', address: 'fine.lan', username: 'me' });
+    for (const h of [hung, fine]) t.ctx.db.update(hosts).set({ facts: JSON.stringify({ hasDocker: true }) }).where(eq(hosts.id, h.id)).run();
+    const jobs = new Jobs(t.ctx);
+    const warn = vi.spyOn(t.ctx.log, 'warn');
+    const asked: number[] = [];
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      // The hung host's read never ends (a stale NFS home under its SSH, say).
+      const hist = new ContainerHistory(t.ctx, (id) => (asked.push(id), id === hung.id ? new Promise<HostContainers>(() => {}) : Promise.resolve(snap(id, [['x', 'app', 1, 1]], t.clock.now))), jobs);
+      let ended = false;
+      void hist.tick().then(() => (ended = true));
+      await vi.advanceTimersByTimeAsync(HISTORY_HOST_MS + 1000);
+      expect(ended).toBe(true);
+      t.clock.now += 5 * 60_000;
+      await hist.tick();
+      expect(asked).toEqual([hung.id, fine.id, fine.id]);
+      expect(hist.history(fine.id, 'app', 86_400_000)).toHaveLength(2);
+      expect(warn.mock.calls.filter((c) => String(c.at(-1)).includes('hung: no answer in 2 min'))).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('forgets what is older than a month, and samples only hosts with Docker', async () => {

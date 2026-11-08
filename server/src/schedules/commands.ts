@@ -1,4 +1,4 @@
-import { desc, eq, inArray, lt } from 'drizzle-orm';
+import { desc, eq, inArray, isNull, lt } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { commandScheduleInput, scheduledScript, TIMED_OUT_CODE, type CommandRun, type CommandRunBrief, type CommandSchedule } from '@burrow/shared';
 import { audit } from '../audit.js';
@@ -42,6 +42,7 @@ export class CommandScheduler {
 
   // Every 20 seconds, each minute's run once (runKey): a timer a minute apart drifts and can step over a minute.
   start(): void {
+    this.closeOrphanRuns();
     // A tick that throws (the database busy for a moment) is said; the next one comes all the same.
     this.#timer = setInterval(() => void this.tick().catch((err: Error) => this.ctx.log.warn(`scheduled commands: the schedule check failed: ${err.message}`)), 20_000);
     this.#timer.unref();
@@ -49,6 +50,19 @@ export class CommandScheduler {
 
   stop(): void {
     if (this.#timer) clearInterval(this.#timer);
+  }
+
+  /**
+   * Before the first tick: a run is this process's own, so one not ended was cut off when the last
+   * one ended (a crash, a restart while it ran). Said so, not shown as running for the 30 days it
+   * is kept. Not fatal when it cannot be written (the data disk full): Burrow starts all the same.
+   */
+  closeOrphanRuns(): void {
+    try {
+      this.ctx.db.update(commandRuns).set({ endedAt: this.ctx.now(), error: 'Burrow stopped while this ran: how it ended is not known.' }).where(isNull(commandRuns.endedAt)).run();
+    } catch (err) {
+      this.ctx.log.error({ err }, 'scheduled commands: the runs of the last start could not be closed');
+    }
   }
 
   /** The schedules due this minute start (each once per minute, also after a restart); old runs go. */

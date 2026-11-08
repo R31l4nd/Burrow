@@ -601,6 +601,32 @@ Checked 2026-10-06.
   that service for one now (a request file in the data volume) and offers
   the newest encrypted archive for download (the backups folder mounted
   read-only); a restore stays a command with Burrow stopped (report 445f22).
+  - 2026-11-07: Settings -> Backups shows that command for the newest
+    archive, with a copy button and what it does.
+- **Healthchecks** and **Uptime Kuma**'s push monitors are dead-man
+  switches: a job calls a URL on a schedule, and the service alerts when
+  the calls stop. Backup tools (Duplicati, restic wrappers) and cron jobs
+  use them to say they ran.
+  - Taken over (2026-11-07): Burrow calls `HEARTBEAT_URL` (or the address
+    in Settings -> System) every five minutes while it runs well, so being
+    down, stuck or full is told by someone else; its own notifications
+    cannot.
+- **Home Assistant**'s Repairs and **Uptime Kuma**'s notifications about
+  itself tell an admin about the tool's own troubles, not only the
+  monitored things.
+  - Taken over (2026-11-07): Burrow sends over its channels, once per
+    problem and once when it is gone, a job that keeps failing, its data
+    disk filling (under 1 GB or 5 % free), a channel that fails (through
+    the others), new errors in its own log, a new version (checked daily)
+    and a self-update that failed or was rolled back; and once a week
+    "Burrow runs" on every channel, whose silence means something broke.
+- **fail2ban** bans an address after a few failed logins (by default 5 in
+  10 minutes), so a tool that logs in for you must not retry a refused
+  login at once.
+  - Done (2026-11-07): Burrow's alert streams wait longer after
+    each failed connect (10 s doubling up to 30 min, 5 min first after a
+    refused login), and try again within seconds when the host's
+    password or key is changed.
 
 ## Host administration
 

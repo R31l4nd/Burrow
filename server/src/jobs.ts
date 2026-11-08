@@ -51,11 +51,27 @@ export class Jobs {
   }
 }
 
-/** Runs fn over items, at most `limit` at a time; one slow or hung item does not hold up the others. */
-export async function eachLimited<T>(items: T[], limit: number, fn: (item: T) => Promise<void>, stop: () => boolean = () => false): Promise<void> {
+/**
+ * Runs fn over items, at most `limit` at a time; one slow or hung item does not hold up the others.
+ * With `itemMs`, an item not done in that time no longer holds its worker either (`late` is told):
+ * it ends or fails on its own, and the round ends without it. Without, one hung host held a worker
+ * and with it the whole round, and a round runs one at a time: sampling stopped for every host.
+ */
+export async function eachLimited<T>(items: T[], limit: number, fn: (item: T) => Promise<void>, stop: () => boolean = () => false, opts: { itemMs?: number; late?: (item: T) => void } = {}): Promise<void> {
   let next = 0;
+  const one = async (item: T) => {
+    if (!opts.itemMs) return fn(item);
+    let timer: NodeJS.Timeout | undefined;
+    const late = new Promise<true>((r) => (timer = setTimeout(() => r(true), opts.itemMs)));
+    try {
+      // Failing in time fails the round, as without a deadline; later, it is the item's own (handled through the race).
+      if ((await Promise.race([fn(item).then(() => false as const), late])) === true) opts.late?.(item);
+    } finally {
+      clearTimeout(timer);
+    }
+  };
   const worker = async () => {
-    while (next < items.length && !stop()) await fn(items[next++]!);
+    while (next < items.length && !stop()) await one(items[next++]!);
   };
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
 }

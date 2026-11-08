@@ -66,6 +66,7 @@ export function registerTerminalRoutes(app: FastifyInstance, ctx: Ctx, manager: 
     const a = requireAuth(req);
     let viewerId: string | null = null;
     let closed = false;
+    let failed = false;
     // Messages can arrive before attach() resolves; keep them in order.
     const early: string[] = [];
 
@@ -82,12 +83,19 @@ export function registerTerminalRoutes(app: FastifyInstance, ctx: Ctx, manager: 
       const m = clientMessage.safeParse(data);
       if (!m.success) return;
       const msg = m.data;
-      if (msg.t === 'input') manager.input(id, viewerId, msg.d);
-      else if (msg.t === 'resize') manager.resize(id, viewerId, msg.cols, msg.rows, msg.active ?? false);
-      else if (msg.t === 'password') manager.pastePassword(id, viewerId, actor(req));
-      else if (msg.t === 'scroll') manager.scroll(id, viewerId, msg.lines);
-      else if (msg.t === 'history') void manager.history(id, viewerId, msg.mouse ?? false);
-      else send({ t: 'pong' });
+      // Never out of the socket's event: a throw there (a database write on a full disk) ended the
+      // process, with every session of everyone in it. Said once per socket.
+      try {
+        if (msg.t === 'input') manager.input(id, viewerId, msg.d);
+        else if (msg.t === 'resize') manager.resize(id, viewerId, msg.cols, msg.rows, msg.active ?? false);
+        else if (msg.t === 'password') manager.pastePassword(id, viewerId, actor(req));
+        else if (msg.t === 'scroll') manager.scroll(id, viewerId, msg.lines);
+        else if (msg.t === 'history') void manager.history(id, viewerId, msg.mouse ?? false);
+        else send({ t: 'pong' });
+      } catch (err) {
+        if (!failed) ctx.log.error({ err, session: id }, 'terminal: a message from a viewer could not be handled');
+        failed = true;
+      }
     };
 
     socket.on('message', (raw) => handle(String(raw)));

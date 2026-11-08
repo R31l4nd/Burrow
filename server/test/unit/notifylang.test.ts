@@ -99,3 +99,21 @@ describe('testing a channel', () => {
     expect((await t.request('POST', '/api/channels/9999/test', {})).json()).toMatchObject({ error: 'not_found' });
   });
 });
+
+describe('a channel that fails (2026-11-07)', () => {
+  it('is kept as failing, since its first failure, until a send through it works again', async () => {
+    const t0 = t.ctx.now();
+    let up = false;
+    const n = new Notifier(t.ctx, { fetch: async () => (up ? new Response('ok') : new Response('nope', { status: 401 })) });
+    t.ctx.db.insert(channels).values({ kind: 'ntfy', name: 'Phone', enabled: true, topics: JSON.stringify(['alerts']), lang: 'en', config: JSON.stringify({ url: 'https://ntfy.example.com', topic: 'x' }), createdAt: t0 } as typeof channels.$inferInsert).run();
+    const notice = { topic: 'alerts' as const, title: 't', body: 'b', page: '/', priority: 3 };
+    expect((await n.notify(notice)).sent).toBe(0);
+    t.advance(60_000);
+    await n.notify(notice);
+    expect(n.failing.get('Phone')).toMatchObject({ since: t0 });
+    expect(n.failing.get('Phone')!.error).toMatch(/401/);
+    up = true;
+    expect((await n.notify(notice)).sent).toBe(1);
+    expect(n.failing.size).toBe(0);
+  });
+});

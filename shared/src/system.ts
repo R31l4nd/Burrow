@@ -48,6 +48,13 @@ export const systemSettingsInput = z.object({
     .max(253)
     .regex(/^[a-z0-9.-]*$/i, 'a domain name such as example.com')
     .nullable(),
+  // Called every five minutes while Burrow runs well (a dead-man switch); empty here: the .env's.
+  heartbeatUrl: z
+    .string()
+    .trim()
+    .max(2000)
+    .regex(/^(https?:\/\/\S+)?$/i, 'an http(s) address')
+    .nullable(),
 });
 export type SystemSettingsInput = z.infer<typeof systemSettingsInput>;
 
@@ -58,6 +65,7 @@ export interface SystemValues {
   updateCheckExclude: string;
   registryEndpoints: string;
   appsBaseDomain: string;
+  heartbeatUrl: string;
 }
 
 /** What is set here (null: the .env's), the .env's own values, and what applies now. */

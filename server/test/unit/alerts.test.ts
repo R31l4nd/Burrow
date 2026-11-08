@@ -27,7 +27,7 @@ describe('masking', () => {
       ['authorization="ApiKey QWxhZGRpbjpvcGVuIHNlc2FtZQ"', 'QWxhZGRpbjpvcGVuIHNlc2FtZQ'],
       ['connect: pwd=Winter2026! user=app', 'Winter2026!'],
       ['x-auth-token: ab12cd34ef56', 'ab12cd34ef56'],
-      // Put together here, so the repository holds no key-shaped block (the public export refuses one).
+      // Put together here, so the repository holds no key-shaped block (scripts/check-public.sh refuses one).
       [`-----BEGIN OPENSSH ${'PRIVATE'} KEY----- b3BlbnNzaC1rZXktdjEAAAAA -----END OPENSSH ${'PRIVATE'} KEY-----`, 'b3BlbnNzaC1rZXktdjEAAAAA'],
     ] as const;
     for (const [line, secret] of leaks) expect(maskText(line, { ips: false }), line).not.toContain(secret);

@@ -13,7 +13,7 @@ import type { StatusMonitor } from '../hosts/status.js';
 // (the terminal limits, the update check, registries, apps) has the value set here at once.
 
 const KEY = 'system';
-const NONE: SystemSettingsInput = { terminalMaxSessions: null, terminalIdleMinutes: null, statusIntervalSeconds: null, updateCheckExclude: null, registryEndpoints: null, appsBaseDomain: null };
+const NONE: SystemSettingsInput = { terminalMaxSessions: null, terminalIdleMinutes: null, statusIntervalSeconds: null, updateCheckExclude: null, registryEndpoints: null, appsBaseDomain: null, heartbeatUrl: null };
 
 // The .env's own values, taken before anything set here changed the config.
 const fromEnv = new WeakMap<Config, { values: SystemValues; endpoints: Record<string, string>; exclude: RegExp | null }>();
@@ -32,6 +32,7 @@ function envOf(c: Config) {
           .map(([k, v]) => `${k}=${v}`)
           .join(','),
         appsBaseDomain: c.appsBaseDomain ?? '',
+        heartbeatUrl: c.heartbeatUrl ?? '',
       },
       endpoints: c.registryEndpoints,
       exclude: c.updateCheckExclude,
@@ -58,6 +59,7 @@ function apply(c: Config, saved: SystemSettingsInput): SystemValues {
     updateCheckExclude: saved.updateCheckExclude ?? env.values.updateCheckExclude,
     registryEndpoints: saved.registryEndpoints ?? env.values.registryEndpoints,
     appsBaseDomain: saved.appsBaseDomain ?? env.values.appsBaseDomain,
+    heartbeatUrl: saved.heartbeatUrl ?? env.values.heartbeatUrl,
   };
   c.terminalMaxSessions = v.terminalMaxSessions;
   c.terminalIdleMinutes = v.terminalIdleMinutes;
@@ -65,6 +67,7 @@ function apply(c: Config, saved: SystemSettingsInput): SystemValues {
   c.updateCheckExclude = saved.updateCheckExclude === null ? env.exclude : v.updateCheckExclude ? new RegExp(v.updateCheckExclude) : null;
   c.registryEndpoints = saved.registryEndpoints === null ? env.endpoints : (parseRegistryEndpoints(v.registryEndpoints) ?? {});
   c.appsBaseDomain = v.appsBaseDomain || null;
+  c.heartbeatUrl = v.heartbeatUrl || null;
   return v;
 }
 

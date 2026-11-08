@@ -35,6 +35,10 @@ const schema = z.object({
   // Fills the * in SWAG's swag_url labels when finding apps. Default: the
   // last two labels of the origin (burrow.local.example.com -> example.com).
   APPS_BASE_DOMAIN: z.string().trim().regex(/^[a-z0-9.-]+$/i).optional(),
+  // A dead-man switch (Healthchecks, an Uptime Kuma push monitor): Burrow
+  // calls this address every five minutes while it runs well, so the service
+  // there tells you when the calls stop (Burrow down, its host gone).
+  HEARTBEAT_URL: z.string().trim().url().regex(/^https?:\/\//).optional(),
   // Where Burrow reaches a registry whose name means something else from
   // inside its container, e.g. a registry on the host's localhost:
   // "localhost:5000=http://172.17.0.1:5000". Comma separated.
@@ -76,6 +80,7 @@ export interface Config {
   terminalIdleMinutes: number;
   androidCertSha256: string[];
   appsBaseDomain: string | null;
+  heartbeatUrl: string | null;
   registryEndpoints: Record<string, string>;
   updateCheckExclude: RegExp | null;
   ignoreLabel: string;
@@ -119,6 +124,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     terminalMaxSessions: e.TERMINAL_MAX_SESSIONS,
     terminalIdleMinutes: e.TERMINAL_IDLE_MINUTES,
     appsBaseDomain: e.APPS_BASE_DOMAIN ?? null,
+    heartbeatUrl: e.HEARTBEAT_URL ?? null,
     registryEndpoints: parseEndpoints(e.REGISTRY_ENDPOINTS),
     updateCheckExclude: e.UPDATE_CHECK_EXCLUDE ? new RegExp(e.UPDATE_CHECK_EXCLUDE) : null,
     ignoreLabel: e.BURROW_IGNORE_LABEL,

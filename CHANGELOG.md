@@ -6,6 +6,78 @@ says how it was verified.
 
 ## [Unreleased]
 
+## [2.21.0] - 2026-11-08
+
+### Added
+
+- Burrow tells about itself over the notification channels: a background
+  job that keeps failing for an hour, its data disk getting full (under
+  1 GB or 5 % free, well before it is full), a channel that fails (told
+  through the others), new errors in its own log, and a self-update that
+  failed or was rolled back: each once, and once more when it is gone. A
+  new Burrow version goes to the channels for image updates (checked once
+  a day). Once a week every channel gets "Burrow runs": when it stops
+  coming, Burrow or that channel is broken.
+- A heartbeat address (Settings -> System, or `HEARTBEAT_URL`): Burrow
+  calls it every five minutes while it runs well, so Healthchecks or an
+  Uptime Kuma push monitor can tell you when Burrow is down, which Burrow
+  cannot say itself.
+- Settings -> Backups: how to put a backup back, with the command for the
+  newest archive to copy.
+- Locked out: `docker compose exec burrow node dist/invite-admin.js`
+  prints a one-time admin invite, so the last admin who lost every way to
+  sign in gets back in without wiping anything (docs/DEPLOY.md).
+
+### Fixed
+
+- A wrong password or key had Burrow's alert streams log in to the host
+  every ten seconds, so fail2ban banned Burrow within minutes (terminals
+  and files with it); a host that was off was tried as often. They now
+  wait longer after each failure (ten seconds doubling up to half an hour,
+  five minutes first after a refused login) and try again within seconds
+  when the host's password or key is changed.
+- One host that never answered (a stale NFS home folder) held every call
+  for it forever, and stopped the statistics and container history of
+  every other host. A connection now gets 30 seconds, and a round no
+  longer waits on one host.
+- A lost master key (`secret.key` gone, `BURROW_SECRET` changed) was
+  replaced by a new one over the database, and every stored password and
+  key failed later with a cryptic error. Burrow now refuses to start and
+  says why and what to do.
+- A full data disk ended the whole process at a keystroke in a terminal,
+  and then again at every start. A shell printing faster than the server
+  could follow (`yes`, a big `cat`) ended it too; the host is now held
+  back instead.
+- A terminal recording that reached its size limit stopped, but the
+  session still said it recorded. Recordings and scheduled runs that were
+  open when Burrow stopped are closed at the next start, instead of
+  showing as running (a recording could not be removed).
+- The database's write-ahead log stayed as large as its biggest prune.
+
+### Verified
+
+- Each fix with a test that failed on the code before it: the alert
+  streams' wait after a refused login and its reset on a new key, a host
+  that never answers (the connection's 30 seconds, a round not waiting on
+  it), a lost master key refused at start, a full disk and a shell
+  printing too fast in the terminal manager, a recording's size limit
+  telling the session, recordings and runs left open closed at start.
+- Burrow telling about itself: each kind told once and once more when
+  gone, also across a restart; nothing lost when no channel took it; the
+  version check once a day and again an hour after it failed; the weekly
+  message on every channel. The heartbeat sent, held back while Burrow is
+  unwell, a failure logged once. The console invite makes a one-time admin
+  invite and an audit row.
+- e2e: Settings -> Backups shows the restore steps and copies the command;
+  Settings -> System saves and clears the heartbeat address; the
+  screenshots on a phone in Dutch and on a computer looked at.
+- Integration tests of the terminal, sharing, the shell, alerts, host
+  statistics and scheduled commands on the test sshd; new ones of Burrow
+  telling about itself as it runs (the version check over SSH, the
+  notices through the channels, the heartbeat) and of the master key
+  check against what Burrow seals; the gate; the Android test; a fresh
+  install.
+
 ## [2.20.3] - 2026-11-08
 
 The first release on GitHub (https://github.com/R31l4nd/Burrow).

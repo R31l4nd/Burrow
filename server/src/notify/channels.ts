@@ -254,6 +254,9 @@ export function emailHtml(n: Notice, url: string, lang: 'en' | 'nl'): string {
 
 /** Every enabled channel for a topic gets the notice; failures are logged, not thrown. */
 export class Notifier {
+  /** Channels whose last send failed, by name: since when, and why (told by the self-watch through the others). */
+  readonly failing = new Map<string, { error: string; since: number }>();
+
   constructor(
     private readonly ctx: Ctx,
     private readonly deps: SendDeps = {},
@@ -278,8 +281,10 @@ export class Notifier {
         try {
           await sendTo(this.ctx, r, n, this.deps);
           sent++;
+          this.failing.delete(r.name);
         } catch (err) {
           failed.push({ channel: r.name, error: (err as Error).message });
+          if (!this.failing.has(r.name)) this.failing.set(r.name, { error: (err as Error).message, since: this.ctx.now() });
           this.ctx.log.warn(`notify: ${r.kind} "${r.name}" failed: ${(err as Error).message}`);
         }
       }),

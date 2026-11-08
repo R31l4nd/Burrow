@@ -589,6 +589,20 @@ enter the secret again, or it is dropped.
   `priority`, `data`); with a secret, `X-Burrow-Signature: sha256=<HMAC of
   the body>`.
 
+Burrow also tells about itself, on the channels that get alerts: a
+background job that keeps failing for an hour, its data disk getting full
+(under 1 GB or 5 % free), a channel that fails (told through the others),
+new errors in its own log, and a self-update that failed or was rolled
+back; each once, and once more when it is gone. A new Burrow version goes
+to the channels that get image updates (checked once a day). Once a week
+every channel gets "Burrow runs": when it stops coming, Burrow or that
+channel is broken.
+
+Burrow cannot tell you that it is down itself. For that, give it a
+heartbeat address (Settings -> System, or `HEARTBEAT_URL`): it calls it
+every five minutes while it runs well, and Healthchecks or an Uptime Kuma
+push monitor there tells you when the calls stop.
+
 ## Reports
 
 Bottom bar -> *Containers* -> *Reports*. A *Weekly report* is there, off:

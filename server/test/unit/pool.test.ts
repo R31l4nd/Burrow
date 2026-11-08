@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events';
 import type { Client, SFTPWrapper } from 'ssh2';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Ctx } from '../../src/context.js';
-import { SftpPool } from '../../src/files/pool.js';
+import { CONNECT_MS, SftpPool } from '../../src/files/pool.js';
 
 // The per-host SSH pool, with connections made up by the test.
 
@@ -106,5 +106,50 @@ describe('one SSH connection per host', () => {
     expect(first.ended).toBe(1);
     await use(p);
     expect(clients).toHaveLength(2);
+  });
+
+  it('a connection that does not get ready (realpath on a stale NFS home) fails in time, and the next call connects again', async () => {
+    const signals: AbortSignal[] = [];
+    let hang = true;
+    const clients: FakeClient[] = [];
+    const p = new SftpPool({} as Ctx, {
+      connect: async (_id, signal) => {
+        signals.push(signal);
+        const client = new FakeClient();
+        clients.push(client);
+        // Hung after SSH was up: the pool's give-up must end it (the real openSftp ends its client on the signal).
+        if (hang) return new Promise(() => {});
+        return { client: client as unknown as Client, sftp: {} as SFTPWrapper, home: '/' };
+      },
+      identity: () => 'same',
+    });
+    let got: unknown = 'pending';
+    void use(p).then(
+      (c) => (got = c),
+      (err: unknown) => (got = err),
+    );
+    await vi.advanceTimersByTimeAsync(CONNECT_MS + 1000);
+    expect(got).toMatchObject({ code: 'connect_timeout' });
+    expect(signals[0]!.aborted).toBe(true);
+    hang = false;
+    expect(await use(p)).toBe(clients[1]);
+  });
+
+  it('a connection made after the pool gave up on it is ended: nobody has it', async () => {
+    const clients: FakeClient[] = [];
+    let n = 0;
+    const p = new SftpPool({} as Ctx, {
+      connect: async () => {
+        const client = new FakeClient();
+        clients.push(client);
+        if (n++ === 0) await new Promise((r) => setTimeout(r, CONNECT_MS + 10_000));
+        return { client: client as unknown as Client, sftp: {} as SFTPWrapper, home: '/' };
+      },
+      identity: () => 'same',
+    });
+    const first = use(p).catch((err: Error & { code?: string }) => err.code);
+    await vi.advanceTimersByTimeAsync(CONNECT_MS + 11_000);
+    expect(await first).toBe('connect_timeout');
+    expect(clients[0]!.ended).toBe(1);
   });
 });
