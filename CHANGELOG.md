@@ -57,6 +57,9 @@ says how it was verified.
   hours on 2026-11-08, the first CI run with them): the editor's tools
   (hadolint, ruff, taplo, ShellCheck) are tried again, then fetched
   through GitHub's API, checked against the same SHA-256.
+- The release's APK did not build on GitHub: the build ran as uid 1000,
+  and the runner's checkout is another user's. It now runs as the user
+  who builds.
 
 ### Verified
 
@@ -81,6 +84,8 @@ says how it was verified.
   notices through the channels, the heartbeat) and of the master key
   check against what Burrow seals; the gate; the Android test; a fresh
   install.
+- The release's APK built and signed (v3) as another uid than 1000, in a
+  checkout of that uid, as on GitHub's runner; it failed so before.
 - Example addresses in the docs, tests and README pictures are no
   machine's real ones (10.0.0.x); the pictures made again.
 - The image's tool stage built without cache while GitHub's release

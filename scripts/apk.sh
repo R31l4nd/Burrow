@@ -13,6 +13,10 @@ grep -q '^KEYSTORE_PASSWORD=..' .env.build || { echo "KEYSTORE_PASSWORD in .env.
 mkdir -p artifacts android/keystore
 
 compose() { docker compose --profile build "$@"; }
+# The build runs as the user who calls this: it writes in that user's
+# checkout, and on CI that user is not uid 1000 (the first release built on
+# GitHub, 2026-11-08, could not write android/ there).
+export PUID="${PUID:-$(id -u)}" PGID="${PGID:-$(id -g)}"
 
 if [ "${1:-}" = keystore ]; then
   [ -f android/keystore/burrow.jks ] && { echo "android/keystore/burrow.jks exists already; not replacing it (installed apps would refuse updates)."; exit 1; }
