@@ -4,6 +4,7 @@ import type { Ctx } from '../context.js';
 import { resolveTarget } from '../hosts/service.js';
 import { HttpError } from '../http.js';
 import { openSsh } from '../ssh/connect.js';
+import { retryAfter } from '../ssh/retry.js';
 import { storedKeys } from '../ssh/knownhosts.js';
 
 // One SSH connection with an SFTP channel per host, shared by all file
@@ -74,10 +75,22 @@ export class SftpPool {
   readonly #conns = new Map<number, Slot>();
   readonly #connect: (hostId: number, signal: AbortSignal) => Promise<Opened>;
   readonly #identity: (hostId: number) => string;
+  readonly #now: () => number;
+  readonly #random: () => number;
+  /**
+   * Hosts whose connects fail: how many in a row, the last error, and until
+   * when the background leaves them alone. The alert streams waited longer
+   * after each failure, but statistics, the container monitor and package
+   * checks still connected every round: a wrong password was a failed login
+   * every few minutes for fail2ban, a host that was off a timeout each time.
+   */
+  readonly #failing = new Map<number, { count: number; error: unknown; until: number; identity: string }>();
 
-  constructor(ctx: Ctx, deps: { connect?: (hostId: number, signal: AbortSignal) => Promise<Opened>; identity?: (hostId: number) => string } = {}) {
+  constructor(ctx: Ctx, deps: { connect?: (hostId: number, signal: AbortSignal) => Promise<Opened>; identity?: (hostId: number) => string; now?: () => number; random?: () => number } = {}) {
     this.#connect = deps.connect ?? ((id, signal) => openSftp(ctx, id, signal));
     this.#identity = deps.identity ?? ((id) => identityOf(ctx, id));
+    this.#now = deps.now ?? (() => ctx.now());
+    this.#random = deps.random ?? Math.random;
   }
 
   /** What a connection to the host is made with now (see identityOf): changed, a connection that failed may succeed. */
@@ -128,13 +141,26 @@ export class SftpPool {
       o.sftp.on?.('error', sftpGone);
       return entry;
     });
-    slot.entry.catch(() => this.#forget(hostId, slot));
+    slot.entry.then(
+      () => this.#failing.delete(hostId),
+      (err: unknown) => {
+        this.#forget(hostId, slot);
+        const count = (this.#failing.get(hostId)?.count ?? 0) + 1;
+        const code = (err as { code?: unknown }).code;
+        this.#failing.set(hostId, { count, error: err, identity, until: this.#now() + retryAfter(count, typeof code === 'string' ? code : undefined, this.#random) });
+      },
+    );
     this.#conns.set(hostId, slot);
     return slot;
   }
 
-  /** Run `fn` with the host's connection; keeps it open while in use. */
-  async with<T>(hostId: number, fn: (e: { client: Client; sftp: SFTPWrapper; home: string }) => Promise<T>): Promise<T> {
+  /**
+   * Run `fn` with the host's connection; keeps it open while in use.
+   * `background`: a round nobody waits on (statistics, the monitor, package
+   * checks): while a host's connects fail and its wait is not over, its last
+   * error at once, no new connect. What a person opens always tries.
+   */
+  async with<T>(hostId: number, fn: (e: { client: Client; sftp: SFTPWrapper; home: string }) => Promise<T>, opts: { background?: boolean } = {}): Promise<T> {
     const identity = this.#identity(hostId);
     let slot = this.#conns.get(hostId);
     if (slot && slot.identity !== identity) {
@@ -142,6 +168,9 @@ export class SftpPool {
       this.#retire(hostId, slot);
       slot = undefined;
     }
+    const failing = this.#failing.get(hostId);
+    // Changed since (another password, a key installed): tried again at once.
+    if (opts.background && !slot && failing && this.#now() < failing.until && failing.identity === identity) throw failing.error;
     slot ??= this.#open(hostId, identity);
     const e = await slot.entry;
     if (e.timer) clearTimeout(e.timer);

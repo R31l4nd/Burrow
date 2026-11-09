@@ -1,0 +1,1 @@
+Instellingen -> Android zegt het als de aangeboden app ouder is dan Burrow, met een link naar de releases. De suggesties in de terminal hebben nu de lettergrootte van de terminal en nemen minder ruimte in. Vensters sluiten zonder te flikkeren.

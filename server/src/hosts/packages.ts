@@ -79,19 +79,19 @@ export class PackageChecks {
   ) {}
 
   /** A check now; one at a time per host, shared by whoever asks meanwhile. */
-  check(hostId: number): Promise<PackageReport> {
+  check(hostId: number, background = false): Promise<PackageReport> {
     const running = this.#runs.get(hostId);
     if (running) return running;
-    const run = this.#checkNow(hostId).finally(() => this.#runs.delete(hostId));
+    const run = this.#checkNow(hostId, background).finally(() => this.#runs.delete(hostId));
     this.#runs.set(hostId, run);
     return run;
   }
 
-  async #checkNow(hostId: number): Promise<PackageReport> {
+  async #checkNow(hostId: number, background: boolean): Promise<PackageReport> {
     const at = new Date(this.ctx.now()).toISOString();
     let report: PackageReport;
     try {
-      const r = await this.pool.with(hostId, ({ client }) => exec(client, PACKAGES_COMMAND, 120_000, 4 << 20));
+      const r = await this.pool.with(hostId, ({ client }) => exec(client, PACKAGES_COMMAND, 120_000, 4 << 20), { background });
       report = r.truncated ? { ...parsePackageCheck(hostId, at, ''), message: 'The answer was larger than Burrow reads (4 MB).' } : parsePackageCheck(hostId, at, r.stdout, r.stderr);
     } catch (err) {
       report = { hostId, checkedAt: at, state: 'error', manager: null, listAt: null, updates: [], security: 0, reboot: false, message: (err as Error).message };
@@ -146,7 +146,8 @@ export class PackageChecks {
     // Only hosts Burrow could read (facts): one never reached is not checked over and over.
     const h = this.ctx.db.select({ facts: hosts.facts }).from(hosts).where(eq(hosts.id, hostId)).get();
     if (!h?.facts) return;
-    await this.check(hostId);
+    // Due by itself: a host whose connects fail is left alone until its wait is over (the pool's backoff).
+    await this.check(hostId, true);
   }
 }
 

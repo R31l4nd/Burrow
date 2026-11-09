@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Alert, ConnectResult, DiskActivity, DiskHistory, Host, HostLimitsView, HostSample, HostStats, SmartReport } from '@burrow/shared';
+import { eq } from 'drizzle-orm';
+import { hosts } from '../../src/db/schema.js';
 import { makeApp, setupAdmin, totpNow, type TestApp } from '../helpers.js';
 
 // Phase 11: a host's own numbers from the test sshd (a Debian container):
@@ -48,6 +50,19 @@ describe('host statistics', () => {
     // Muting works for host subjects too.
     await t.json('POST', '/api/alerts/mutes', { hostId: h.id, container: '@disk /', minutes: 60 });
     (t.hostStats.thresholds as { diskPercent: number }).diskPercent = 90;
+  });
+
+  it('a host that stops answering: a Host unreachable alert at the second round that cannot reach it', async () => {
+    const got: Alert[] = [];
+    t.alerts.onAlert = (a) => got.push(a);
+    // A host that answered once (its facts) and now refuses every connect.
+    const gone = await t.json<Host>('POST', '/api/hosts', { name: 'gone-away', address: '127.0.0.1', port: 1, username: 'tester', authMethod: 'password', password: 'x' });
+    t.ctx.db.update(hosts).set({ facts: JSON.stringify({ checkedAt: new Date(t.clock.now).toISOString() }) }).where(eq(hosts.id, gone.id)).run();
+    await t.hostStats.tick();
+    expect(got.filter((a) => a.hostId === gone.id)).toEqual([]);
+    t.advance(5 * 60_000);
+    await t.hostStats.tick();
+    await expect.poll(() => got.filter((a) => a.hostId === gone.id).map((a) => [a.container, a.ruleName, a.title.split(':')[0]])).toEqual([['@reachable', 'Host unreachable', 'not reachable']]);
   });
 
   it('reads each whole disk and what it did over the second (report d4a9c0)', async () => {

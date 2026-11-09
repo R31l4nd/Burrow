@@ -1,6 +1,6 @@
 import type { BackgroundJob, LogEvent, Notice, UpdateCheck } from '@burrow/shared';
 import { describe, expect, it } from 'vitest';
-import { DISK_LOW_BYTES, diskProblem, SelfWatch, type SelfWatchDeps } from '../../src/selfwatch.js';
+import { DISK_LOW_BYTES, diskProblem, SelfWatch, updateNotices, type SelfWatchDeps } from '../../src/selfwatch.js';
 import { makeApp, type TestApp } from '../helpers.js';
 
 const HOUR = 3600_000;
@@ -30,7 +30,7 @@ function watch(t: TestApp, over: Partial<SelfWatchDeps> = {}) {
 
 const job = (name: BackgroundJob['name'], error: string | null, at: string): BackgroundJob => ({ name, lastRunAt: at, ms: 5, runs: 3, lastError: error, lastErrorAt: error ? at : null, ok: error === null });
 
-const check = (over: Partial<UpdateCheck> = {}): UpdateCheck => ({ target: null, running: '2.20.3', mode: 'git', available: '2.20.3', behind: 0, subject: null, last: null, problem: null, breaking: [], ...over });
+const check = (over: Partial<UpdateCheck> = {}): UpdateCheck => ({ target: null, running: '2.20.3', mode: 'git', available: '2.20.3', behind: 0, subject: null, last: null, problem: null, breaking: [], image: null, pinned: null, ...over });
 
 describe('Burrow tells about itself (2026-11-07)', () => {
   it('a job failing for an hour is told once, and once more when it works again', async () => {
@@ -119,6 +119,13 @@ describe('Burrow tells about itself (2026-11-07)', () => {
     // Not newer than what runs: nothing.
     expect(sent.map((n) => n.title)).not.toContain('Burrow 2.20.3 is available');
     await t.close();
+  });
+
+  it('an install whose image tag does not reach the new version is told the tag that does', () => {
+    const pinned = updateNotices(check({ mode: 'image', available: '2.22.0', image: 'ghcr.io/r31l4nd/burrow:2.21', pinned: { image: 'ghcr.io/r31l4nd/burrow:2.21', next: 'ghcr.io/r31l4nd/burrow:2.22' } }))[0]!;
+    expect(pinned.en.body).toContain('set BURROW_IMAGE=ghcr.io/r31l4nd/burrow:2.22 in .env');
+    expect(pinned.nl.body).toContain('zet BURROW_IMAGE=ghcr.io/r31l4nd/burrow:2.22 in .env');
+    expect(updateNotices(check({ mode: 'image', available: '2.22.0', image: 'ghcr.io/r31l4nd/burrow:latest' }))[0]!.en.body).not.toContain('BURROW_IMAGE');
   });
 
   it('a check that fails is tried again the next hour, not a day later', async () => {

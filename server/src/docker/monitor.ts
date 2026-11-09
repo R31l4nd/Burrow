@@ -92,7 +92,8 @@ export class DockerMonitor {
   }
 
   /** One poll now, without watching (tests, and hosts shown once). */
-  async poll(hostId: number, withStats = true): Promise<HostContainers> {
+  /** `background`: the watch's own round, which waits out a host whose connects fail (the pool's backoff). */
+  async poll(hostId: number, withStats = true, background = false): Promise<HostContainers> {
     const hostName = (() => {
       try {
         return getHost(this.ctx, hostId).name;
@@ -102,7 +103,7 @@ export class DockerMonitor {
     })();
     const at = new Date(this.ctx.now()).toISOString();
     try {
-      const r = await this.pool.with(hostId, ({ client }) => exec(client, withStats ? MONITOR_COMMAND : STATE_COMMAND, 30_000, 4 << 20));
+      const r = await this.pool.with(hostId, ({ client }) => exec(client, withStats ? MONITOR_COMMAND : STATE_COMMAND, 30_000, 4 << 20), { background });
       // Cut off: not all containers (a half list read as "these are all"; AUDIT2 DO-13).
       if (r.truncated) return { hostId, hostName, containers: [], stats: {}, history: {}, error: "docker's answer was larger than Burrow reads (4 MB)", at };
       // Failed is not empty: a host whose docker cannot be read has no "no containers".
@@ -137,7 +138,7 @@ export class DockerMonitor {
     // State every poll, CPU and memory every STATS_EVERY polls (the rest
     // carry the last sample on).
     const withStats = (s.polls++ % STATS_EVERY) === 0;
-    const h = await this.poll(hostId, withStats);
+    const h = await this.poll(hostId, withStats, true);
     if (!withStats && s.last) h.stats = s.last.stats;
     const now = this.ctx.now();
     // A watch just started: the kept hour first, so the list is not empty at every visit.

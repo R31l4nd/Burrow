@@ -415,8 +415,10 @@ async function termRowsInside(page: Page, where: string) {
       return out;
     });
   // Right after the window changed size the fit is still on its way (a frame, the session's new size
-  // from the server): a moment for it, then what stays cut is cut (the sizes run, 2026-11-06).
-  await page.waitForFunction(`(${measure.toString()})().length === 0`, undefined, { timeout: 3000 }).catch(() => {});
+  // from the server): a moment for it, then what stays cut is cut (the sizes run, 2026-11-06). Up to
+  // ten seconds: under a gate's load three were not always enough (a NOTE at size-desktop-terminal);
+  // a fit that is done ends the wait at once.
+  await page.waitForFunction(`(${measure.toString()})().length === 0`, undefined, { timeout: 10_000 }).catch(() => {});
   const cut = await page.evaluate(measure);
   expect.soft(cut, `terminal rows or columns cut off by its box (${where})`).toEqual([]);
 }

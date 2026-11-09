@@ -120,7 +120,9 @@ loading, error, many) are listed in the tour, not all of them in every pass.
 
 - Touch targets are at least 36 px; key bars only while typing. The
   terminal's key bar and text box are the exception: 28 px high, the keys
-  only as wide as their label (they take room from the terminal), and the
+  only as wide as their label (they take room from the terminal); its
+  suggestions are as tall as the text box, in the terminal's own font size
+  and quieter than it (report c02b7a); and the
   key bar stays on a touch screen with the keyboard closed too, on purpose:
   its keys (arrows, Esc, Ctrl+C, page up and down) are used without typing,
   to answer a program or scroll it. On a computer with its own keyboard it

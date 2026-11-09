@@ -724,7 +724,9 @@ password). A disk 90% full, a disk SMART calls failing or with new bad
 sectors, heat, and a busy host raise alerts (the *Host health* rule). A
 short peak does not: the CPU counts when its average over the five minutes
 between samples is 90% or more, memory (95%) and heat when two samples in a
-row are over. Each
+row are over. A host that two samples in a row cannot reach raises a *Host
+unreachable* alert, and another when it answers again: a rule of its own,
+to switch off when hosts are off on purpose (woken with Wake-on-LAN). Each
 disk gets a verdict from the five counts Backblaze found to go with failing
 disks (SMART 5 reallocated, 187 uncorrectable, 188 command timeouts, 197
 pending, 198 unreadable): all zero is *good*, any above zero *watch it*

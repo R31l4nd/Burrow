@@ -39,6 +39,14 @@
     actions?: Snippet;
   } = $props();
 
+  // Closing, it stays drawn while it fades: its title as it was, not the one
+  // of the state cleared on close ("Direct route: " with no name, report 693cf4).
+  let keptTitle = $state('');
+  $effect.pre(() => {
+    if (open) keptTitle = title;
+  });
+  const shownTitle = $derived(open ? title : keptTitle);
+
   let el: HTMLDialogElement | undefined = $state();
   let bodyEl: HTMLDivElement | undefined = $state();
   let bodyScrolls = $state(false);
@@ -160,7 +168,7 @@
   }}
 >
   <header>
-    <h2>{title}</h2>
+    <h2>{shownTitle}</h2>
     <!-- The report button on the page is behind an open dialog (the page is
          inert then): while armed, each dialog has its own. -->
     {#if bug.armed && !bug.open && tour !== 'bug-report'}
@@ -241,10 +249,15 @@
   /* A column: only the body scrolls, the title, its close button and the
      footer's buttons stay in sight (UIA-01, UIB-01: the whole dialog
      scrolled, Save below the screen, the title gone). */
-  dialog[open] {
-    display: flex;
+  /* The column's other parts on the dialog itself, not only while [open]:
+     closing, it is drawn on while it fades, and without them it showed as a
+     row in odd proportions for a few frames (report 693cf4). */
+  dialog {
     flex-direction: column;
     overflow: hidden;
+  }
+  dialog[open] {
+    display: flex;
   }
   header,
   footer {

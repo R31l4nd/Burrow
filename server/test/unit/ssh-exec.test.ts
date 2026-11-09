@@ -142,4 +142,15 @@ describe('execChannel', () => {
     const first = { exec: () => { throw new Error('Not connected'); } };
     await expect(execChannel(first as never, 'true')).rejects.toThrow('Not connected');
   });
+
+  it('a connection that never answers the channel request ends in time; a channel that comes after is closed, not leaked', async () => {
+    let late: ((e: Error | null, ch?: unknown) => void) | null = null;
+    const client = { exec: (_c: string, _o: unknown, cb: (e: Error | null, ch?: unknown) => void) => void (late = cb) };
+    // Waits at most its own wait, and a few seconds for the answer to the last request.
+    const r = await within(execChannel(client as never, 'true', {}, 300).catch((e: Error) => e.message), 6000);
+    expect(r).toMatch(/no channel within/i);
+    const closed = vi.fn();
+    late!(null, { close: closed });
+    expect(closed).toHaveBeenCalled();
+  });
 });

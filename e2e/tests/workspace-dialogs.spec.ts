@@ -1,5 +1,6 @@
 import { expect, test } from './fixtures.js';
 import { signIn } from './passkey.js';
+import { lookAt } from './checks.js';
 
 // Dialogs that hold what was typed (A3-WEB-12), and the step-up dialog with
 // no way to confirm (A3-WEB-23).
@@ -132,4 +133,44 @@ test("an update whose backup service did not come back is said in the app's word
   await page.getByTestId('update-check').click();
   await expect(page.getByTestId('update-state')).toContainText('the backup service did not come back after the update');
   await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
+test('an install on prebuilt images whose tag does not reach the new version is told the tag that does', async ({ page }) => {
+  await signIn(page);
+  const sshd = await page.evaluate(async () => ((await (await fetch('/api/hosts')).json()) as { id: number; name: string }[]).find((h) => h.name === 'test-sshd')!.id);
+  await page.route('**/api/system/update', (r) =>
+    r.fulfill({ json: { target: { hostId: sshd, hostName: 'test-sshd', dir: '/opt/burrow', container: 'burrow', service: 'burrow' }, running: '2.21.0', mode: 'image', available: '2.22.0', behind: null, subject: 'Burrow 2.22.0', last: null, problem: null, breaking: [], image: 'ghcr.io/r31l4nd/burrow:2.21', pinned: { image: 'ghcr.io/r31l4nd/burrow:2.21', next: 'ghcr.io/r31l4nd/burrow:2.22' } } }),
+  );
+  await page.goto('/#/settings/about');
+  await page.reload();
+  await page.getByTestId('update-check').click();
+  await expect(page.getByTestId('update-state')).toContainText('2.22.0 is available');
+  await expect(page.getByTestId('update-pinned')).toContainText('set BURROW_IMAGE=ghcr.io/r31l4nd/burrow:2.22 in .env');
+  await page.getByTestId('about').scrollIntoViewIfNeeded();
+  await lookAt(page, 'settings-update-pinned');
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
+test('a dialog closing keeps its layout and its title while it fades out (report 693cf4)', async ({ page }) => {
+  await signIn(page);
+  const made = await page.evaluate(async () => (await (await fetch('/api/snippets', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'fade-out snippet', command: 'echo fade' }) })).json()) as { id: number });
+  // The fade itself, which the other tests switch off.
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/#/snippets');
+  await page.reload();
+  await page.getByTestId('snippet-row').filter({ hasText: 'fade-out snippet' }).getByTestId('snippet-menu').click();
+  await page.locator('dialog[open]').last().getByTestId('snippet-run').click();
+  const dialog = page.locator('dialog[open]').last();
+  await expect(dialog.locator('h2')).toHaveText('fade-out snippet');
+  // Closed by its X: the frame after, it is still drawn (fading), as a column, under its own title.
+  const during = await page.evaluate(async () => {
+    const d = [...document.querySelectorAll('dialog')].find((x) => x.open && x.querySelector('h2')?.textContent === 'fade-out snippet')!;
+    (d.querySelector('header button[aria-label="Close"]') as HTMLButtonElement).click();
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const cs = getComputedStyle(d);
+    return { open: d.open, display: cs.display, direction: cs.flexDirection, overflow: cs.overflow, title: d.querySelector('h2')!.textContent };
+  });
+  expect(during).toEqual({ open: false, display: 'flex', direction: 'column', overflow: 'hidden', title: 'fade-out snippet' });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.evaluate(async (id) => fetch(`/api/snippets/${id}`, { method: 'DELETE' }), made.id);
 });

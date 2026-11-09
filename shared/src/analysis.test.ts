@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { alertRuleInput, alertTitle, groupLines, maskText, renderGroups } from './analysis.js';
+import { alertRuleInput, alertTitle, groupLines, maskText, renderGroups, subjectLabel } from './analysis.js';
 
 describe('masking addresses for a model outside the network', () => {
   it('IPv6 in its short forms too, never a time of day', () => {
@@ -234,9 +234,15 @@ describe('alert titles in Dutch', () => {
       ['"nightly backup" timed out after 10 min', '"nightly backup" afgebroken na 10 min'],
       ['"nightly backup" could not run: connect ECONNREFUSED', '"nightly backup" kon niet draaien: connect ECONNREFUSED'],
       ['Package id 0 at 92 C', 'Package id 0 op 92 C'],
+      ['not reachable: connect ECONNREFUSED 10.0.0.9:22', 'niet bereikbaar: connect ECONNREFUSED 10.0.0.9:22'],
+      ['reachable again after 15 minutes', 'weer bereikbaar na 15 minuten'],
       ['something only English knows', 'something only English knows'],
     ];
     for (const [en, nl] of cases) expect(alertTitle(en, 'nl')).toBe(nl);
+  });
+
+  it('a host that stops answering is about the host being reachable, in both languages', () => {
+    expect([subjectLabel('@reachable'), subjectLabel('@reachable', 'nl')]).toEqual(['Reachable', 'Bereikbaar']);
   });
 });
 

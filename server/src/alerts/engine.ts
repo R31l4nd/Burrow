@@ -14,6 +14,7 @@ import type { Notifier } from '../notify/channels.js';
 import { endsWithChannel, exec } from '../ssh/connect.js';
 import { shellQuote } from '../ssh/quote.js';
 import { throwaway } from './throwaway.js';
+import { RETRY_MAX_MS, RETRY_MS, retryAfter } from '../ssh/retry.js';
 
 // Log alerts. Per Docker host one `docker events` stream (when an event rule
 // covers it), and `docker logs -f` only for containers that a pattern or
@@ -22,12 +23,6 @@ import { throwaway } from './throwaway.js';
 // and is pushed through ntfy with a link to the logs of that moment.
 
 const RECONCILE_MS = 60_000;
-const RETRY_MS = 10_000;
-/** Longest wait between connects to a host that keeps failing them. */
-const RETRY_MAX_MS = 30 * 60_000;
-/** Refused for who Burrow is or what the host's key is: not better in seconds, and each try is a failed login to fail2ban. */
-const REFUSED_RETRY_MS = 5 * 60_000;
-const REFUSED = new Set(['auth_failed', 'unknown_host_key', 'host_key_mismatch']);
 const BUNDLE_MS = 10 * 60_000;
 /** Longest line looked at (bytes of text). */
 export const MAX_LINE = 64 * 1024;
@@ -58,16 +53,6 @@ export function toRule(r: typeof alertRules.$inferSelect): AlertRule {
   };
 }
 
-/**
- * How long to wait before connecting again after `failures` failed connects in a row: from ten
- * seconds (five minutes when the host refused Burrow itself), doubled each time up to half an hour,
- * a little spread. Every ten seconds, a wrong password got Burrow banned by fail2ban within minutes,
- * terminals and files with it, and a host that was off filled the log.
- */
-export function retryAfter(failures: number, code: string | undefined, random: () => number = Math.random): number {
-  const first = code && REFUSED.has(code) ? REFUSED_RETRY_MS : RETRY_MS;
-  return Math.min(RETRY_MAX_MS, Math.round(first * 2 ** Math.max(0, failures - 1) * (1 + random() * 0.1)));
-}
 
 /** Does a rule cover this container? */
 export function covers(r: AlertRule, hostId: number, container: string, project: string | null): boolean {

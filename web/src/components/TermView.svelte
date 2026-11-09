@@ -1518,7 +1518,9 @@
 <!-- On a computer (no key bar) the row stays, empty or not: coming and going
      it made the terminal jump up and down while typing (report 854cb3). -->
 {#if suggestions.length || aiLine !== null || !keyBars.show}
-  <div use:scrollCue class="suggest" class:idle={!suggestions.length && aiLine === null} role="listbox" aria-label={t('term.suggestions')} data-testid="suggestions">
+  <!-- In the terminal's own font size, as tall as the text box: larger and brighter than the
+       terminal, the row took much of its room (report c02b7a). -->
+  <div use:scrollCue class="suggest" class:idle={!suggestions.length && aiLine === null} role="listbox" aria-label={t('term.suggestions')} data-testid="suggestions" style:--chip-font="{prefs.fontSize}px" style:--chip-h="{composeOne}px">
     {#if aiLine !== null}
       <button class="chip-btn ai" role="option" aria-selected="false" onpointerdown={(e) => e.preventDefault()} onclick={() => onai?.(aiLine ?? '')}
         ><Icon name="sparkle" size={14} /> {t('ai.askChip')}</button
@@ -1759,7 +1761,7 @@
   .suggest {
     display: flex;
     gap: 6px;
-    padding: 6px;
+    padding: 4px;
     overflow-x: auto;
     scrollbar-width: none;
     background: var(--bg-raised);
@@ -1767,7 +1769,7 @@
   }
   /* Nothing to offer: the same height, so the terminal keeps its rows. */
   .suggest.idle {
-    min-height: calc(36px + 12px + 1px);
+    min-height: calc(var(--chip-h, 36px) + 8px + 1px);
     /* Empty: part of the terminal, not a white band under it. */
     background: var(--bg-sunken);
     border-top-color: transparent;
@@ -1778,19 +1780,25 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    padding: 6px 12px;
-    min-height: 36px;
+    box-sizing: border-box;
+    padding: 0 10px;
+    height: var(--chip-h, 36px);
     border-radius: 5px;
     border: 1px solid var(--border);
     background: var(--bg-sunken);
-    color: var(--text);
-    font: 0.85rem var(--mono);
+    color: var(--text-dim);
+    font: var(--chip-font, 0.85rem) var(--mono);
     cursor: pointer;
     touch-action: manipulation;
   }
+  @media (hover: hover) {
+    .chip-btn:hover {
+      color: var(--text);
+    }
+  }
   .chip-btn.history,
   .chip-btn.snippet {
-    border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+    border-color: color-mix(in srgb, var(--accent) 25%, var(--border));
   }
   .chip-btn.option {
     color: var(--text-dim);

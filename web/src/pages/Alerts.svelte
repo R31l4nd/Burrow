@@ -65,7 +65,7 @@
   // The built-in rules' names in the reader's language.
   const builtinIds = $derived(new Set(rules.filter((r) => r.builtin).map((r) => r.id)));
   const ruleName = (id: number | null, name: string) =>
-    id !== null && builtinIds.has(id) ? (name === 'Host health' ? t('alerts.builtinHost') : t('alerts.builtin')) : name;
+    id !== null && builtinIds.has(id) ? (name === 'Host health' ? t('alerts.builtinHost') : name === 'Host unreachable' ? t('alerts.builtinUnreachable') : t('alerts.builtin')) : name;
 
   // A host's own trouble (disk, temperature) is on its statistics page; a container's in its logs.
   const logsLink = (a: Alert, analyze = false) =>

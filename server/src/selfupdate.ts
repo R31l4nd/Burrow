@@ -1,9 +1,11 @@
 import { createRequire } from 'node:module';
 import type { FastifyInstance } from 'fastify';
-import type { LastUpdate, UpdateCheck, UpdateTarget } from '@burrow/shared';
+import { compareVersions, highestVersion, PROJECT_URL, versionParts, type LastUpdate, type UpdateCheck, type UpdateTarget } from '@burrow/shared';
 import { audit } from './audit.js';
 import type { Ctx } from './context.js';
+import { changelog } from './docker/changelog.js';
 import type { DockerMonitor } from './docker/monitor.js';
+import type { FetchFn } from './docker/registry.js';
 import { selfContainerId } from './docker/stacks.js';
 import type { SftpPool } from './files/pool.js';
 import { getHost, listHosts } from './hosts/service.js';
@@ -27,7 +29,7 @@ const SERVER_VERSION = (createRequire(import.meta.url)('../package.json') as { v
 const STATE = '"$HOME/.burrow-update.json"';
 
 /** The commands that tell what an update would bring (read-only, apart from git fetch). */
-export function checkScript(dir: string, running: string = SERVER_VERSION): string {
+export function checkScript(dir: string, running: string = SERVER_VERSION, container: string | null = null): string {
   return [
     `cd ${shellQuote(dir)} || exit 1`,
     `v() { sed -n 's/.*"version": *"\\([^"]*\\)".*/\\1/p' | head -1; }`,
@@ -52,14 +54,15 @@ export function checkScript(dir: string, running: string = SERVER_VERSION): stri
     '    echo "subject $(git log -1 --format=%s)"',
     '    [ -f CHANGELOG.md ] && cl < CHANGELOG.md',
     '  fi',
-    'else echo "mode image"; fi',
+    // No checkout: the image it was started with, whose tag says which releases a pull reaches.
+    `else echo "mode image"; ${container ? `echo "image $(docker inspect -f '{{.Config.Image}}' ${shellQuote(container)} 2>/dev/null)"` : 'true'}; fi`,
     `[ -f ${STATE} ] && echo "last $(cat ${STATE})"`,
     'true',
   ].join('\n');
 }
 
 export function parseCheck(out: string): Omit<UpdateCheck, 'target' | 'running'> {
-  const r: Omit<UpdateCheck, 'target' | 'running'> = { mode: null, available: null, behind: null, subject: null, last: null, problem: null, breaking: [] };
+  const r: Omit<UpdateCheck, 'target' | 'running'> = { mode: null, available: null, behind: null, subject: null, last: null, problem: null, breaking: [], image: null, pinned: null };
   for (const line of out.split('\n')) {
     const i = line.indexOf(' ');
     const [k, v] = i < 0 ? [line, ''] : [line.slice(0, i), line.slice(i + 1).trim()];
@@ -67,6 +70,7 @@ export function parseCheck(out: string): Omit<UpdateCheck, 'target' | 'running'>
     else if (k === 'version') r.available = v || null;
     else if (k === 'behind') r.behind = Number.isFinite(Number(v)) && v !== '' ? Number(v) : null;
     else if (k === 'subject') r.subject = v || null;
+    else if (k === 'image') r.image = v || null;
     else if (k === 'problem') r.problem = v;
     else if (k === 'breaking' && v && r.breaking.length < 20) r.breaking.push(v.slice(0, 300));
     else if (k === 'last') {
@@ -88,6 +92,67 @@ export function readCheck(r: Pick<ExecResult, 'code' | 'stdout' | 'stderr'>): Om
   const c = parseCheck(r.stdout);
   if (r.code !== 0) c.problem = r.stderr.trim().split('\n').pop()?.slice(0, 300) || (r.code === null ? 'The check ended without an exit code (the connection to the host was lost).' : `The check ended with exit code ${r.code}.`);
   return c;
+}
+
+/** The "### Breaking" items of one release's notes (its CHANGELOG section), a bullet's wrapped lines joined. */
+export function breakingOf(body: string): string[] {
+  const out: string[] = [];
+  let inside = false;
+  let item = '';
+  const flush = () => {
+    if (item) out.push(item);
+    item = '';
+  };
+  for (const line of body.split(/\r?\n/)) {
+    if (/^#{2,3} /.test(line)) {
+      flush();
+      inside = /^### Breaking/.test(line);
+    } else if (inside && line.startsWith('- ')) {
+      flush();
+      item = line.slice(2).trim();
+    } else if (inside && item && /^ {2,}\S/.test(line)) item += ` ${line.trim()}`;
+  }
+  flush();
+  return out;
+}
+
+/**
+ * What a pull would bring to an install on the prebuilt images, which has no
+ * checkout to ask: Burrow's newest release on GitHub (not a pre-release,
+ * unless one runs), its title, and the breaking changes of every release
+ * after the running one, from their notes (each its CHANGELOG section).
+ */
+export async function imageUpdate(running: string, opts: { fetch?: FetchFn; now?: number } = {}): Promise<Pick<UpdateCheck, 'available' | 'subject' | 'breaking' | 'problem'>> {
+  try {
+    const c = await changelog(PROJECT_URL, running, opts);
+    const newer = c.releases.filter((r) => compareVersions(r.tag, running) > 0);
+    const top = highestVersion(newer.map((r) => r.tag));
+    const plain = (tag: string) => tag.replace(/^v/i, '');
+    return {
+      available: top ? plain(top) : running,
+      subject: (top && newer.find((r) => r.tag === top)?.name) || null,
+      breaking: newer.flatMap((r) => breakingOf(r.body).map((b) => `${plain(r.tag)}: ${b}`.slice(0, 300))).slice(0, 20),
+      problem: null,
+    };
+  } catch (err) {
+    return { available: null, subject: null, breaking: [], problem: `Burrow's releases on GitHub could not be read: ${err instanceof Error ? err.message : String(err)}` };
+  }
+}
+
+/**
+ * An image whose tag does not reach `available`, and the tag that does: a
+ * minor line (2.21) follows its fixes but not 2.22, a whole version (2.21.0)
+ * only itself. Null for latest, a digest, a tag that is no version, or one
+ * that reaches it (the pull then brings it).
+ */
+export function pinnedImage(image: string | null, available: string | null): { image: string; next: string } | null {
+  const want = available ? versionParts(available) : null;
+  if (!image || !want || image.includes('@')) return null;
+  const m = /^(.+):v?(\d+(?:\.\d+){0,2})$/.exec(image);
+  if (!m) return null;
+  const parts = m[2]!.split('.').map(Number);
+  if (parts.every((p, i) => p === want[i])) return null;
+  return { image, next: `${m[1]}:${want.slice(0, parts.length).join('.')}` };
 }
 
 /** The update itself, run on the host with sh. */
@@ -231,7 +296,7 @@ export interface SelfUpdates {
   check(): Promise<UpdateCheck | null>;
 }
 
-export function registerSelfUpdateRoutes(app: FastifyInstance, ctx: Ctx, docker: DockerMonitor, pool: SftpPool): SelfUpdates {
+export function registerSelfUpdateRoutes(app: FastifyInstance, ctx: Ctx, docker: DockerMonitor, pool: SftpPool, fetcher?: FetchFn): SelfUpdates {
   let target: UpdateTarget | null = null;
   // Not found is kept a while too (for the same hosts): every visit of Settings read every Docker host again (OPS-W-11).
   let missed: { at: number; hosts: string } | null = null;
@@ -247,12 +312,22 @@ export function registerSelfUpdateRoutes(app: FastifyInstance, ctx: Ctx, docker:
   const checkNow = async (): Promise<UpdateCheck | null> => {
     const t = await locate();
     if (!t) return null;
-    const r = await pool.with(t.hostId, ({ client }) => exec(client, checkScript(t.dir), 60_000));
-    return { target: t, running: SERVER_VERSION, ...readCheck(r) };
+    const r = await pool.with(t.hostId, ({ client }) => exec(client, checkScript(t.dir, SERVER_VERSION, t.container), 60_000));
+    const c = readCheck(r);
+    // No checkout to ask: GitHub's releases say what is newer (2026-11-08: image installs heard of none).
+    if (c.mode === 'image' && !c.available) {
+      const i = await imageUpdate(SERVER_VERSION, { ...(fetcher ? { fetch: fetcher } : {}), now: ctx.now() });
+      c.available = i.available;
+      c.subject = i.subject;
+      c.breaking = i.breaking;
+      c.problem ??= i.problem;
+      c.pinned = pinnedImage(c.image, c.available);
+    }
+    return { target: t, running: SERVER_VERSION, ...c };
   };
 
   app.get('/api/system/update', async (): Promise<UpdateCheck> => {
-    return (await checkNow()) ?? { target: null, running: SERVER_VERSION, mode: null, available: null, behind: null, subject: null, last: null, problem: 'not_found', breaking: [] };
+    return (await checkNow()) ?? { target: null, running: SERVER_VERSION, mode: null, available: null, behind: null, subject: null, last: null, problem: 'not_found', breaking: [], image: null, pinned: null };
   });
 
   // Replaces what runs everything: confirmed as the person first (AUDIT2 AUTH-09).

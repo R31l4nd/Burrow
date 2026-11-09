@@ -460,6 +460,11 @@ Checked 2026-10-06.
 
 ## Image updates
 
+- **Uptime Kuma** checks for a newer version of itself (a version address
+  of its own, switchable in its settings), whatever way it was installed.
+  - Taken over (2.22.0): an install on Burrow's prebuilt images reads its
+    releases on GitHub (a git checkout still asks its upstream), and names
+    the image tag that reaches the new version when its own does not.
 - **Renovate** ignores a version once its pull request was closed without
   merging; **Watchtower** has no memory of an update that went wrong.
   - Taken over (W-FUNC-03): a digest that was rolled back is not tried again
@@ -501,6 +506,19 @@ Checked 2026-10-06.
 
 ## Monitoring, alerts and disks
 
+- **Beszel** has a "Status" alert per system: told when it goes down (after
+  a minute) and again when it is up. **Uptime Kuma** waits a number of
+  failed checks (retries) before it calls a monitor down.
+  - Taken over (2.22.0): *Host unreachable*, a built-in rule of its own,
+    told at the second statistics round in a row that cannot reach the host
+    and once when it answers again.
+- **fail2ban** bans an address after a few failed logins in its window;
+  **Prometheus**' scrapes and **Beszel**'s agent connect on every interval
+  whatever the last one said.
+  - Taken over (2.22.0, not the second): Burrow's rounds in the background
+    (statistics, the container monitor, SMART, packages) wait out a host
+    whose connects fail, as its alert streams do: from ten seconds, five
+    minutes after a refused login, doubled up to half an hour.
 - **smartd** (`-n standby` in smartd.conf) skips a sleeping disk rather
   than spinning it up for a check.
   - Taken over (decision 5): Burrow's SMART check does the same and keeps

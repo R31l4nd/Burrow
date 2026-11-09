@@ -287,7 +287,10 @@ self-update pulls them when Burrow's folder is not a git checkout, and
 builds from the checkout when it is. A folder that is not a checkout needs
 `compose.yaml`, `.env`, `secrets/` and, for restores, `scripts/restore.sh`
 and `scripts/backup/` from the release (its source archive on GitHub);
-building the Android app yourself needs the checkout.
+building the Android app yourself needs the checkout (or install the APK
+from the release). Burrow tells of a new version from its releases on
+GitHub; when your tag does not reach it (`X.Y` follows only that line's
+fixes), Settings -> About and the notice name the tag to set.
 
 ### More than one Burrow on a machine
 

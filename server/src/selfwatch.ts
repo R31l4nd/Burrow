@@ -92,10 +92,14 @@ export function updateNotices(c: UpdateCheck): Problem[] {
   const out: Problem[] = [];
   if (c.available && compareVersions(c.available, c.running) > 0) {
     const breaking = c.breaking.length ? `\nBreaking changes to read first:\n${c.breaking.slice(0, 5).join('\n')}` : '';
+    // An image tag that does not reach it: Update would pull the same line again.
+    const pin = c.pinned
+      ? { en: `\nThis install runs ${c.pinned.image}, which does not reach it: set BURROW_IMAGE=${c.pinned.next} in .env (BURROW_BACKUP_IMAGE alike), then Update.`, nl: `\nDeze installatie draait ${c.pinned.image}, en die haalt hem niet: zet BURROW_IMAGE=${c.pinned.next} in .env (BURROW_BACKUP_IMAGE net zo), en dan Bijwerken.` }
+      : { en: '', nl: '' };
     out.push({
       key: `version:${c.available}`,
-      en: { title: `Burrow ${c.available} is available`, body: `This one runs ${c.running}. Settings -> About: What is new, and Update.${breaking}` },
-      nl: { title: `Burrow ${c.available} is beschikbaar`, body: `Deze draait ${c.running}. Instellingen -> Over: Wat is nieuw, en Bijwerken.${breaking}` },
+      en: { title: `Burrow ${c.available} is available`, body: `This one runs ${c.running}. Settings -> About: What is new, and Update.${pin.en}${breaking}` },
+      nl: { title: `Burrow ${c.available} is beschikbaar`, body: `Deze draait ${c.running}. Instellingen -> Over: Wat is nieuw, en Bijwerken.${pin.nl}${breaking}` },
       page: '/settings?s=about',
     });
   }

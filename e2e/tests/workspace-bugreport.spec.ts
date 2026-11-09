@@ -107,8 +107,8 @@ test('report a problem from the screen where it happens', async ({ page }) => {
   // Which Burrow this is: the page and the server, the same version.
   const version = (JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { version: string }).version;
   await expect(page.getByTestId('about')).toContainText(`Burrow ${version} | server ${version}`);
-  // Not "this page is older than the server" (a word, not "folder" in what is new).
-  await expect(page.getByTestId('about')).not.toContainText(/\bolder\b/);
+  // Not "the server runs X; this page is older" (its words, not "older" in what is new).
+  await expect(page.getByTestId('about')).not.toContainText('this page is older');
   await page.goto('/#/settings/report');
   await page.getByTestId('bug-arm').click();
   await page.getByTestId('bug-arm').click();

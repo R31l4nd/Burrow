@@ -91,6 +91,40 @@ describe('a host that never answers (OPS-W-06)', () => {
   });
 });
 
+describe('a host that stops answering (Host unreachable)', () => {
+  it('told once at the second sample in a row that fails, and once when it answers again; one failure alone is nothing', async () => {
+    const gone = await t.json<Host>('POST', '/api/hosts', { name: 'gone', address: 'gone.lan', username: 'me' });
+    t.ctx.db.update(hosts).set({ facts: JSON.stringify({ checkedAt: new Date(t.clock.now).toISOString() }) }).where(eq(hosts.id, gone.id)).run();
+    const s = new HostStatsService(t.ctx, {} as never);
+    const told: { subject: string; event: string; title: string }[] = [];
+    s.onTrouble = (_id, tr) => told.push(tr);
+    s.smart = async () => ({}) as never;
+    const answers = [false, true, false, false, false, true, true];
+    s.sample = async () => {
+      if (!answers.shift()) throw new Error('connect ECONNREFUSED 10.0.0.9:22');
+      return {} as never;
+    };
+    const round = async () => {
+      await s.tick();
+      t.clock.now += 5 * 60_000;
+    };
+    // Down once, then fine: nothing.
+    await round();
+    await round();
+    expect(told).toEqual([]);
+    // Down three rounds: told at the second, not again at the third.
+    await round();
+    await round();
+    expect(told).toEqual([{ subject: '@reachable', event: 'unreachable', title: 'not reachable: connect ECONNREFUSED 10.0.0.9:22' }]);
+    await round();
+    expect(told).toHaveLength(1);
+    // It answers again: told once, with how long it was gone.
+    await round();
+    await round();
+    expect(told.slice(1)).toEqual([{ subject: '@reachable', event: 'unreachable', title: 'reachable again after 15 minutes' }]);
+  });
+});
+
 describe('a disk asleep at a SMART check (decision 5)', () => {
   it('is not woken: smartctl -n standby; its last reading stands, said from when, and no trouble from it', async () => {
     const { smartCommand } = await import('../../src/hosts/stats.js');

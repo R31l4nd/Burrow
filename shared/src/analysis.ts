@@ -358,9 +358,9 @@ export type FileAskInput = z.infer<typeof fileAskInput>;
 // ---- alerts
 
 /** Container events, and (phase 11) host events: a full disk, SMART trouble, heat. */
-export type AlertEvent = 'crash' | 'oom' | 'unhealthy' | 'restart_loop' | 'disk_full' | 'smart' | 'hot' | 'busy' | 'updates' | 'scheduled';
-export const ALERT_EVENTS: AlertEvent[] = ['crash', 'oom', 'unhealthy', 'restart_loop', 'disk_full', 'smart', 'hot', 'busy', 'updates', 'scheduled'];
-export const HOST_EVENTS: AlertEvent[] = ['disk_full', 'smart', 'hot', 'busy', 'updates', 'scheduled'];
+export type AlertEvent = 'crash' | 'oom' | 'unhealthy' | 'restart_loop' | 'disk_full' | 'smart' | 'hot' | 'busy' | 'updates' | 'scheduled' | 'unreachable';
+export const ALERT_EVENTS: AlertEvent[] = ['crash', 'oom', 'unhealthy', 'restart_loop', 'disk_full', 'smart', 'hot', 'busy', 'updates', 'scheduled', 'unreachable'];
+export const HOST_EVENTS: AlertEvent[] = ['disk_full', 'smart', 'hot', 'busy', 'updates', 'scheduled', 'unreachable'];
 
 /** Host alerts carry their subject as "@disk /data", "@smart /dev/sda", "@temperature". */
 export const isHostSubject = (container: string) => container.startsWith('@');
@@ -389,6 +389,7 @@ const HOST_SUBJECTS: Record<string, { en: string; nl: string }> = {
   temperature: { en: 'Temperature', nl: 'Temperatuur' },
   disk: { en: 'Disk', nl: 'Schijf' },
   smart: { en: 'Disk health', nl: 'Schijfgezondheid' },
+  reachable: { en: 'Reachable', nl: 'Bereikbaar' },
 };
 
 /** What an alert is about, for people: a container's name, or "Disk /data" for "@disk /data". */
@@ -505,6 +506,8 @@ export function alertTitle(title: string, lang: 'en' | 'nl'): string {
     [/^"(.+)" timed out after (\d+) min$/, (m) => `"${m[1]}" afgebroken na ${m[2]} min`],
     [/^"(.+)" could not run: (.+)$/, (m) => `"${m[1]}" kon niet draaien: ${m[2]}`],
     [/^(\d+) security updates? waiting(: .+)?$/, (m) => `${plural(Number(m[1]), 'beveiligingsupdate', 'beveiligingsupdates')} klaar${m[2] ?? ''}`],
+    [/^not reachable: (.+)$/, (m) => `niet bereikbaar: ${m[1]}`],
+    [/^reachable again after (\d+) minutes?$/, (m) => `weer bereikbaar na ${m[1]} ${m[1] === '1' ? 'minuut' : 'minuten'}`],
     [/^(.+) at (.+) C$/, (m) => `${m[1]} op ${m[2]} C`],
   ];
   for (const [re, to] of rules) {

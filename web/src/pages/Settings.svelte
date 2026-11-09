@@ -762,6 +762,7 @@
               {#if found === 'newer'}| {t('about.newer', { v: selfUpdate.available ?? '' })}{:else if found === 'older'}| <span data-testid="update-older">{t('about.older', { v: selfUpdate.available ?? '' })}</span>{:else if selfUpdate.available}| {t('about.current')}{/if}
               {#if selfUpdate.behind}| {t('about.behind', { n: selfUpdate.behind })}{/if}
             </p>
+            {#if selfUpdate.pinned}<p class="alert small" data-testid="update-pinned">{t('about.pinned', { image: selfUpdate.pinned.image, next: selfUpdate.pinned.next })}</p>{/if}
             {#if selfUpdate.subject}<p class="dim"><code>{selfUpdate.subject}</code></p>{/if}
             {#if selfUpdate.problem}<p class="alert">{selfUpdate.problem}</p>{/if}
             {#if selfUpdate.last}

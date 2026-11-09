@@ -315,8 +315,8 @@ test('an alert rule: changed, off, deleted', async ({ page }) => {
   await expect(page.getByTestId('rule-kind')).toHaveValue('event');
   await expect(page.locator('dialog[open] [data-testid=rule-event][value=hot]')).toHaveCount(0);
   await page.getByTestId('rule-kind').selectOption('host');
-  // disk_full, smart, hot, busy, package updates, a scheduled command that failed (2.11.0).
-  await expect(page.locator('dialog[open] [data-testid=rule-event]')).toHaveCount(6);
+  // disk_full, smart, hot, busy, package updates, a scheduled command that failed (2.11.0), unreachable (2.22.0).
+  await expect(page.locator('dialog[open] [data-testid=rule-event]')).toHaveCount(7);
   await expect(page.getByTestId('rule-container')).toHaveCount(0);
   // For one host: any host may be chosen for its own problems.
   const sshd = (await api<{ id: number; name: string }[]>(page, 'GET', '/api/hosts')).find((h) => h.name === 'test-sshd')!;
@@ -324,7 +324,7 @@ test('an alert rule: changed, off, deleted', async ({ page }) => {
   await page.getByTestId('rule-save').click();
   await expect
     .poll(async () => (await api<{ name: string; kind: string; events: string[]; container: string | null; hostId: number | null }[]>(page, 'GET', '/api/alerts/rules')).find((r) => r.name === 'crud-rule'))
-    .toMatchObject({ kind: 'event', events: ['disk_full', 'smart', 'hot', 'busy', 'updates', 'scheduled'], container: null, hostId: sshd.id });
+    .toMatchObject({ kind: 'event', events: ['disk_full', 'smart', 'hot', 'busy', 'updates', 'scheduled', 'unreachable'], container: null, hostId: sshd.id });
   // Opened again: a host rule.
   await fromRowMenu(rule, 'rule-menu', 'rule-edit');
   await expect(page.getByTestId('rule-kind')).toHaveValue('host');

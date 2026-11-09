@@ -477,7 +477,7 @@ export async function buildApp(deps: AppDeps): Promise<BurrowApp> {
   registerWorkspaceRoutes(app, ctx, files, fileGuard);
   registerBugReportRoutes(app, ctx, notifier);
   registerBackupRoutes(app, ctx);
-  const selfUpdates = registerSelfUpdateRoutes(app, ctx, docker, files);
+  const selfUpdates = registerSelfUpdateRoutes(app, ctx, docker, files, deps.fetch);
   // Burrow tells about itself over the channels (2026-11-07): see selfwatch.ts.
   const selfWatch = new SelfWatch(ctx, {
     send: (n) => notifier.notify(n),

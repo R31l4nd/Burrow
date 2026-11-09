@@ -1,6 +1,6 @@
 <script lang="ts">
   import { ask, askText } from '../lib/confirm.svelte.js';
-  import type { AuthState, DeviceHostResult, DeviceInfo } from '@burrow/shared';
+  import { compareVersions, PROJECT_URL, projectPublished, type AuthState, type DeviceHostResult, type DeviceInfo } from '@burrow/shared';
   import { android, refreshAndroidInfo, type AllFilesStatus, type AndroidInfo, type WidgetAway } from '../lib/android.js';
   import { switchAllFiles } from '../lib/allfiles.js';
   import { installAppUpdate } from '../lib/appupdate.svelte.js';
@@ -65,12 +65,16 @@
 
   // Burrow's side read: until then (or when it failed) no "no app built" and no pairing to offer.
   let loaded = $state(false);
+  // Burrow's own version: an APK older than it was left from before a self-update (that builds no app).
+  let server = $state<string | null>(null);
   async function load() {
-    const [a, d] = await Promise.all([get<{ apk: Apk | null }>('/api/android'), get<DeviceInfo[]>('/api/account/devices')]);
+    const [a, d, v] = await Promise.all([get<{ apk: Apk | null }>('/api/android'), get<DeviceInfo[]>('/api/account/devices'), get<{ server: string }>('/api/version').catch(() => null)]);
     apk = a.apk;
     devices = d;
+    server = v?.server ?? null;
     loaded = true;
   }
+  const apkOlder = $derived(!!apk && !!server && apk.versionName !== '?' && compareVersions(apk.versionName, server) < 0);
   // The phones not read: said here with Try again, not "none paired" (A3-WEB-01).
   let loadError = $state('');
   const firstLoad = () => {
@@ -215,6 +219,15 @@
   const thisPaired = $derived(!!session.state?.deviceId && info?.deviceId === session.state.deviceId);
 </script>
 
+{#snippet olderApk()}
+  {#if apkOlder}
+    <p class="alert small" data-testid="apk-older">
+      {t('android.apkOlder', { apk: apk?.versionName ?? '', server: server ?? '' })}
+      {#if projectPublished()}<a href={`${PROJECT_URL}/releases`} target="_blank" rel="noopener noreferrer">{t('android.releases')}</a>{/if}
+    </p>
+  {/if}
+{/snippet}
+
 {#if android && info}
   <div class="card stack">
     <!-- This app's version, and a newer one from this Burrow to install. -->
@@ -233,6 +246,7 @@
       {:else}
         <p class="small dim">{t('android.upToDate', { version: info.version })}</p>
       {/if}
+      {@render olderApk()}
     </div>
     {#if thisPaired}
       <p class="small">{t('android.thisPaired')}</p>
@@ -328,8 +342,10 @@
     {#if apk}
       <a class="btn small" href="/api/android/burrow.apk" download>{t('android.downloadApk', { version: apk.versionName, size: formatBytes(apk.size) })}</a>
       {#if apk.sha256}<p class="dim small mono break">SHA-256 {apk.sha256}</p>{/if}
+      {@render olderApk()}
     {:else}
-      <p class="dim small">{t('android.noApk')}</p>
+      <!-- An install on the prebuilt images has no checkout to build one: the release has it. -->
+      <p class="dim small">{t('android.noApk')} {#if projectPublished()}<a href={`${PROJECT_URL}/releases`} target="_blank" rel="noopener noreferrer">{t('android.releases')}</a>{/if}</p>
     {/if}
   </div>
 

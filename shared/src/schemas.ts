@@ -343,4 +343,8 @@ export interface UpdateCheck {
   problem: string | null;
   /** "### Breaking" items of the CHANGELOG between the running version and this one ("1.5.0: text"). */
   breaking: string[];
+  /** The image Burrow's container was started with (image mode). */
+  image: string | null;
+  /** Its tag does not reach `available` (ghcr.io/...:2.21 for 2.22.0): the tag that does, to set in .env. */
+  pinned: { image: string; next: string } | null;
 }

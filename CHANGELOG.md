@@ -6,6 +6,54 @@ says how it was verified.
 
 ## [Unreleased]
 
+## [2.22.0] - 2026-11-08
+
+What was left open at the handover, and two reports from the phone.
+
+### Added
+
+- An install on the prebuilt images hears of new versions too: Settings
+  -> About and the daily check read Burrow's releases on GitHub (the
+  newest, its breaking changes since the running one), where only a git
+  checkout was asked before. When the image's tag does not reach the new
+  version (`:2.21` for 2.22.0), Settings and the notice name the tag that
+  does, to set as `BURROW_IMAGE` in `.env`.
+- Alerts: a built-in rule "Host unreachable", told once when two
+  statistics rounds in a row (five minutes apart) cannot reach a host,
+  and once when it answers again. A rule of its own: switch it off for
+  hosts that are off on purpose.
+- Settings -> Android says when the app this Burrow offers is older than
+  Burrow itself (a self-update builds no app), with a link to the
+  releases on GitHub; "no app built yet" links there too.
+
+### Fixed
+
+- Statistics, the container monitor, SMART and package checks connected
+  to a host every round, also when it refused Burrow's login (a failed
+  login for fail2ban each time) or was off: they now wait as the alert
+  streams do, from ten seconds (five minutes after a refused login),
+  doubled up to half an hour. What a person opens always tries at once.
+- A connection that never answered a request for a channel held whoever
+  asked for good: it now fails after its wait and five seconds more, and
+  a channel that comes after that is closed.
+- Closing a dialog showed it for a few frames in odd proportions, under
+  a title cut short (report 693cf4).
+- The terminal's suggestions were larger and brighter than the terminal
+  and took much of its room: now in the terminal's own font size, as
+  tall as the text box, and quieter (report c02b7a).
+
+### Verified
+
+- Each fix with a test that failed on the code before it: the image
+  install's check against GitHub's releases (unit, and as it runs over
+  SSH), the tag that reaches a new version (the check, the notice, the
+  page), the older app said in Settings, Host unreachable (two rounds,
+  once, again when back; the built-in rule as it runs; its Dutch), the
+  pool's wait for background callers, the channel request that never
+  answers, the dialog fading out as a column under its title, the
+  suggestions' size.
+- make check; the e2e specs these touch; the gate.
+
 ## [2.21.0] - 2026-11-08
 
 ### Added

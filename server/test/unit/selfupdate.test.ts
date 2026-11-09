@@ -3,7 +3,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, wr
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { checkScript, findTarget, launchScript, locateTarget, parseCheck, readCheck, updateScript } from '../../src/selfupdate.js';
+import { checkScript, findTarget, imageUpdate, launchScript, locateTarget, parseCheck, pinnedImage, readCheck, updateScript } from '../../src/selfupdate.js';
 
 // The update script runs for real, with sh, against a stand-in docker that
 // writes down what it was asked and says "healthy" or not as told.
@@ -303,6 +303,53 @@ describe('self-update', () => {
     expect(r.problem).toMatch(/core\.sshcommand/);
     // The rest is still told.
     expect(r).toMatchObject({ mode: 'git', available: '9.9.10', behind: 3 });
+  });
+});
+
+describe('an install on the prebuilt images', () => {
+  // GitHub's releases of Burrow as its API gives them, newest first; each body is its CHANGELOG section.
+  const releases = [
+    { tag_name: 'v2.23.0-rc.1', name: 'Burrow 2.23.0-rc.1', body: '### Breaking\n\n- Not out yet.\n', prerelease: true },
+    { tag_name: 'v2.22.0', name: 'Burrow 2.22.0', body: '### Breaking\n\n- BURROW_PORT is now PORT: change it\n  in your .env first.\n\n### Fixed\n\n- Not this one.\n', prerelease: false },
+    { tag_name: 'v2.21.1', name: 'Burrow 2.21.1', body: '### Fixed\n\n- A fix.\n', prerelease: false },
+    { tag_name: 'v2.21.0', name: 'Burrow 2.21.0', body: '### Breaking\n\n- Already running, not shown.\n', prerelease: false },
+  ];
+  let asked: string[] = [];
+  const github = (status = 200) => (async (url: string) => {
+    asked.push(url);
+    return new Response(JSON.stringify(releases), { status });
+  }) as typeof fetch;
+  // Each case later than the hour GitHub's answer is kept.
+  let now = Date.parse('2026-12-01T00:00:00Z');
+  const later = () => (now += 2 * 3600_000);
+
+  it("tells the newest release on GitHub, its title and the breaking changes since the running one, not a pre-release's", async () => {
+    asked = [];
+    expect(await imageUpdate('2.21.0', { fetch: github(), now: later() })).toEqual({
+      available: '2.22.0',
+      subject: 'Burrow 2.22.0',
+      breaking: ['2.22.0: BURROW_PORT is now PORT: change it in your .env first.'],
+      problem: null,
+    });
+    expect(asked).toEqual(['https://api.github.com/repos/R31l4nd/Burrow/releases?per_page=100']);
+    // The newest running: nothing newer, it is current.
+    expect(await imageUpdate('2.22.0', { fetch: github(), now: later() })).toMatchObject({ available: '2.22.0', breaking: [], problem: null });
+    // GitHub refusing: said, not "current".
+    expect(await imageUpdate('2.21.0', { fetch: github(403), now: later() })).toMatchObject({ available: null, problem: expect.stringMatching(/GitHub limits/) });
+  });
+
+  it('tells the image it was started with, and the tag that reaches a newer version when its tag does not', () => {
+    writeFileSync(join(bin, 'docker'), '#!/bin/sh\n[ "$1 $2 $3" = "inspect -f {{.Config.Image}}" ] && [ "$4" = burrow ] && echo ghcr.io/r31l4nd/burrow:2.21\nexit 0\n');
+    expect(parseCheck(sh(checkScript(dir, '2.21.0', 'burrow')))).toMatchObject({ mode: 'image', image: 'ghcr.io/r31l4nd/burrow:2.21' });
+    // A minor line follows its fixes, not the next line; a whole version only itself; latest and a digest everything.
+    expect(pinnedImage('ghcr.io/r31l4nd/burrow:2.21', '2.21.1')).toBeNull();
+    expect(pinnedImage('ghcr.io/r31l4nd/burrow:2.21', '2.22.0')).toEqual({ image: 'ghcr.io/r31l4nd/burrow:2.21', next: 'ghcr.io/r31l4nd/burrow:2.22' });
+    expect(pinnedImage('ghcr.io/r31l4nd/burrow:v2.21.0', '2.21.1')).toEqual({ image: 'ghcr.io/r31l4nd/burrow:v2.21.0', next: 'ghcr.io/r31l4nd/burrow:2.21.1' });
+    expect(pinnedImage('localhost:5000/burrow:2.21', '3.0.0')).toEqual({ image: 'localhost:5000/burrow:2.21', next: 'localhost:5000/burrow:3.0' });
+    expect(pinnedImage('ghcr.io/r31l4nd/burrow:latest', '2.22.0')).toBeNull();
+    expect(pinnedImage('ghcr.io/r31l4nd/burrow@sha256:' + '0'.repeat(64), '2.22.0')).toBeNull();
+    expect(pinnedImage('burrow:local', '2.22.0')).toBeNull();
+    expect(pinnedImage(null, '2.22.0')).toBeNull();
   });
 });
 

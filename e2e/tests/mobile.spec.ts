@@ -454,6 +454,14 @@ test("a phone keyboard's corrections reach the shell once", async ({ page }) => 
     }
   });
   await expect(page.getByTestId('suggestions')).toContainText('echo gboard-world');
+  // The suggestions in the terminal's own font size and as tall as the text box beside the
+  // keys, not larger and brighter than the terminal (report c02b7a).
+  const sizes = await page.evaluate(() => {
+    const chip = document.querySelector<HTMLElement>('[data-testid=suggestions] [role=option]')!;
+    const box = document.querySelector<HTMLElement>('textarea[data-testid=compose]')!;
+    return { chip: getComputedStyle(chip).fontSize, chipHeight: Math.round(chip.getBoundingClientRect().height), box: getComputedStyle(box).fontSize, boxHeight: Math.round(box.getBoundingClientRect().height) };
+  });
+  expect({ font: sizes.chip, height: sizes.chipHeight }).toEqual({ font: sizes.box, height: sizes.boxHeight });
   await page.keyboard.press('Control+U');
   await page.getByRole('button', { name: 'Sessions' }).tap();
   await page.getByTestId('compose-toggle').uncheck();

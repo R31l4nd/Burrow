@@ -2,7 +2,8 @@ import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Host } from '@burrow/shared';
 import { eq } from 'drizzle-orm';
-import { AlertEngine, lineSplitter, MAX_LINE, retryAfter } from '../../src/alerts/engine.js';
+import { AlertEngine, lineSplitter, MAX_LINE } from '../../src/alerts/engine.js';
+import { retryAfter } from '../../src/ssh/retry.js';
 import { alertCounts, alertMutes, alerts } from '../../src/db/schema.js';
 import { makeApp, setupAdmin, type TestApp } from '../helpers.js';
 

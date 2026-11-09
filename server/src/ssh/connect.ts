@@ -376,19 +376,35 @@ export function execChannel(
 ): Promise<ClientChannel> {
   const started = Date.now();
   return new Promise((resolve, reject) => {
+    let done = false;
+    const end = (err: Error | null, ch?: ClientChannel) => {
+      if (done) return;
+      done = true;
+      clearTimeout(deadline);
+      if (err) reject(err);
+      else resolve(ch!);
+    };
+    // A connection that never answers the request (a host gone without a
+    // reset, its TCP still open): the caller waited for good, with whatever
+    // it held. Its wait, and a few seconds for the answer to the last try.
+    const deadline = setTimeout(() => end(new Error(`No channel within ${Math.round((waitMs + 5_000) / 1000)} s: the connection does not answer`)), waitMs + 5_000);
+    deadline.unref?.();
     const attempt = (delay: number) => {
+      if (done) return;
       try {
         client.exec(command, options, (err, ch) => {
-          if (!err) return resolve(ch);
+          // Too late: the caller has gone on, the channel would hold one of the host's sessions.
+          if (done) return void (ch as ClientChannel | undefined)?.close();
+          if (!err) return end(null, ch);
           if (
             !CHANNEL_FULL.test(err.message) ||
             Date.now() - started + delay > waitMs
           )
-            return reject(err);
+            return end(err);
           setTimeout(() => attempt(Math.min(delay * 2, 1000)), delay);
         });
       } catch (err) {
-        reject(err as Error);
+        end(err as Error);
       }
     };
     attempt(100);

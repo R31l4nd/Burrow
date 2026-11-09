@@ -1,0 +1,1 @@
+Settings -> Android says when the app on offer is older than Burrow, with a link to the releases. The terminal's suggestions now use the terminal's own font size and take less room. Dialogs close without a flicker.

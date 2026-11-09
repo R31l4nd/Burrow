@@ -115,9 +115,10 @@ describe('a host printing faster than the server parses its screen', () => {
     const pause = vi.spyOn(channel, 'pause');
     await expect(channel.flood(80 << 20)).resolves.toBeUndefined();
     expect(pause).toHaveBeenCalled();
-    await vi.waitFor(() => expect(channel.paused).toBe(false), { timeout: 30_000 });
+    await vi.waitFor(() => expect(channel.paused).toBe(false), { timeout: 120_000 });
     expect(got.filter((m) => m.t === 'exit')).toEqual([]);
-  }, 60_000);
+    // 80 MB through the screen's parser: over a minute under the gate's coverage on a busy machine (2026-11-08).
+  }, 180_000);
 });
 
 describe('a recording at its size limit', () => {

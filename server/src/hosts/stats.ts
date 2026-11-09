@@ -248,7 +248,7 @@ export const DEFAULT_THRESHOLDS: Thresholds = { diskPercent: 90, cpuCelsius: 85,
 export interface Trouble {
   /** What it is about: "@disk /data", "@smart /dev/sda", "@temperature". */
   subject: string;
-  event: 'disk_full' | 'smart' | 'hot' | 'busy' | 'updates' | 'scheduled';
+  event: 'disk_full' | 'smart' | 'hot' | 'busy' | 'updates' | 'scheduled' | 'unreachable';
   title: string;
 }
 
@@ -382,7 +382,8 @@ export class HostStatsService {
   }
 
   async #read(hostId: number, sampling: boolean): Promise<{ stats: HostStats; out: string; at: number }> {
-    const r = await this.pool.with(hostId, ({ client }) => exec(client, STATS_COMMAND, 20_000, 1 << 20));
+    // The sampler's round waits out a host whose connects fail (the pool's backoff); the page asks it now.
+    const r = await this.pool.with(hostId, ({ client }) => exec(client, STATS_COMMAND, 20_000, 1 << 20), { background: sampling });
     const gap = statsGap(r.stdout);
     if (gap) throw new HttpError(502, 'stats_unreadable', `The host's numbers could not be read (${gap}).`);
     const now = this.ctx.now();
@@ -401,9 +402,9 @@ export class HostStatsService {
   }
 
   /** SMART now, through sudo; kept for the page and compared with last time. One check at a time per host (AUDIT2 SMART-03). */
-  smart(hostId: number): Promise<SmartReport> {
+  smart(hostId: number, background = false): Promise<SmartReport> {
     const before = this.#smartRuns.get(hostId) ?? Promise.resolve();
-    const run = before.catch(() => {}).then(() => this.#smartNow(hostId));
+    const run = before.catch(() => {}).then(() => this.#smartNow(hostId, background));
     this.#smartRuns.set(hostId, run);
     void run.finally(() => this.#smartRuns.get(hostId) === run && this.#smartRuns.delete(hostId)).catch(() => {});
     return run;
@@ -411,11 +412,11 @@ export class HostStatsService {
 
   readonly #smartRuns = new Map<number, Promise<SmartReport>>();
 
-  async #smartNow(hostId: number): Promise<SmartReport> {
+  async #smartNow(hostId: number, background: boolean): Promise<SmartReport> {
     const password = hostPassword(this.ctx, hostId);
     let report: SmartReport;
     try {
-      const r = await this.pool.with(hostId, ({ client }) => exec(client, smartCommand(password), 120_000, 4 << 20, password !== null ? `${password}\n` : undefined));
+      const r = await this.pool.with(hostId, ({ client }) => exec(client, smartCommand(password), 120_000, 4 << 20, password !== null ? `${password}\n` : undefined), { background });
       report = { hostId, checkedAt: new Date(this.ctx.now()).toISOString(), ...smartOutcome(r.code, r.stdout, r.stderr) };
     } catch (err) {
       report = { hostId, checkedAt: new Date(this.ctx.now()).toISOString(), state: 'error', message: (err as Error).message, disks: [] };
@@ -647,19 +648,34 @@ export class HostStatsService {
   /** Hosts whose sampling is under way, maybe still from a round that went on without them. */
   readonly #sampling = new Set<number>();
 
+  /** Hosts whose samples fail: since when, how many in a row, and whether that was told (Host unreachable). */
+  readonly #misses = new Map<number, { since: number; count: number; told: boolean }>();
+
   /** One host's part of a round: its sample, then SMART and its packages when due. */
   async #hostRound(h: { id: number; name: string }, failed: (message: string) => void): Promise<void> {
     try {
       await this.sample(h.id);
       this.jobs?.fine('host statistics', h.name, { hostId: h.id });
+      // Back after it was told gone: said once, with how long (Beszel tells "up" again too).
+      const m = this.#misses.get(h.id);
+      this.#misses.delete(h.id);
+      if (m?.told) this.onTrouble?.(h.id, { subject: '@reachable', event: 'unreachable', title: `reachable again after ${Math.round((this.ctx.now() - m.since) / 60_000)} minutes` }, new Date(this.ctx.now()).toISOString());
     } catch (err) {
       // At warn, once per host and message: at debug nobody saw it (OPS-W-14).
       failed((err as Error).message);
       this.jobs?.failed('host statistics', h.name, (err as Error).message, { hostId: h.id });
+      // Two samples in a row, five minutes apart: one that fails alone (a reboot, a blip) is no outage.
+      const m = this.#misses.get(h.id) ?? { since: this.ctx.now(), count: 0, told: false };
+      m.count += 1;
+      this.#misses.set(h.id, m);
+      if (m.count === 2) {
+        m.told = true;
+        this.onTrouble?.(h.id, { subject: '@reachable', event: 'unreachable', title: `not reachable: ${(err as Error).message.slice(0, 200)}` }, new Date(this.ctx.now()).toISOString());
+      }
     }
     if (this.#stopped) return;
     const last = this.ctx.db.select().from(hostSmart).where(eq(hostSmart.hostId, h.id)).get();
-    if (!last || this.ctx.now() - last.checkedAt > SMART_MS) await this.smart(h.id).catch(() => {});
+    if (!last || this.ctx.now() - last.checkedAt > SMART_MS) await this.smart(h.id, true).catch(() => {});
     if (this.#stopped) return;
     await this.packages?.checkIfDue(h.id).catch(() => {});
   }

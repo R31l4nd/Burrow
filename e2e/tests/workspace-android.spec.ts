@@ -38,9 +38,9 @@ test('WireGuard in the app: import, state, what goes through', async ({ page }) 
   await sayYes(page);
   await signIn(page);
   await page.addInitScript(() => {
-    type State = { conf: string | null; viaBurrow: boolean; hosts: string[]; calls: string[]; shake: boolean };
+    type State = { conf: string | null; viaBurrow: boolean; hosts: string[]; calls: string[]; shake: boolean; screenshots: boolean };
     const w = window as unknown as { BurrowAndroid: unknown; __wg: State };
-    const state: State = { conf: null, viaBurrow: true, hosts: [], calls: [], shake: true };
+    const state: State = { conf: null, viaBurrow: true, hosts: [], calls: [], shake: true, screenshots: false };
     w.__wg = state;
     const status = () => ({
       configured: state.conf !== null,
@@ -60,8 +60,9 @@ test('WireGuard in the app: import, state, what goes through', async ({ page }) 
         const { id, method, params } = JSON.parse(raw) as { id: number; method: string; params: Record<string, unknown> };
         state.calls.push(method);
         let result: unknown = null;
-        if (method === 'info') result = { version: '1.0.0', versionCode: 10000, deviceId: null, deviceName: 'Pixel', profiles: true, screenshots: false, screenshotsFixed: false, shake: state.shake };
+        if (method === 'info') result = { version: '1.0.0', versionCode: 10000, deviceId: null, deviceName: 'Pixel', profiles: true, screenshots: state.screenshots, screenshotsFixed: false, shake: state.shake };
         else if (method === 'setShake') state.shake = Boolean(params.on);
+        else if (method === 'setScreenshots') state.screenshots = Boolean(params.allow);
         else if (method === 'wgStatus') result = status();
         else if (method === 'wgSave') {
           state.conf = String(params.conf);
@@ -133,6 +134,9 @@ test('WireGuard in the app: import, state, what goes through', async ({ page }) 
   // Screenshots of the app: allowed here (off by default).
   await page.getByTestId('allow-screenshots').check();
   await expect.poll(() => page.evaluate(() => (window as unknown as { __wg: { calls: string[] } }).__wg.calls)).toContain('setScreenshots');
+  // And it stays on once the app's info is read again (the phone's answer, not the click).
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __wg: { screenshots: boolean } }).__wg.screenshots)).toBe(true);
+  await expect(page.getByTestId('allow-screenshots')).toBeChecked();
   // A shake reports a problem: on by default, off here for this phone.
   const shake = page.getByTestId('shake-report');
   await expect(shake).toBeChecked();
@@ -874,4 +878,28 @@ test("Settings -> Android app in the app with Burrow not answering: the app's ow
   await expect.poll(() => page.evaluate(() => (window as unknown as { __direct: unknown[] }).__direct.length)).toBe(1);
   await page.unrouteAll({ behavior: 'ignoreErrors' });
   await page.setViewportSize({ width: 1280, height: 800 });
+});
+
+test('the app this Burrow offers is older than Burrow itself (after a self-update): said, with where a new one comes from', async ({ page }) => {
+  await signIn(page);
+  await page.route('**/api/android', (r) => r.fulfill({ json: { apk: { versionName: '2.21.0', versionCode: 22100, sha256: 'a'.repeat(64), size: 28 * 1048576 } } }));
+  await page.route('**/api/version', (r) => r.fulfill({ json: { server: '2.22.0' } }));
+  await page.goto('/#/settings/android');
+  await page.reload();
+  const older = page.getByTestId('apk-older');
+  await expect(older).toContainText('The app this Burrow offers (2.21.0) is older than Burrow itself (2.22.0)');
+  await expect(older.getByRole('link', { name: 'Releases on GitHub' })).toHaveAttribute('href', 'https://github.com/R31l4nd/Burrow/releases');
+  await lookAt(page, 'settings-android-apk-older');
+  // The same version: nothing said.
+  await page.unroute('**/api/version');
+  await page.route('**/api/version', (r) => r.fulfill({ json: { server: '2.21.0' } }));
+  await page.reload();
+  const get = page.getByRole('link', { name: /Download the app \(2\.21\.0/ });
+  await expect(get).toBeVisible();
+  // The app itself, from this Burrow.
+  await page.route('**/api/android/burrow.apk', (r) => r.fulfill({ body: 'apk', headers: { 'content-type': 'application/vnd.android.package-archive' } }));
+  const [file] = await Promise.all([page.waitForEvent('download'), get.click()]);
+  expect(file.suggestedFilename()).toBe('burrow.apk');
+  await expect(older).toBeHidden();
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
