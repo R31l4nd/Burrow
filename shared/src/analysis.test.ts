@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { alertRuleInput, alertTitle, groupLines, maskText, renderGroups, subjectLabel } from './analysis.js';
+import { alertRuleInput, alertTitle, groupLines, maskText, renderGroups, subjectLabel, fileAskText, FILE_ASK_MAX_CHARS } from './analysis.js';
 
 describe('masking addresses for a model outside the network', () => {
   it('IPv6 in its short forms too, never a time of day', () => {
@@ -368,5 +368,15 @@ describe('secrets that went out unmasked (audit 2026-11-09)', () => {
 
   it('a path to a secret is no secret: its name says so', () => {
     expect(maskText('DB_PASSWORD_FILE=/run/secrets/db', { ips: false })).toBe('DB_PASSWORD_FILE=/run/secrets/db');
+  });
+});
+
+describe('fileAskText', () => {
+  it("cuts a text over FILE_ASK_MAX_CHARS at a line end, under a request's 1 MB (audit 2026-11-09)", () => {
+    const big = Array.from({ length: 250_000 }, (_, i) => String(i + 1)).join('\n');
+    const cut = fileAskText(big);
+    expect(cut.length).toBeLessThanOrEqual(FILE_ASK_MAX_CHARS);
+    expect(big.startsWith(`${cut}\n`)).toBe(true);
+    expect(fileAskText('a\nb')).toBe('a\nb');
   });
 });

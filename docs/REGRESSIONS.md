@@ -943,6 +943,11 @@ sizes of workspace-sizes.spec.ts.
 | 2026-11-09 audit | The app's WireGuard question left out a peer behind a comment that the tunnel then used | `android/app/src/test/kotlin/io/github/r31l4nd/burrow/BridgeProtocolTest.kt :: wgEndpointReadsTheConfigAsTheTunnelDoes` |
 | 2026-11-09 audit | An empty share from the page ended the app | `android/app/src/test/kotlin/io/github/r31l4nd/burrow/BridgeProtocolTest.kt :: aShareOfNothingIsRefused` |
 | 2026-11-09 audit | The split terminals test was given another spec's session (in tmux's copy mode, or sized by another viewer) and failed now and then | `e2e/tests/terminal.spec.ts :: split terminals on a wide screen: panes side by side, kept after a reload, typing into all of them only on purpose` |
+| 2026-11-09 audit | Closing idle terminal sessions tried a host that could not be reached every minute (fail2ban) | `server/test/unit/terminal-manager.test.ts :: is tried again later, not every minute: the host's fail2ban counted each attempt (audit 2026-11-09)` |
+| 2026-11-09 audit | A recording turned off and on again at once left the first one open, never ended | `server/test/unit/terminal-manager.test.ts :: leaves one recording open, not one per press that is never ended (audit 2026-11-09)` |
+| 2026-11-09 audit | Ask AI about a file over 1 MB was refused as too large | `e2e/tests/workspace-editor.spec.ts :: ask AI about a file over the request limit: the part a model can take is sent, not refused (audit 2026-11-09)` |
+| 2026-11-09 audit | The text sent with a question about a file was not cut under a request's limit | `shared/src/analysis.test.ts :: cuts a text over FILE_ASK_MAX_CHARS at a line end, under a request's 1 MB (audit 2026-11-09)` |
+| 2026-11-09 audit | Another app could hold the tunnel proxy's places open and shut Burrow's own requests out | `android/wg/tunnel_test.go :: TestUnauthenticatedBounds` |
 
 ## Retired
 

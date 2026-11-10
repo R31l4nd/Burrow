@@ -974,6 +974,36 @@ test('ask AI about the selected lines or the whole file: masked, answered, asked
   }
 });
 
+test('ask AI about a file over the request limit: the part a model can take is sent, not refused (audit 2026-11-09)', async ({ page }) => {
+  // The editor opens files up to 5 MB, a request takes 1 MB: the whole buffer went and was refused.
+  await signIn(page);
+  const sshd = await hostNamed(page, 'test-sshd');
+  await api(page, 'POST', '/api/snippets/run', { hostIds: [sshd], command: 'rm -rf ~/proj-ask-big && mkdir -p ~/proj-ask-big && seq 1 250000 > ~/proj-ask-big/big.log' });
+  const ws = await api<{ id: number }>(page, 'POST', '/api/workspaces', { hostId: sshd, root: '/home/tester/proj-ask-big' });
+  type Ai = { provider: string; ollama: { url: string; model: string }; anthropic: { model: string }; openai: { url: string; model: string }; timeoutMinutes: number; prices: { input: number | null; output: number | null; currency: string } };
+  const before = await api<Ai>(page, 'GET', '/api/settings/ai');
+  const input = (a: Ai) => ({ provider: a.provider, ollama: a.ollama, anthropic: { model: a.anthropic.model }, openai: { url: a.openai.url, model: a.openai.model }, timeoutMinutes: a.timeoutMinutes, prices: a.prices });
+  const llm = process.env.LLM_URL ?? 'http://burrow-e2e-llm:8000/v1';
+  await api(page, 'PUT', '/api/settings/ai', input({ ...before, provider: 'openai', openai: { url: llm, model: 'fake-model' } }));
+  try {
+    await page.goto(`/#/ws/${ws.id}`);
+    await page.locator('[data-testid=tree-node][data-path="big.log"]').click();
+    await expect(page.locator('.cm-content').first()).toContainText('1');
+    await page.getByTestId('editor-menu').click();
+    await page.getByTestId('editor-ask-ai').click();
+    const dialog = page.getByRole('dialog', { name: 'Ask AI about this file' });
+    await dialog.getByTestId('file-ask-question').fill('What is in it?');
+    await dialog.getByTestId('file-ask-run').click();
+    await expect(dialog.getByTestId('file-ask-answer')).toContainText('Line 1 reads: 1', { timeout: 30_000 });
+    await expect(dialog.getByTestId('load-failed')).toHaveCount(0);
+    await dialog.getByRole('button', { name: 'Close' }).last().click();
+  } finally {
+    await api(page, 'PUT', '/api/settings/ai', input(before));
+    await api(page, 'DELETE', `/api/workspaces/${ws.id}`);
+    await api(page, 'POST', '/api/snippets/run', { hostIds: [sshd], command: 'rm -rf ~/proj-ask-big' });
+  }
+});
+
 test("copy and paste in a workspace's tree: copied from a file's menu, pasted from a folder's or a file's, cut moves it (report 67d3e6)", async ({ page }) => {
   await signIn(page);
   const sshd = await hostNamed(page, 'test-sshd');

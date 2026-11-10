@@ -83,7 +83,11 @@ problem is in [SECURITY.md](../SECURITY.md).
   WireGuard proxy secret: the app answers the proxy's question by its
   address and realm, and Android does not say which port asks. That
   secret opens only the proxy, which reaches what your tunnel reaches.
-  Install apps you trust on the phone that carries your tunnel.
+  Such an app can also keep opening connections to the proxy to slow the
+  app's own requests: the proxy takes 32 not signed in at once, closes the
+  oldest when another comes and reads 64 KB of headers each, so holding
+  sockets open no longer shuts the app out. Install apps you trust on the
+  phone that carries your tunnel.
 - **App tabs share one cookie store on an old WebView** (one without
   profiles, before about version 110): the apps' cookies sit beside
   Burrow's own and each other's, and the app says so once. Burrow's cookie

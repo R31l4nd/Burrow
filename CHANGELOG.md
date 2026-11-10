@@ -6,7 +6,7 @@ says how it was verified.
 
 ## [Unreleased]
 
-## [2.23.0] - 2026-11-09
+## [2.23.0] - 2026-11-10
 
 Three reports from the phone (the containers in another order, a terminal
 that jumped and changed size with the keyboard), and what a full code
@@ -52,6 +52,13 @@ audit found.
   read failed: both are said now, with Try again.
 - A dialog fading out still took taps: a quick second tap ran a menu item
   twice.
+- Closing idle terminal sessions (Settings -> System, off unless set)
+  tried a host that could not be reached every minute, a failed login for
+  fail2ban each time: it waits now, from 5 minutes up to 6 hours.
+- A recording turned off and on again at once left the first one open
+  beside the new one, never ended.
+- Ask AI about a file over 1 MB was refused as too large: the part a
+  model can take is sent (the editor opens files up to 5 MB).
 
 ### Security
 
@@ -80,6 +87,9 @@ audit found.
 - The app's tunnel proxy forwarded a plain-http client's next request to
   the first host it asked for.
 - An empty share from the page ended the app.
+- Another app on the phone could hold the tunnel proxy's places open with
+  silent sockets and shut Burrow's own requests out: one more now closes
+  the oldest waiting, not the new one.
 - CI checks that nothing under android/ changed before the signing key is
   there; release tags are X.Y.Z only (a prerelease published images, then
   failed before the release).
@@ -87,8 +97,8 @@ audit found.
 ### Verified
 
 - Each fix with a test that failed on the code before it (unit, e2e, and
-  JVM for the app), except the tunnel proxy (Go's own tests still pass)
-  and the CI and release-tag checks (run by hand).
+  JVM and Go for the app), except the tunnel proxy's plain-http fix (Go's
+  own tests still pass) and the CI and release-tag checks (run by hand).
 - The split terminals test types only into sessions of its own: it was
   given another spec's session beside its own (once one in tmux's copy
   mode, once one sized by another viewer, whose suggestions lay over a

@@ -85,6 +85,8 @@ export class LiveSession {
   ownerId: string | null = null;
   /** Its output being recorded (F3), or null. */
   recorder: import('./recorder.js').Recorder | null = null;
+  /** A recorder made, waiting for the screen so far before it takes output (TerminalManager.#record). */
+  recorderStarting: import('./recorder.js').Recorder | null = null;
   /** Without tmux: the alternate screen's switches taken out, and whether a program is on it (scrolls as arrow keys). */
   alt: import('@burrow/shared').AltScreenFilter | null = null;
   client: Client | null = null;

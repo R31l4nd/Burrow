@@ -265,7 +265,7 @@ func TestUnauthenticatedBounds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tun := &Tunnel{ln: ln, auth: "Basic c2VjcmV0", pending: make(chan struct{}, 2)}
+	tun := &Tunnel{ln: ln, auth: "Basic c2VjcmV0", maxWaiting: 2}
 	tun.wg.Add(1)
 	go tun.serve()
 	defer func() { _ = ln.Close(); tun.wg.Wait() }()
@@ -274,7 +274,8 @@ func TestUnauthenticatedBounds(t *testing.T) {
 		_, err := c.Read(make([]byte, 1))
 		return err == io.EOF
 	}
-	// Two held open without a word: a third is closed at once.
+	// Two held open without a word: a third comes, and the oldest goes, not the new one. A local
+	// app holding the places open shut Burrow's own requests out (audit 2026-11-09).
 	var held []net.Conn
 	for i := 0; i < 2; i++ {
 		c, err := net.Dial("tcp", ln.Addr().String())
@@ -282,16 +283,20 @@ func TestUnauthenticatedBounds(t *testing.T) {
 			t.Fatal(err)
 		}
 		held = append(held, c)
+		time.Sleep(50 * time.Millisecond)
 	}
-	time.Sleep(100 * time.Millisecond)
 	third, err := net.Dial("tcp", ln.Addr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !closed(third) {
-		t.Error("a third connection not signed in was kept")
+	if !closed(held[0]) {
+		t.Error("the oldest connection not signed in was kept")
 	}
-	for _, c := range held {
+	_ = third.SetReadDeadline(time.Now().Add(300 * time.Millisecond))
+	if _, err := third.Read(make([]byte, 1)); err == io.EOF {
+		t.Error("the newest connection was closed instead of the oldest")
+	}
+	for _, c := range append(held, third) {
 		_ = c.Close()
 	}
 	time.Sleep(100 * time.Millisecond)

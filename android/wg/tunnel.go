@@ -44,10 +44,14 @@ type Tunnel struct {
 	allowed []netip.Prefix
 	dns     bool
 	wg      sync.WaitGroup
-	// Connections not signed in yet: at most cap(pending) at once, the rest closed at once.
-	pending chan struct{}
-	mu      sync.Mutex
-	refusal string
+	// Connections not signed in yet, oldest first: at most maxWaiting (maxPending when 0). One more
+	// closes the oldest, not the new one: a local app holding the places open with silent sockets
+	// shut Burrow's own requests out (audit 2026-11-09); now it has to keep opening new ones.
+	waiting    []net.Conn
+	maxWaiting int
+	waitMu     sync.Mutex
+	mu         sync.Mutex
+	refusal    string
 }
 
 // Before the secret is shown: so many connections at once, so many header bytes each. Another app
@@ -256,7 +260,7 @@ func Start(conf, user, secret string) (*Tunnel, error) {
 		dev.Close()
 		return nil, err
 	}
-	t := &Tunnel{dev: dev, tnet: tnet, ln: ln, auth: "Basic " + base64.StdEncoding.EncodeToString([]byte(user+":"+secret)), dns: len(c.DNS) > 0, pending: make(chan struct{}, maxPending)}
+	t := &Tunnel{dev: dev, tnet: tnet, ln: ln, auth: "Basic " + base64.StdEncoding.EncodeToString([]byte(user+":"+secret)), dns: len(c.DNS) > 0}
 	for _, p := range c.Peers {
 		t.allowed = append(t.allowed, p.AllowedIPs...)
 	}
@@ -304,12 +308,8 @@ func (t *Tunnel) serve() {
 		if err != nil {
 			return
 		}
-		select {
-		case t.pending <- struct{}{}:
-			go t.handle(c)
-		default:
-			_ = c.Close()
-		}
+		t.wait(c)
+		go t.handle(c)
 	}
 }
 
@@ -405,15 +405,36 @@ func withPort(authority, def string) string {
 	return net.JoinHostPort(strings.TrimSuffix(strings.TrimPrefix(authority, "["), "]"), def)
 }
 
-func (t *Tunnel) handle(c net.Conn) {
-	defer c.Close()
-	admitted := true
-	release := func() {
-		if admitted {
-			admitted = false
-			<-t.pending
+// wait counts c among the connections not signed in yet, closing the oldest when there are too many.
+func (t *Tunnel) wait(c net.Conn) {
+	limit := t.maxWaiting
+	if limit <= 0 {
+		limit = maxPending
+	}
+	t.waitMu.Lock()
+	defer t.waitMu.Unlock()
+	if len(t.waiting) >= limit {
+		_ = t.waiting[0].Close()
+		t.waiting = t.waiting[1:]
+	}
+	t.waiting = append(t.waiting, c)
+}
+
+// signedIn takes c out of the connections waiting; once only, and nothing when it was closed as the oldest.
+func (t *Tunnel) signedIn(c net.Conn) {
+	t.waitMu.Lock()
+	defer t.waitMu.Unlock()
+	for i, w := range t.waiting {
+		if w == c {
+			t.waiting = append(t.waiting[:i:i], t.waiting[i+1:]...)
+			return
 		}
 	}
+}
+
+func (t *Tunnel) handle(c net.Conn) {
+	defer c.Close()
+	release := func() { t.signedIn(c) }
 	defer release()
 	// Not long: a local app holding the few places open with idle sockets shut out Burrow's own (audit 2026-11-05).
 	_ = c.SetReadDeadline(time.Now().Add(10 * time.Second))

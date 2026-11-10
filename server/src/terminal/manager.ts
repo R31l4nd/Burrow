@@ -81,6 +81,9 @@ export function ownTmuxHistoryCommand(): string {
   ].join('\n');
 }
 
+const IDLE_RETRY_MS = 5 * 60_000;
+const IDLE_RETRY_MAX_MS = 6 * 60 * 60_000;
+
 export interface ManagerOptions {
   maxSessions: number;
   idleMinutes: number;
@@ -94,6 +97,9 @@ export class TerminalManager {
   // masked, the newest AI_TURNS_KEPT; forgotten with the session.
   readonly #ai = new Map<string, AiTurn[]>();
   #idleTimer: NodeJS.Timeout | null = null;
+  #sweeping = false;
+  /** Per host: when its idle sessions are tried again, and the wait before that. */
+  readonly #idleRetry = new Map<number, { at: number; wait: number }>();
   /** A database write failed (the data disk full, OPS-W-02): for the disk watch to be told. */
   onWriteFailed: ((err: unknown) => void) | null = null;
   // Said once until a write works again: not a log line per keystroke.
@@ -118,7 +124,7 @@ export class TerminalManager {
     });
     this.#safely('the recordings of the last run', () => closeOrphanRecordings(this.ctx));
     // Always swept: the limit can be set while Burrow runs (Settings -> System); 0 closes nothing.
-    this.#idleTimer = setInterval(() => this.#closeIdle(), 60_000);
+    this.#idleTimer = setInterval(() => void this.closeIdle().catch(() => {}), 60_000);
     this.#idleTimer.unref();
   }
 
@@ -389,6 +395,8 @@ export class TerminalManager {
   #channelClosed(live: LiveSession, code: number | null): void {
     if (this.#live.get(live.row.id) !== live) return;
     this.#live.delete(live.row.id);
+    live.recorderStarting?.stop();
+    live.recorderStarting = null;
     live.recorder?.stop();
     live.client?.end();
     if (live.closing) return;
@@ -752,6 +760,10 @@ export class TerminalManager {
       live.row.recording = on;
       if (on && !live.recorder?.active && !wasOn) this.#record(live);
       if (!on) {
+        // One still waiting for its first screen too: off and on again at once left it open
+        // beside the next one, never ended (audit 2026-11-09).
+        live.recorderStarting?.stop();
+        live.recorderStarting = null;
         live.recorder?.stop();
         live.recorder = null;
       }
@@ -767,9 +779,11 @@ export class TerminalManager {
     // blank one; taken in the write queue's order, and the recorder takes
     // output only after it (what was queued before is in that screen already).
     live.recorder = null;
+    live.recorderStarting = rec;
     rec.onEnd = () => this.#recorderEnded(live, rec);
     live.term.write('', () => {
-      if (!live.row.recording || live.closing) return rec.stop();
+      if (live.recorderStarting !== rec || !live.row.recording || live.closing) return rec.stop();
+      live.recorderStarting = null;
       rec.output(live.serializer.serialize({ scrollback: 0 }) + screenModes(live.term));
       live.recorder = rec;
     });
@@ -965,14 +979,33 @@ export class TerminalManager {
     }
   }
 
-  #closeIdle(): void {
-    if (this.opts.idleMinutes <= 0) return;
-    const cutoff = this.ctx.now() - this.opts.idleMinutes * 60_000;
-    for (const r of this.ctx.db.select().from(terminalSessions).all()) {
-      const live = this.#live.get(r.id);
-      if (r.lastActivityAt < cutoff && (!live || live.viewers.size === 0)) {
-        void this.close(r.id, { userId: null, username: null, ip: null }, 'idle').catch(() => {});
+  /**
+   * Sessions idle past the limit, with nobody looking, are closed (each minute). A host whose
+   * tmux session could not be ended is tried again later, from 5 minutes up to 6 hours, not
+   * every minute: its sshd's fail2ban counted each attempt (audit 2026-11-09).
+   */
+  async closeIdle(): Promise<void> {
+    if (this.opts.idleMinutes <= 0 || this.#sweeping) return;
+    this.#sweeping = true;
+    try {
+      const now = this.ctx.now();
+      const cutoff = now - this.opts.idleMinutes * 60_000;
+      for (const r of this.ctx.db.select().from(terminalSessions).all()) {
+        const live = this.#live.get(r.id);
+        if (r.lastActivityAt >= cutoff || (live && live.viewers.size > 0)) continue;
+        const held = this.#idleRetry.get(r.hostId);
+        if (held && now < held.at) continue;
+        try {
+          await this.close(r.id, { userId: null, username: null, ip: null }, 'idle');
+          this.#idleRetry.delete(r.hostId);
+        } catch (err) {
+          if (err instanceof HttpError && err.status === 404) continue;
+          const wait = held ? Math.min(held.wait * 2, IDLE_RETRY_MAX_MS) : IDLE_RETRY_MS;
+          this.#idleRetry.set(r.hostId, { at: now + wait, wait });
+        }
       }
+    } finally {
+      this.#sweeping = false;
     }
   }
 }

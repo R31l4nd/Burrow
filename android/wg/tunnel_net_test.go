@@ -151,7 +151,7 @@ func newFarSide(t *testing.T) *farSide {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.tun = &Tunnel{tnet: phone, ln: ln, dns: true, auth: f.secretAuth, allowed: []netip.Prefix{netip.MustParsePrefix("10.99.0.0/24")}, pending: make(chan struct{}, maxPending)}
+	f.tun = &Tunnel{tnet: phone, ln: ln, dns: true, auth: f.secretAuth, allowed: []netip.Prefix{netip.MustParsePrefix("10.99.0.0/24")}}
 	f.tun.wg.Add(1)
 	go f.tun.serve()
 	t.Cleanup(func() { _ = ln.Close(); f.tun.wg.Wait() })

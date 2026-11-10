@@ -8,7 +8,7 @@
 </script>
 
 <script lang="ts">
-  import { MAX_FOLLOW_UPS, type AiPrices, type Analysis } from '@burrow/shared';
+  import { fileAskText, MAX_FOLLOW_UPS, type AiPrices, type Analysis } from '@burrow/shared';
   import { usageText } from '../lib/aiusage.js';
   import { backInSight, errorMessage, get, noConnection, post } from '../lib/api.js';
   import { inBackground } from '../lib/ui.svelte.js';
@@ -157,7 +157,7 @@
       const { id } = await post<{ id: number }>('/api/ai/file', {
         hostId,
         path,
-        text: chosen ? chosen.text : part.text,
+        text: fileAskText(chosen ? chosen.text : part.text),
         firstLine: chosen ? chosen.from : 1,
         totalLines: part.total,
         question: question.trim(),

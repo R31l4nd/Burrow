@@ -354,6 +354,20 @@ export const analysisAsk = z.object({
  * editor holds it (unsaved changes too), from its line firstLine on. The server cuts it to what
  * the model takes and masks it before it goes.
  */
+/**
+ * The most of the editor's text sent with a question about a file: more than any model is given
+ * (server/src/ai/analyze.ts), and well under a request's 1 MB. The editor opens files up to 5 MB,
+ * and the whole of one went and was refused as too large (audit 2026-11-09).
+ */
+export const FILE_ASK_MAX_CHARS = 200_000;
+
+/** The text cut to FILE_ASK_MAX_CHARS at a line's end; the server says the lines after it were not sent. */
+export function fileAskText(text: string): string {
+  if (text.length <= FILE_ASK_MAX_CHARS) return text;
+  const end = text.lastIndexOf('\n', FILE_ASK_MAX_CHARS);
+  return text.slice(0, end > 0 ? end : FILE_ASK_MAX_CHARS);
+}
+
 export const fileAskInput = z.object({
   hostId: z.number().int().positive(),
   path: z.string().min(2).max(4096).startsWith('/'),

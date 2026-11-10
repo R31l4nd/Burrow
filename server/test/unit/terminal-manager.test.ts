@@ -136,6 +136,23 @@ describe('a recording at its size limit', () => {
   }, 60_000);
 });
 
+describe('a recording turned off and on again at once', () => {
+  it('leaves one recording open, not one per press that is never ended (audit 2026-11-09)', async () => {
+    const { id } = await open();
+    // Three presses, each its own request (a recording's file is named by the time it starts).
+    t.terminals.setRecording(id, true, admin());
+    t.clock.now += 1000;
+    t.terminals.setRecording(id, false, admin());
+    t.clock.now += 1000;
+    t.terminals.setRecording(id, true, admin());
+    await vi.waitFor(() => expect(t.ctx.db.select().from(recordings).all().length).toBeGreaterThan(0));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(t.ctx.db.select().from(recordings).all().filter((r) => r.endedAt === null)).toHaveLength(1);
+    t.terminals.setRecording(id, false, admin());
+    expect(t.ctx.db.select().from(recordings).all().filter((r) => r.endedAt === null)).toHaveLength(0);
+  });
+});
+
 describe('what the last run left unfinished', () => {
   it('a recording it was writing is ended at start-up, at the size written: it can be removed and is pruned', async () => {
     mkdirSync(join(dir, RECORDINGS_DIR), { recursive: true });
@@ -149,5 +166,30 @@ describe('what the last run left unfinished', () => {
     expect(rows.find((x) => x.id === r.id)!.endedAt!).toBeGreaterThanOrEqual(startedAt);
     expect(rows.find((x) => x.id === done.id)).toMatchObject({ endedAt: startedAt + 5, bytes: 7 });
     expect((await t.request('DELETE', `/api/recordings/${r.id}`)).statusCode).toBe(204);
+  });
+});
+
+describe('an idle session on a host that cannot be reached', () => {
+  it("is tried again later, not every minute: the host's fail2ban counted each attempt (audit 2026-11-09)", async () => {
+    t.ctx.config.terminalIdleMinutes = 30;
+    t.ctx.db.insert(terminalSessions).values({ id: 'idle-1', hostId: host.id, userId: adminId, mode: 'tmux', tmuxName: 'burrow-idle-1', createdAt: t.clock.now, lastActivityAt: t.clock.now - 60 * 60_000 }).run();
+    vi.mocked(openSsh).mockClear();
+    vi.mocked(openSsh).mockRejectedValue(new Error('connect ECONNREFUSED'));
+    const sweep = async (minutes: number) => {
+      for (let i = 0; i < minutes; i++) {
+        t.clock.now += 60_000;
+        await t.terminals.closeIdle();
+      }
+    };
+    await sweep(1);
+    expect(vi.mocked(openSsh)).toHaveBeenCalledTimes(1);
+    // Ten minutes on: at most one more try (after five), not ten.
+    await sweep(10);
+    expect(vi.mocked(openSsh).mock.calls.length).toBeLessThanOrEqual(2);
+    // Still tried, later and later (5 minutes doubled, at most 6 hours): not given up.
+    await sweep(6 * 60);
+    expect(vi.mocked(openSsh).mock.calls.length).toBeGreaterThan(4);
+    expect(vi.mocked(openSsh).mock.calls.length).toBeLessThan(10);
+    expect(t.ctx.db.select().from(terminalSessions).where(eq(terminalSessions.id, 'idle-1')).get()).toBeDefined();
   });
 });
