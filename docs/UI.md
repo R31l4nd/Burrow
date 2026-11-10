@@ -130,6 +130,9 @@ loading, error, many) are listed in the tour, not all of them in every pass.
 - The terminal's bar (the way back, the session tabs) stays with the
   keyboard up, compact (36 px); only a screen lower than 300 px (a phone
   turned on its side with its keyboard up) leaves it out (`termBarKept`).
+  On a touch screen it is compact always, and its row of labels shows only
+  for a warning: nothing changes size when the keyboard comes or goes
+  (report aa109d).
 - Something that can be opened or folded shows so (a chevron), also on a
   phone.
 - Filters fold away behind one button on a phone; that button counts the

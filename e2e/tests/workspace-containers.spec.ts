@@ -312,3 +312,94 @@ test("a container's details open on a phone held sideways: they scroll in their 
   await page.getByTestId('container-info').click();
   await expect(page.getByTestId('container-history')).toHaveCount(0);
 });
+
+test('containers in the order chosen: by name, the busiest, the most memory or problems first, kept on this device (report d36ec8)', async ({ page }) => {
+  await signIn(page);
+  // A stack of four on the first host's snapshot, with stats that stay put (that host's later changes left out).
+  const MB = 1048576;
+  const at = new Date(Date.now() - 3_600_000).toISOString();
+  const c = (name: string, state: string, exitCode: number) => ({ id: name, name, image: 'nginx:1', imageId: 'sha256:sort', state, health: null, restarts: 0, startedAt: at, finishedAt: state === 'running' ? null : at, exitCode, oomKilled: false, createdAt: at, project: 'sortstack', service: name, configFiles: null, workingDir: null });
+  const stats = { 'sort-a': { cpu: 2, memBytes: 50 * MB, memLimitBytes: 0 }, 'sort-b': { cpu: 30, memBytes: 10 * MB, memLimitBytes: 0 }, 'sort-d': { cpu: 7, memBytes: 400 * MB, memLimitBytes: 0 } };
+  let into: number | null = null;
+  // The page's socket and the snapshot it got: new numbers sent later, as the monitor does.
+  let sock: { send: (m: string) => void } | null = null;
+  let snap: { t: string; host: { stats: Record<string, unknown> } } | null = null;
+  await page.routeWebSocket(/\/api\/docker\/ws/, (ws) => {
+    const server = ws.connectToServer();
+    server.onMessage((m) => {
+      const j = JSON.parse(String(m)) as { t: string; host?: { hostId: number; containers: unknown[]; stats: Record<string, unknown> }; d?: { hostId: number } };
+      if (j.t === 'host' && j.host && (into === null || into === j.host.hostId)) {
+        into = j.host.hostId;
+        j.host.containers.push(c('sort-d', 'running', 0), c('sort-c', 'exited', 1), c('sort-b', 'running', 0), c('sort-a', 'running', 0));
+        Object.assign(j.host.stats, stats);
+        sock = ws;
+        snap = j as typeof snap;
+        return ws.send(JSON.stringify(j));
+      }
+      if (j.t === 'delta' && j.d?.hostId === into) return;
+      ws.send(m);
+    });
+  });
+  await page.goto('/#/containers');
+  await page.reload();
+  const stack = page.getByTestId('stack').filter({ hasText: 'sortstack' });
+  const order = () => stack.locator('.c-name .nowrap').allTextContents();
+  // By name to begin with.
+  await expect.poll(order).toEqual(['sort-a', 'sort-b', 'sort-c', 'sort-d']);
+  await expect(page.getByTestId('containers-sort')).toHaveAttribute('aria-label', 'Order: By name');
+  const choose = async (name: string) => {
+    await page.getByTestId('containers-sort').click();
+    await page.getByTestId('containers-sort-by').filter({ hasText: name }).click();
+    await expect(page.getByTestId('containers-sort-items')).toBeHidden();
+  };
+  await page.getByTestId('containers-sort').click();
+  await expect(page.getByTestId('containers-sort-by').filter({ hasText: 'By name' })).toHaveAttribute('aria-pressed', 'true');
+  await lookAt(page, 'containers-sort');
+  await page.keyboard.press('Escape');
+  // The busiest first; one not running (no stats) last.
+  await choose('Busiest first');
+  await expect.poll(order).toEqual(['sort-b', 'sort-d', 'sort-a', 'sort-c']);
+  // The numbers move (sort-a now the busiest): the rows stay where they are, not moving under a
+  // finger with every update (audit 2026-11-09); chosen again, the order is new.
+  snap!.host.stats['sort-a'] = { cpu: 90, memBytes: 50 * MB, memLimitBytes: 0 };
+  sock!.send(JSON.stringify(snap));
+  await expect(stack.locator('.c-cpu').first()).toHaveText('30.0%');
+  await expect.poll(async () => (await stack.locator('.crow').filter({ hasText: 'sort-a' }).locator('.c-cpu').textContent())?.trim()).toBe('90.0%');
+  expect(await order()).toEqual(['sort-b', 'sort-d', 'sort-a', 'sort-c']);
+  await choose('Busiest first');
+  await expect.poll(order).toEqual(['sort-a', 'sort-b', 'sort-d', 'sort-c']);
+  snap!.host.stats['sort-a'] = { cpu: 2, memBytes: 50 * MB, memLimitBytes: 0 };
+  sock!.send(JSON.stringify(snap));
+  await choose('Busiest first');
+  await expect.poll(order).toEqual(['sort-b', 'sort-d', 'sort-a', 'sort-c']);
+  await choose('Most memory first');
+  await expect.poll(order).toEqual(['sort-d', 'sort-a', 'sort-b', 'sort-c']);
+  // Problems first: the one that failed, then the rest by name.
+  await choose('Problems first');
+  await expect.poll(order).toEqual(['sort-c', 'sort-a', 'sort-b', 'sort-d']);
+  // Kept on this device.
+  await page.reload();
+  await expect.poll(order).toEqual(['sort-c', 'sort-a', 'sort-b', 'sort-d']);
+  await expect(page.getByTestId('containers-sort')).toHaveAttribute('aria-label', 'Order: Problems first');
+  await choose('By name');
+  await expect.poll(order).toEqual(['sort-a', 'sort-b', 'sort-c', 'sort-d']);
+});
+
+test("a part that could not be read says so with Try again: the stacks brought down, a host's alert limits (audit 2026-11-09)", async ({ page }) => {
+  await signIn(page);
+  // The stacks brought down from Burrow vanished without a word, with no way left to bring them up.
+  await page.route('**/api/docker/stacks/down', (r) => r.fulfill({ status: 500, json: { error: 'internal', message: 'The list could not be read.' } }));
+  await page.goto('/#/containers');
+  await expect(page.getByTestId('load-failed').filter({ hasText: 'The list could not be read.' })).toBeVisible();
+  await page.unroute('**/api/docker/stacks/down');
+  await page.getByTestId('load-failed').filter({ hasText: 'The list could not be read.' }).getByTestId('load-retry').click();
+  await expect(page.getByTestId('load-failed')).toHaveCount(0);
+  // A host's limits: the card went, and the colours fell back to Burrow's defaults.
+  const host = (await page.evaluate(async () => ((await (await fetch('/api/hosts')).json()) as { id: number; name: string }[]).find((h) => h.name === 'test-sshd')!.id));
+  await page.route('**/api/hosts/*/limits', (r) => r.fulfill({ status: 500, json: { error: 'internal', message: 'The limits could not be read.' } }));
+  await page.goto(`/#/hosts/${host}/stats`);
+  await expect(page.getByTestId('load-failed').filter({ hasText: 'The limits could not be read.' })).toBeVisible();
+  await page.unroute('**/api/hosts/*/limits');
+  await page.getByTestId('load-failed').filter({ hasText: 'The limits could not be read.' }).getByTestId('load-retry').click();
+  await expect(page.getByTestId('limits')).toBeVisible();
+});

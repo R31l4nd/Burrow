@@ -49,3 +49,24 @@ describe('a run the last start of Burrow left unfinished (a crash, a restart whi
     expect(scheduled.runById(done.id)).toMatchObject({ endedAt: new Date(t.clock.now - 30_000).toISOString(), ok: true, error: null });
   });
 });
+
+describe('a deleted host (audit 2026-11-09)', () => {
+  it('leaves the schedules, the reports and the wake relays: a new host given its id is no target of theirs', async () => {
+    const { commandSchedules: cs, reportSchedules: rs, hosts } = await import('../../src/db/schema.js');
+    const { eq } = await import('drizzle-orm');
+    type H = { id: number };
+    const a = await t.json<H>('POST', '/api/hosts', { name: 'keep', address: 'keep.lan' });
+    const b = await t.json<H>('POST', '/api/hosts', { name: 'old-nas', address: 'nas.lan', wakeVia: a.id });
+    await t.json('PUT', `/api/hosts/${a.id}`, { name: 'keep', address: 'keep.lan', wakeVia: b.id });
+    const now = t.clock.now;
+    t.ctx.db.insert(cs).values({ name: 'nightly', command: 'docker system prune -af', hostIds: JSON.stringify([a.id, b.id]), enabled: true, kind: 'daily', day: 1, time: '03:00', cron: null, timeZone: 'UTC', timeoutMinutes: 5, createdAt: now, updatedAt: now }).run();
+    const report = t.ctx.db.select().from(rs).all()[0];
+    if (report) t.ctx.db.update(rs).set({ hostIds: JSON.stringify([b.id]) }).where(eq(rs.id, report.id)).run();
+    await t.json('DELETE', `/api/hosts/${b.id}`);
+    const c = await t.json<H>('POST', '/api/hosts', { name: 'someone-else', address: 'other.lan' });
+    expect(c.id).toBe(b.id);
+    expect(JSON.parse(t.ctx.db.select().from(cs).all()[0]!.hostIds) as number[]).toEqual([a.id]);
+    if (report) expect(JSON.parse(t.ctx.db.select().from(rs).where(eq(rs.id, report.id)).get()!.hostIds ?? '[]') as number[]).not.toContain(c.id);
+    expect(t.ctx.db.select().from(hosts).where(eq(hosts.id, a.id)).get()!.wakeVia).toBeNull();
+  });
+});

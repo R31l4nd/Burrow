@@ -83,3 +83,23 @@ describe('a background round that throws', () => {
     expect(unhandled).toEqual([]);
   });
 });
+
+describe("the container monitor and a host's failing connects (audit 2026-11-09)", () => {
+  it('the history sampler waits them out too; a watch just opened tries at once, its later rounds wait', async () => {
+    const host = await t.json<Host>('POST', '/api/hosts', { name: 'h2', address: 'h2.lan', username: 'me' });
+    const asked: (boolean | undefined)[] = [];
+    const pool = { with: async (_id: number, _fn: unknown, o?: { background?: boolean }) => (asked.push(o?.background), Promise.reject(new Error('connect ECONNREFUSED'))) };
+    const monitor = new DockerMonitor(t.ctx, pool as never, 10);
+    // The sampler every five minutes (a wrong password was a failed login each time: fail2ban).
+    await monitor.recent(host.id, 60_000, true, true);
+    expect(asked).toEqual([true]);
+    asked.length = 0;
+    // Someone opens Containers: the first round is theirs, not held back by an old failure.
+    const stop = monitor.watch(host.id, () => {});
+    await vi.waitFor(() => expect(asked.length).toBeGreaterThanOrEqual(3));
+    stop();
+    monitor.stop();
+    expect(asked[0]).toBe(false);
+    expect(asked.slice(1).every((b) => b === true)).toBe(true);
+  });
+});

@@ -1,0 +1,1 @@
+Containers in de volgorde die je kiest: op naam, drukste of meeste geheugen eerst, of problemen eerst, via het icoon naast het filter. De terminal verspringt en verandert niet meer van grootte als het toetsenbord opent of sluit. En de fixes van een volledige code-audit.

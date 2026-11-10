@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { maxPanes, moveTab, nextForPane, ordered, placeIn, readLayout, shownPanes } from './termsplit.js';
+import { broadcastable, maxPanes, moveTab, nextForPane, ordered, placeIn, readLayout, shownPanes } from './termsplit.js';
 
 describe('split terminals', () => {
   it('four panes on a wide screen, two on a medium one, one on a phone', () => {
@@ -36,5 +36,14 @@ describe('split terminals', () => {
     expect(moveTab(['a', 'b', 'c'], 'a', 'c')).toEqual(['b', 'c', 'a']);
     expect(moveTab(['a', 'b', 'c'], 'c', 'a')).toEqual(['c', 'a', 'b']);
     expect(moveTab(['a', 'b', 'c'], 'b', 'b')).toEqual(['a', 'b', 'c']);
+  });
+});
+
+describe('typing into all panes (audit 2026-11-09)', () => {
+  it("only what is typed: not the terminal's own answers, focus or mouse reports, which typed escape junk into the others' shells", () => {
+    expect(broadcastable('ls\r')).toBe(true);
+    expect(broadcastable('\x1b[A')).toBe(true);
+    expect(broadcastable('\x03')).toBe(true);
+    for (const d of ['\x1b[I', '\x1b[O', '\x1b[12;40R', '\x1b[?62;22c', '\x1b[<0;10;5M', '\x1b[<64;10;5M', '\x1b[M !!', '\x1b]11;rgb:0000/0000/0000\x07']) expect(broadcastable(d), JSON.stringify(d)).toBe(false);
   });
 });

@@ -74,8 +74,10 @@ export function fileFollowUpPrompt(lang: 'en' | 'nl'): string {
 /** The file's lines (masked, numbered as in the file) within the budget, and the question. */
 function fileQuestion(ctx: Ctx, body: FileAskInput, opts: { ips: boolean; budget: number }): { user: string; lines: number; question: string } {
   const host = getHost(ctx, body.hostId).name;
-  const lines = maskText(body.text, opts).split('\n');
-  const last = body.firstLine + lines.length - 1;
+  // Masked only as far as can be sent: a whole file through the masks took seconds (audit 2026-11-09).
+  const count = body.text.split('\n').length;
+  const lines = maskText(body.text.slice(0, opts.budget + 4096), opts).split('\n');
+  const last = body.firstLine + count - 1;
   const total = Math.max(body.totalLines ?? last, last);
   const part = body.firstLine > 1 || last < total ? `lines ${body.firstLine}-${last} of ${total}` : `all ${plural(total, 'line', 'lines')}`;
   const out: string[] = [];
@@ -91,7 +93,7 @@ function fileQuestion(ctx: Ctx, body: FileAskInput, opts: { ips: boolean; budget
   }
   const question = maskText(body.question, opts);
   const user = [`File ${maskText(body.path, opts)} on host ${maskText(host, opts)}, ${part}:`, '', out.join('\n'), '', `Question: ${question}`].join('\n');
-  return { user, lines: lines.length, question };
+  return { user, lines: count, question };
 }
 
 function describe(c: ContainerInfo | undefined, name: string, host: string): string {

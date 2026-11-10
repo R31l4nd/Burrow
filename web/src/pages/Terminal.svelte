@@ -19,7 +19,7 @@
   import { session } from '../lib/session.svelte.js';
   import { closeSession, connectHost, loadSessions, newSession, prefs, recordSession, renameSession, shareSession, terms } from '../lib/sessions.svelte.js';
   import type { ConnState } from '../lib/terminal.js';
-  import { maxPanes, moveTab, nextForPane, ordered, placeIn, readLayout, shownPanes, type SplitLayout } from '../lib/termsplit.js';
+  import { broadcastable, maxPanes, moveTab, nextForPane, ordered, placeIn, readLayout, shownPanes, type SplitLayout } from '../lib/termsplit.js';
   import { toast, inBackground } from '../lib/ui.svelte.js';
 
   // A session on the server: the WebSocket, the session tabs and menus.
@@ -103,6 +103,13 @@
   const owner = $derived(paneSt[active]?.owner ?? true);
   const shell = $derived(paneSt[active]?.shell ?? null);
   const limited = $derived(paneSt[active]?.limited ?? false);
+  // On a phone (report aa109d): the bar always compact and the labels only for
+  // a warning, the same with the keyboard up or down; the bar grew, the labels
+  // came back and the terminal moved each time it went down. "Lost on restart"
+  // is no warning there: chosen when opening, said in the session list, and its
+  // row took the terminal's room with the keyboard up for the whole session.
+  const phone = $derived(keyBars.show);
+  const warning = $derived(viewers.length > 1 || !owner || connState === 'reconnecting' || connState === 'connecting');
 
   /** Typing goes to this pane; the address follows without opening the page again. */
   function activate(pid: string) {
@@ -112,9 +119,19 @@
     keepLayout();
     history.replaceState(history.state, '', `#/term/${pid}`);
   }
+  /**
+   * One session on screen. The page's own one by the router did nothing: the address had followed
+   * another pane without the router, which still thought it was there (audit 2026-11-09).
+   */
+  function showOnly(sid: string) {
+    if (sid !== id) return go(`/term/${sid}`);
+    layout.panes = [sid];
+    keepLayout();
+    activate(sid);
+  }
   /** A session from the tabs: in the active pane when split, else the page for it. */
   function pick(sid: string) {
-    if (!split) return go(`/term/${sid}`);
+    if (!split) return showOnly(sid);
     layout.panes = placeIn(shown, Math.max(0, shown.indexOf(active)), sid);
     keepLayout();
     activate(sid);
@@ -234,7 +251,7 @@
     if (!split) broadcast = false;
   });
   function typedIn(pid: string, data: string) {
-    if (!broadcast || pid !== active) return;
+    if (!broadcast || pid !== active || !broadcastable(data)) return;
     for (const p of shown) if (p !== pid) refs[p]?.send(data);
   }
 
@@ -305,7 +322,8 @@
         return;
       }
       const next = tabs[0];
-      go(next ? `/term/${next.id}` : '/hosts');
+      if (next) showOnly(next.id);
+      else go('/hosts');
     } catch (err) {
       toast(errorMessage(err), 'error');
     } finally {
@@ -436,7 +454,7 @@
   }
 </script>
 
-<div class="term-page">
+<div class="term-page" class:phone>
   <header class="term-top">
     <button class="icon-btn" aria-label={t('nav.hosts')} onclick={() => go('/hosts')}><Icon name="back" /></button>
     <div use:scrollCue class="tabs" role="tablist" bind:this={tabStrip}>
@@ -516,23 +534,23 @@
     <button class="icon-btn" aria-label={t('term.menu')} title={t('term.menu')} onclick={() => (switcherOpen = true)}><Icon name="more" /></button>
   </header>
 
-  <div class="status-row">
+  {#if !phone || warning}<div class="status-row">
     <!-- In the Android app: which route this session takes (the other is "Direct"). -->
-    {#if android}<span class="badge" data-testid="route-burrow">{t('term.viaBurrow')}</span>{/if}
-    {#if mode === 'memory'}
+    {#if android && !phone}<span class="badge" data-testid="route-burrow">{t('term.viaBurrow')}</span>{/if}
+    {#if mode === 'memory' && !phone}
       <span class="badge warn" data-testid="memory-badge">{t('term.memory')}</span>
       <HelpTip text={t('help.memoryMode')} />
-    {:else if mode === 'tmux'}
+    {:else if mode === 'tmux' && !phone}
       <span class="badge">tmux</span>
     {/if}
-    {#if limited && !shell?.integration}
+    {#if limited && !shell?.integration && !phone}
       <span class="badge" data-testid="limited-badge">{t('term.limited')}</span>
       <HelpTip text={t('help.limited')} />
     {/if}
     {#if viewers.length > 1}<span class="badge" data-testid="viewer-count">{t('term.devices', { n: viewers.length })}</span>{/if}
     {#if !owner}<span class="badge">{t('term.otherSize')}</span>{/if}
     {#if connState === 'reconnecting' || connState === 'connecting'}<span class="badge">{t('term.connecting')}</span>{/if}
-  </div>
+  </div>{/if}
 
   {#if listError}
     <div class="alert error small listfail" role="alert">
@@ -820,7 +838,7 @@
      the cursor in sight, TermView). Only a phone turned on its side (some
      260 px) leaves too little for it: there nothing of the terminal showed. */
   @media (max-height: 480px) {
-    .status-row {
+    .term-page:not(.phone) .status-row {
       display: none;
     }
     .term-top {
@@ -836,6 +854,21 @@
     .tab {
       padding: 2px 8px;
     }
+  }
+  /* A phone: that compact bar whatever the keyboard does, so nothing changes
+     size when it comes or goes (report aa109d). */
+  .phone .term-top {
+    padding: 0 4px;
+  }
+  .phone .term-top :global(.icon-btn) {
+    width: 36px;
+    height: 36px;
+  }
+  .phone .tabs {
+    padding: 2px;
+  }
+  .phone .tab {
+    padding: 2px 8px;
   }
   @media (max-height: 300px) {
     .term-top {

@@ -903,3 +903,26 @@ test('the app this Burrow offers is older than Burrow itself (after a self-updat
   await expect(older).toBeHidden();
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
+
+test("the app's version while Burrow's side could not be read: no 'up to date' (audit 2026-11-09)", async ({ page }) => {
+  // Failed is not empty: with /api/android failing it said the app was up to date.
+  await signIn(page);
+  await page.addInitScript(() => {
+    const port = {
+      onmessage: null as ((e: { data: string }) => void) | null,
+      postMessage(raw: string) {
+        const { id, method } = JSON.parse(raw) as { id: number; method: string };
+        const result = method === 'info' ? { version: '2.0.0', versionCode: 20000, deviceId: null, deviceName: 'Pixel', profiles: true, screenshots: false, screenshotsFixed: false, shake: false } : null;
+        setTimeout(() => port.onmessage?.({ data: JSON.stringify({ id, result }) }), 5);
+      },
+    };
+    (window as unknown as { BurrowAndroid: unknown }).BurrowAndroid = port;
+  });
+  await page.route('**/api/android', (r) => r.fulfill({ status: 500, json: { error: 'internal', message: 'The list could not be read.' } }));
+  await page.goto('/#/settings/android');
+  await page.reload();
+  await expect(page.getByTestId('load-failed')).toContainText('The list could not be read.');
+  await expect(page.getByTestId('app-version')).toContainText('This app is version 2.0.0.');
+  await expect(page.getByTestId('app-version')).not.toContainText('up to date');
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});

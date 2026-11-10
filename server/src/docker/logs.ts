@@ -165,7 +165,11 @@ export function fileCommand(t: { container: string; file: string }, hostPath: { 
   }
   if (!LOG_FILE_PATH.test(t.file) || (t.container && !CONTAINER_NAME.test(t.container))) throw new Error('invalid log file');
   // First the zone where the file is (the host, or inside the container): its times without one are in it (AUDIT2 AI-12).
-  const script = `case "$(readlink -f -- "$1" 2>/dev/null)" in /dev/*|/proc/*) echo ${OUTPUT_MARK}; exit 0;; esac; echo "${ZONE_MARK} $(date +%z 2>/dev/null)"; exec tail -n ${o.tail}${o.follow ? ' -F' : ''} -- "$1"`;
+  // Never a key or Burrow's own secret, as files.access closes them to operators, who stream every
+  // source: a container could turn a log in its folder into a link to the SSH user's key (audit
+  // 2026-11-09). Judged where it really lies when the read starts.
+  const closed = String.raw`*/.ssh/*|*/ssh_host_*_key|*/secret.key|*/backup_encryption_key|*/burrow.db|*/burrow.db-*|*/burrow-*.tar.gz.enc|/etc/shadow|/etc/shadow-|/etc/gshadow|/etc/gshadow-`;
+  const script = `R=$(readlink -f -- "$1" 2>/dev/null); case "$R" in /dev/*|/proc/*) echo ${OUTPUT_MARK}; exit 0;; ${closed}) echo "tail: $1: kept from logs: it leads to a key or a secret" >&2; exit 1;; esac; echo "${ZONE_MARK} $(date +%z 2>/dev/null)"; exec tail -n ${o.tail}${o.follow ? ' -F' : ''} -- "$1"`;
   const run = `sh -c ${shellQuote(script)} sh`;
   // "Since start": first when its container started (or the host booted), for the lines to be held to.
   const start = o.since !== SINCE_START ? '' : t.container ? `${startedAt(t.container)} echo "${SINCE_MARK} $S"; ` : `echo "${SINCE_MARK} @$(awk '/^btime/ {print $2}' /proc/stat 2>/dev/null)"; `;

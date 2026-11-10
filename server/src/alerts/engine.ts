@@ -505,7 +505,8 @@ export class AlertEngine {
     // The host or the rule went while the event was being looked at: nothing to store (AUDIT2 MON-14).
     if (!this.ctx.db.select({ id: hosts.id }).from(hosts).where(eq(hosts.id, hostId)).get()) return;
     if (!this.ctx.db.select({ id: alertRules.id }).from(alertRules).where(eq(alertRules.id, rule.id)).get()) return;
-    const safeDetail = detail ? maskText(detail, { ips: false }).slice(0, 1000) : null;
+    // Cut before masking too: a 64 KB line through the masks took seconds (audit 2026-11-09).
+    const safeDetail = detail ? maskText(detail.slice(0, 4000), { ips: false }).slice(0, 1000) : null;
     // Bundled with one of the same kind only: a crash and an unhealthy check
     // of one container are two alerts, each with its own count (AUDIT2 MON-11).
     const kind = alertKind(title);

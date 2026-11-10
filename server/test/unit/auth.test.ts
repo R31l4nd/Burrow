@@ -91,6 +91,24 @@ describe('login', () => {
     expect(a.json()).toEqual(b.json());
   });
 
+  it('attempts sent together are checked one at a time: no more get through than the block allows (audit 2026-11-09)', async () => {
+    await setupAdmin(t);
+    t.cookie = null;
+    // A few failures, so each attempt waits: those sent meanwhile all passed the throttle, which
+    // counted a failure only after the check.
+    for (let i = 0; i < 3; i++) throttle.fail(t.ctx, ['user:admin']);
+    let wake!: () => void;
+    const held = new Promise<void>((r) => (wake = r));
+    const sleep = vi.spyOn(throttle.timing, 'sleep').mockImplementation(() => held);
+    const all = Array.from({ length: 30 }, () => t.request('POST', '/api/auth/password', { username: 'admin', password: 'wrong password!!' }));
+    await new Promise((r) => setTimeout(r, 50));
+    wake();
+    const codes = (await Promise.all(all)).map((r) => r.statusCode);
+    sleep.mockRestore();
+    expect(codes.filter((c) => c === 401).length).toBeLessThanOrEqual(BLOCK_AFTER - 3);
+    expect(codes.every((c) => c === 401 || c === 429)).toBe(true);
+  });
+
   it('a recovery code signs in exactly once', async () => {
     const { recoveryCodes } = await setupAdmin(t);
     t.cookie = null;

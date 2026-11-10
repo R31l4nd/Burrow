@@ -662,7 +662,7 @@ export function reportNotice(r: Report) {
     const lines = r.containers
       .filter((c) => c.status !== 'ok')
       .slice(0, 12)
-      .map((c) => `${c.status === 'problem' ? 'x' : '!'} ${c.container} (${c.hostName}): ${c.reasons.map((x) => reasonText(x, lang)).join(', ')}`);
+      .map((c) => `${c.status === 'problem' ? 'x' : '!'} ${subjectLabel(c.container, lang)} (${c.hostName}): ${c.reasons.map((x) => reasonText(x, lang)).join(', ')}`);
     // The summary in the channel's own language: the one stored is in the language of most
     // channels, and went to a Dutch channel in English beside Dutch lines (AUDIT2 MON-23).
     const summary = overall(r.containers, r.counts, lang, (r.unreachable ?? []).map((u) => u.hostName), r.updates);
@@ -704,7 +704,8 @@ function toReport(r: typeof reports.$inferSelect, lang: 'en' | 'nl'): Report {
 export function overall(cs: ContainerReport[], counts: Report['counts'], lang: 'en' | 'nl', unreachable: string[] = [], updates: Report['updates'] = []): string {
   const nl = lang === 'nl';
   const list = (xs: string[]) => xs.slice(0, 5).join(', ') + (xs.length > 5 ? ` ${nl ? 'en' : 'and'} ${xs.length - 5} ${nl ? 'meer' : 'more'}` : '');
-  const names = (xs: ContainerReport[]) => list(xs.map((c) => c.container));
+  // A host log file by its path, not its encoded name (audit 2026-11-09).
+  const names = (xs: ContainerReport[]) => list(xs.map((c) => subjectLabel(c.container, lang)));
   const parts: string[] = [];
   const problems = cs.filter((c) => c.status === 'problem');
   const attention = cs.filter((c) => c.status === 'attention');

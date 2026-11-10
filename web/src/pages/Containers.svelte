@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { pullToRefresh } from '../lib/pull.svelte.js';
   import { session } from '../lib/session.svelte.js';
   import type { ContainerInfo, ContainerStats, DownStack, StatsHistory } from '@burrow/shared';
@@ -25,6 +26,7 @@
   import type { BulkAction, BulkRow } from '../lib/bulk.js';
   import { notesLabel } from '../lib/notescount.js';
   import { footBar } from '../lib/footbar.js';
+  import { CONTAINER_SORTS, readSort, sortGroups, sortRows, type ContainerSort, type SortKeys } from '../lib/containersort.js';
 
   // All containers of all Docker hosts, grouped by compose stack across
   // hosts, with state, health, restarts and live CPU/memory. Pick several
@@ -48,7 +50,10 @@
   const dockerHosts = $derived(data.hosts.filter((h) => h.facts?.hasDocker));
   // Stacks brought down from Burrow: no containers, still here to bring up again (as Dockge lists them).
   let down = $state<DownStack[]>([]);
-  $effect(() => void get<DownStack[]>('/api/docker/stacks/down').then((d) => (down = d), () => {}));
+  // Not read: said with Try again; the stacks brought down vanished without a word, no way left to bring them up (audit 2026-11-09).
+  let downError = $state('');
+  const readDown = () => get<DownStack[]>('/api/docker/stacks/down').then((d) => ((down = d), (downError = '')), (err: unknown) => (downError = errorMessage(err)));
+  $effect(() => void readDown());
   const downShown = $derived(
     down.filter((d) => (hostFilter === 'all' || d.hostId === hostFilter) && (stateFilter === 'all' || stateFilter === 'stopped') && (!query.trim() || `${d.project} ${d.hostName}`.toLowerCase().includes(query.trim().toLowerCase()))),
   );
@@ -57,6 +62,33 @@
   const hostFilter = $derived(filter.startsWith('host:') ? Number(filter.slice(5)) : 'all');
   const stateFilter = $derived(filter.startsWith('state:') ? filter.slice(6) : 'all');
   let query = $state('');
+  // The order (report d36ec8): by name, the busiest or largest first, or problems
+  // first; kept on this device. A menu, not a second dropdown (no room on a phone).
+  const SORT_KEY = 'burrow.containers.sort';
+  let sortBy = $state<ContainerSort>(storedSort());
+  function storedSort(): ContainerSort {
+    try {
+      return readSort(localStorage.getItem(SORT_KEY));
+    } catch {
+      return 'name';
+    }
+  }
+  let sortMenu = $state(false);
+  function setSort(s: ContainerSort) {
+    sortBy = s;
+    resort++;
+    sortMenu = false;
+    try {
+      localStorage.setItem(SORT_KEY, s);
+    } catch {
+      // Not kept: this order until the page is left.
+    }
+  }
+  const TROUBLE = { bad: 0, warn: 1, ok: 2, off: 3 } as const;
+  const sortKeys = (r: Row): SortKeys => {
+    const up = r.c.state === 'running' && r.stats;
+    return { name: r.c.name, cpu: up ? up.cpu : null, mem: up && up.memKnown !== false ? up.memBytes : null, trouble: TROUBLE[tone(r.c)] };
+  };
   // The logs page reads at most this many at once.
   const MAX_LOGS = MAX_LOG_TARGETS;
   let selecting = $state(false);
@@ -155,14 +187,39 @@
   });
 
   /** Stacks (compose projects) across hosts first, then loose containers per host. */
-  const groups = $derived.by(() => {
+  function groupsOf(rs: Row[]) {
     const m = new Map<string, { key: string; title: string; stack: string | null; rows: Row[] }>();
-    for (const r of rows) {
+    for (const r of rs) {
       const k = r.c.project ? `s:${r.c.project}` : `h:${r.hostName}`;
       if (!m.has(k)) m.set(k, { key: k, title: r.c.project ?? t('containers.loose', { host: r.hostName }), stack: r.c.project, rows: [] });
       m.get(k)!.rows.push(r);
     }
-    return [...m.values()].sort((a, b) => Number(!a.stack) - Number(!b.stack) || a.title.localeCompare(b.title));
+    return [...m.values()];
+  }
+  // The order held while the numbers move (audit 2026-11-09): sorted by CPU or memory, the rows
+  // moved under a finger with every update. Sorted again when an order is chosen, a container
+  // comes or goes, and every 30 s.
+  let resort = $state(0);
+  $effect(() => {
+    const id = setInterval(() => resort++, 30_000);
+    return () => clearInterval(id);
+  });
+  const rowSet = $derived(rows.map((r) => `${r.hostId}:${r.c.name}`).sort().join('\n'));
+  const held = $derived.by(() => {
+    void resort;
+    void rowSet;
+    const by = sortBy;
+    return untrack(() => {
+      const gs = groupsOf(rows).map((g) => ({ ...g, rows: sortRows(g.rows, by, sortKeys) }));
+      const ordered = sortGroups(gs, by, { rows: (g) => g.rows, keys: sortKeys, title: (g) => g.title, loose: (g) => !g.stack });
+      return { groups: new Map(ordered.map((g, i) => [g.key, i])), rows: new Map(ordered.flatMap((g) => g.rows).map((r, i) => [`${r.hostId}:${r.c.name}`, i])) };
+    });
+  });
+  const groups = $derived.by(() => {
+    const at = (m: Map<string, number>, k: string) => m.get(k) ?? Number.MAX_SAFE_INTEGER;
+    return groupsOf(rows)
+      .map((g) => ({ ...g, rows: [...g.rows].sort((a, b) => at(held.rows, `${a.hostId}:${a.c.name}`) - at(held.rows, `${b.hostId}:${b.c.name}`)) }))
+      .sort((a, b) => at(held.groups, a.key) - at(held.groups, b.key));
   });
 
   // Stacks folded away, kept on this device: sixty containers of one stack
@@ -273,6 +330,12 @@
         </optgroup>
       {/if}
     </select>
+    <!-- Not while picking: the pick-all box takes its place (on a 343 px phone the filter's word was cut off). -->
+    {#if !selecting}
+      <button class="icon-btn" aria-haspopup="dialog" aria-label={t('containers.sortLabel', { by: t(`containers.sort.${sortBy}`) })} title={t('containers.sortLabel', { by: t(`containers.sort.${sortBy}`) })} onclick={() => (sortMenu = true)} data-testid="containers-sort"
+        ><Icon name="sort-az" /></button
+      >
+    {/if}
     {#if !looking && groups.length > 1}
       <button class="icon-btn" aria-pressed={allFolded} aria-label={allFolded ? t('containers.unfoldAll') : t('containers.foldAll')} title={allFolded ? t('containers.unfoldAll') : t('containers.foldAll')} onclick={foldAll} data-testid="stacks-fold-all"
         ><Icon name={allFolded ? 'chevron' : 'chevron-down'} /></button
@@ -391,6 +454,7 @@
     </section>
   {/each}
   </div>
+  {#if downError}<LoadFailed inline message={downError} onretry={readDown} />{/if}
   {#if downShown.length}
     <section class="group" data-testid="stacks-down">
       <div class="ghead toolbar">
@@ -452,7 +516,21 @@
 </Dialog>
 <ChangelogDialog items={notesFor} onclose={() => (notesFor = null)} />
 
+<Dialog tour="containers-sort" menu bind:open={sortMenu} title={t('containers.sortTitle')}>
+  <div class="stack" data-testid="containers-sort-items">
+    {#each CONTAINER_SORTS as s (s)}
+      <button class="btn sortby" aria-pressed={sortBy === s} onclick={() => setSort(s)} data-testid="containers-sort-by">{t(`containers.sort.${s}`)}</button>
+    {/each}
+  </div>
+</Dialog>
+
 <style>
+  /* The order in use, among the others in its menu. */
+  .sortby[aria-pressed='true'] {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+    font-weight: 600;
+  }
   .hidden {
     display: none;
   }

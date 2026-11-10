@@ -98,7 +98,8 @@ test('works on a phone: sign in, search, open a host', async ({ page }) => {
       return shown - s.rows;
     })
     .toBe(0);
-  expect(await page.locator('.term-wrap').evaluate((e) => e.scrollHeight - e.clientHeight)).toBeLessThanOrEqual(1);
+  // Fitted once the box has settled (TermView's SETTLE_MS on a touch screen, report b00aad).
+  await expect.poll(() => page.locator('.term-wrap').evaluate((e) => e.scrollHeight - e.clientHeight)).toBeLessThanOrEqual(1);
   await page.getByTestId('compose').fill('echo composed-$((20+22))');
   await page.getByTestId('compose-send').tap();
   await expect(page.locator('[data-testid=terminal] .xterm-rows')).toContainText('composed-42');
@@ -261,7 +262,7 @@ test("a finger's scroll in Burrow's tmux: the whole history at once in a layer t
   const s = await page.evaluate((id) => fetch('/api/terminal/sessions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ hostId: id, tmux: 'always' }) }).then((r) => r.json() as Promise<{ id: string }>), hostId);
   await page.goto(`/#/term/${s.id}`);
   const rows = page.locator('[data-testid=terminal] .xterm-rows');
-  await expect(page.locator('.badge', { hasText: 'tmux' })).toBeVisible();
+  await expect(rows).toContainText('$', { timeout: 20_000 });
   await page.getByTestId('terminal').click();
   // Output still to come while the history is open.
   await page.keyboard.type('seq 1 300; (sleep 3; echo late-$((6*7))) &\n');
@@ -328,7 +329,7 @@ test("typing right after a flick in a tmux session: the glide stops, no scroll g
   const s = await page.evaluate((id) => fetch('/api/terminal/sessions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ hostId: id, tmux: 'always' }) }).then((r) => r.json() as Promise<{ id: string }>), hostId);
   await page.goto(`/#/term/${s.id}`);
   const rows = page.locator('[data-testid=terminal] .xterm-rows');
-  await expect(page.locator('.badge', { hasText: 'tmux' })).toBeVisible();
+  await expect(rows).toContainText('$', { timeout: 20_000 });
   await page.getByTestId('terminal').click();
   await page.keyboard.type('seq 1 300\n');
   await expect(rows).toContainText('299');
@@ -885,6 +886,47 @@ test("the keyboard up over a tmux attach: the terminal keeps its rows, nothing i
   await api('/api/snippets/run', { hostIds: [hostId], command: 'tmux -L tui kill-server 2>/dev/null; true' });
 });
 
+test('the keyboard coming up and going down in steps, as Android animates it: no other size sent on the way (report b00aad)', async ({ page }) => {
+  // Reported (b00aad): the picture jumped each time the keyboard opened or
+  // closed. The page shrinks in steps while the keyboard slides in; the steps
+  // before it counted as a keyboard (120 px) went out as fewer rows, and the
+  // program in the terminal redrew for each, then again for the rows kept.
+  await page.setViewportSize({ width: 343, height: 711 });
+  const sizes: string[] = [];
+  page.on('websocket', (ws) => {
+    if (/\/sessions\/[^/]+\/ws/.test(ws.url())) ws.on('framesent', (f) => {
+      const m = typeof f.payload === 'string' ? /"t":"resize","cols":(\d+),"rows":(\d+)/.exec(f.payload) : null;
+      if (m) sizes.push(`${m[1]}x${m[2]}`);
+    });
+  });
+  await signIn(page);
+  const hostId = await page.evaluate(async () => ((await (await fetch('/api/hosts')).json()) as { id: number; name: string }[]).find((h) => h.name === 'test-sshd')!.id);
+  const s = await page.evaluate((id) => fetch('/api/terminal/sessions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ hostId: id, tmux: 'never' }) }).then((r) => r.json() as Promise<{ id: string }>), hostId);
+  await page.goto(`/#/term/${s.id}`);
+  await expect(page.locator('[data-testid=terminal] .xterm-rows')).toContainText('$', { timeout: 20_000 });
+  await page.locator('[data-testid=terminal] textarea').focus();
+  await expect.poll(() => sizes.length).toBeGreaterThan(0);
+  await page.waitForTimeout(500);
+  const size = sizes.at(-1)!;
+  sizes.length = 0;
+  // Up in steps of 40 px, a frame or two apart, then down again the same way.
+  for (let h = 676; h >= 356; h -= 40) {
+    await page.setViewportSize({ width: 343, height: h });
+    await page.waitForTimeout(30);
+  }
+  await page.setViewportSize({ width: 343, height: 356 });
+  await page.waitForTimeout(800);
+  expect(sizes.filter((x) => x !== size), 'sizes sent while the keyboard came up').toEqual([]);
+  for (let h = 396; h <= 711; h += 40) {
+    await page.setViewportSize({ width: 343, height: h });
+    await page.waitForTimeout(30);
+  }
+  await page.setViewportSize({ width: 343, height: 711 });
+  await page.waitForTimeout(800);
+  expect(sizes.filter((x) => x !== size), 'sizes sent while it went down').toEqual([]);
+  await page.evaluate((id) => fetch(`/api/terminal/sessions/${id}`, { method: 'DELETE' }), s.id);
+});
+
 test("the key bar and the text box are compact, the text box in the terminal's font size", async ({ page }) => {
   // Reported (efc5af): both took too much room; the box's text was bigger than the terminal's.
   await page.setViewportSize({ width: 343, height: 711 });
@@ -1208,12 +1250,17 @@ test('a phone turned on its side with its keyboard up: the terminal keeps the ro
   await page.evaluate(() => (localStorage.setItem('burrow.locale', 'en'), localStorage.removeItem('burrow.appearance')));
   await page.reload();
   await expect(page.locator('[data-testid=terminal] .xterm-rows')).toContainText('$', { timeout: 20_000 });
-  // Upright with the keyboard up: the tabs stay, only the labels make way.
+  // Upright: the bar the same with the keyboard up or down, and no row of
+  // labels coming and going with it (report aa109d: the picture changed
+  // scale each time; the compact one, as with the keyboard up, was liked).
   await page.setViewportSize({ width: 412, height: 450 });
   await expect(page.locator('.term-top')).toBeVisible();
   await expect(page.locator('.status-row')).toBeHidden();
+  const up = (await page.locator('.term-top').boundingBox())!.height;
   await page.setViewportSize({ width: 412, height: 915 });
-  await expect(page.locator('.status-row')).toBeVisible();
+  await expect(page.locator('.term-top').getByRole('tab').first()).toBeVisible();
+  expect((await page.locator('.term-top').boundingBox())!.height, 'the bar with the keyboard down').toBe(up);
+  await expect(page.locator('.status-row')).toBeHidden();
 });
 
 test('several lines pasted reach a program as one paste, from the keyboard and the text box', async ({ page }) => {

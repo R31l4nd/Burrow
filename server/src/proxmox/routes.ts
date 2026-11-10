@@ -28,12 +28,20 @@ const LIST = `${AS_ROOT} for t in qm pct; do echo "@@burrow-pve $t"; if command 
 function parseList(out: string): GuestList {
   const guests = [];
   const errors: string[] = [];
-  for (const part of out.split('@@burrow-pve ').slice(1)) {
+  const parts = out.split('@@burrow-pve ').slice(1);
+  // Both lists, each ended by its exit: one cut off (the connection gone between them) read as a
+  // node without containers (audit 2026-11-09).
+  for (const t of ['qm', 'pct']) if (!parts.some((p) => p.startsWith(`${t}\n`))) errors.push(`${t}: the list was cut short`);
+  for (const part of parts) {
     const name = part.slice(0, part.indexOf('\n')).trim();
     const body = part.slice(part.indexOf('\n') + 1);
     const m = /@@burrow-exit (\d+)\s*$/.exec(body);
     const text = m ? body.slice(0, m.index) : body;
     const code = m ? Number(m[1]) : -1;
+    if (code === -1) {
+      errors.push(`${name}: the list was cut short`);
+      continue;
+    }
     if (code === 127) continue;
     if (code !== 0) {
       errors.push(`${name}: ${text.trim().split('\n').pop() || `exited with ${code}`}`);

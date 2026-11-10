@@ -41,6 +41,12 @@ dots) opens the host menu: new session, test the connection, install a key, edit
   it the session shows *lost on restart*; `sudo apt install tmux` fixes that.
   Burrow uses its own tmux server; join a session from a normal SSH login with
   `tmux -L burrow ls` and `tmux -L burrow attach -t <name>`.
+- On a phone the bar above the terminal is the compact one, with or without
+  the keyboard, so nothing changes size when it comes or goes; the row of
+  labels under it shows only for a warning (connecting, another device's
+  size, more devices); whether a session is lost on restart the session list
+  says. The terminal keeps its rows while the
+  keyboard is up and shows the part with the cursor.
 - Swipe left or right on the terminal to switch sessions; pinch to zoom.
 - On a wide screen *Panes* (the split button) shows up to four open
   sessions side by side (two on a medium screen); the layout is kept on
@@ -389,6 +395,11 @@ then.
 - The arrow before a stack folds it away (kept on this device); folded, it
   still says how many of its containers need a look. A search or a state
   filter shows every stack open.
+- The order icon beside the filter: by name, the busiest (CPU) or the most
+  memory first, or problems first; stacks by what they use together. The
+  rows hold their place while the numbers move, sorted again when you
+  choose, when a container comes or goes, and every 30 s. Kept
+  on this device.
 - Tap a container for its details and logs; *Logs* at a stack, or *Select*
   and pick any containers (also from different hosts), for one merged
   timeline in time order, each source in its own colour.

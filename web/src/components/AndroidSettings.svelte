@@ -243,8 +243,11 @@
           {/if}
           <p class="dim small" role="status">{t('android.updatingHint')}</p>
         {/if}
-      {:else}
+      {:else if loaded}
         <p class="small dim">{t('android.upToDate', { version: info.version })}</p>
+      {:else}
+        <!-- Burrow's side failed or is still coming: only the version, not "up to date" (audit 2026-11-09). -->
+        <p class="small dim">{t('android.versionOnly', { version: info.version })}</p>
       {/if}
       {@render olderApk()}
     </div>

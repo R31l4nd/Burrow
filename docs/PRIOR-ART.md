@@ -363,6 +363,14 @@ Checked 2026-10-06.
 
 ## Containers, stacks and logs
 
+- **Dozzle** and **Portainer** container lists: sorted by name, state, CPU
+  or memory (Dozzle's column headers, Portainer's table).
+  - Taken over (report d36ec8): the Containers page in the order chosen,
+    by name, the busiest (CPU) or the most memory first, or problems first
+    (as Apps' "Down first"); stacks by what they use together; kept on
+    the device. A menu behind one icon, not a second dropdown (no room on
+    a phone).
+
 - **Cockpit** Logs page: the systemd journal per service and priority, read
   in the browser as the signed-in user.
   - Taken over: a host's services with their journal read like container

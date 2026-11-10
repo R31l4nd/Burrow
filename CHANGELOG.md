@@ -6,6 +6,96 @@ says how it was verified.
 
 ## [Unreleased]
 
+## [2.23.0] - 2026-11-09
+
+Three reports from the phone (the containers in another order, a terminal
+that jumped and changed size with the keyboard), and what a full code
+audit found.
+
+### Added
+
+- Containers in the order you choose (report d36ec8): the order icon
+  beside the filter puts them by name, the busiest (CPU) or the most
+  memory first, or problems first; stacks by what they use together.
+  Kept on the device. The rows hold their place while the numbers move
+  (sorted again when an order is chosen, a container comes or goes, and
+  every 30 s): they moved under a finger with every update.
+
+### Fixed
+
+- The terminal's picture jumped each time the keyboard opened or closed
+  on a phone (report b00aad): every step of the slide went out as fewer
+  rows, and the program in the terminal redrew for each. The terminal is
+  fitted once the keyboard has settled, and keeps its rows.
+- The terminal's top bar changed size with the keyboard (report aa109d):
+  on a phone it is now always the compact one, and the row of labels
+  under it shows only for a warning (connecting, another size, more
+  devices); "via Burrow", "tmux" and "lost on restart" (the session list
+  says it) are left out there.
+- "Host unreachable" (2.22.0) also went out for a host that answered but
+  whose numbers could not be read, a slow command or full sessions: only
+  a failed connect counts now.
+- The container history sampler connected to a failing host every five
+  minutes past the backoff of 2.22.0 (a failed login for fail2ban each
+  time); it waits too now. The Containers page opened after an outage
+  tries at once instead of showing the old error for up to half an hour.
+- Security updates were told again after one failed package check.
+- A Proxmox node's guest list cut off between its two parts read as a
+  node without containers.
+- Back to the session a terminal page was opened for (its tab, or closing
+  the pane in front) did nothing after typing in another pane.
+- Typing into all panes also typed the terminal's own answers and mouse
+  reports into the other shells.
+- Settings -> Android said "up to date" while Burrow's side was still
+  being read or could not be read; Containers left out the stacks brought
+  down, and a host's page its alert limits, without a word when their
+  read failed: both are said now, with Try again.
+- A dialog fading out still took taps: a quick second tap ran a menu item
+  twice.
+
+### Security
+
+- A long log line (for example `docker login` repeated over 64 KB) could
+  freeze Burrow for minutes in the masking before logs go to a model or
+  an alert: the masking rules are bounded and the text is cut first.
+- More secrets are masked: quoted option values, names with more after
+  the secret word (`DB_PASSWORD_ROOT`), passwords in SQL statements, in
+  redis, keepalived and `.netrc` files, in XML, and URL-encoded ones.
+- The risk rules read more commands as high: Proxmox guests and storage
+  removed, Podman pruned, a branch deleted by a push, storage rolled back
+  or shrunk, a container with the host's root, SSH stopped, sysrq, rows
+  deleted, and a command whose name is hidden ($'..', globs, a variable);
+  anything piped into a shell at least medium.
+- Sign-in and step-up attempts sent together all passed the throttle while
+  the first ones waited: one attempt at a time per account, address and
+  session now.
+- A host deleted and a new one added got the same id, and the old one's
+  scheduled commands and reports then ran on the new host: a deleted
+  host is taken out of them (and of wake relays and uploads).
+- A host log source that is a link to a key or one of Burrow's secrets is
+  not read: a container could turn a log in its folder into one, and
+  operators stream every source.
+- The app's WireGuard question read Endpoint lines more strictly than the
+  tunnel, so a peer behind a comment was configured but not shown.
+- The app's tunnel proxy forwarded a plain-http client's next request to
+  the first host it asked for.
+- An empty share from the page ended the app.
+- CI checks that nothing under android/ changed before the signing key is
+  there; release tags are X.Y.Z only (a prerelease published images, then
+  failed before the release).
+
+### Verified
+
+- Each fix with a test that failed on the code before it (unit, e2e, and
+  JVM for the app), except the tunnel proxy (Go's own tests still pass)
+  and the CI and release-tag checks (run by hand).
+- The split terminals test types only into sessions of its own: it was
+  given another spec's session beside its own (once one in tmux's copy
+  mode, once one sized by another viewer, whose suggestions lay over a
+  pane's head) and failed now and then on a busy gate.
+- The gate, the Android test on the emulator and a fresh install on a new
+  Debian VM, before the release.
+
 ## [2.22.0] - 2026-11-08
 
 What was left open at the handover, and two reports from the phone.

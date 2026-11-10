@@ -366,3 +366,25 @@ describe("a host's many containers (OPS-W-10)", () => {
     expect(JSON.parse(stripped.split('\n')[1]!).labels).toEqual({ 'a]': 'b"[' });
   });
 });
+
+describe('a host log file that is a link (audit 2026-11-09)', () => {
+  it('to a key or a secret is not read: operators stream every source, and the container behind the folder can make the link', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'burrow-loglink-'));
+    try {
+      mkdirSync(join(dir, '.ssh'));
+      writeFileSync(join(dir, '.ssh', 'id_ed25519'), 'PRIVATE-KEY-LINE\n');
+      writeFileSync(join(dir, 'real.log'), 'a log line\n');
+      symlinkSync(join(dir, '.ssh', 'id_ed25519'), join(dir, 'app.log'));
+      symlinkSync(join(dir, 'real.log'), join(dir, 'rotated.log'));
+      const o = { since: null, until: null, tail: 5, follow: false };
+      const bad = spawnSync('sh', ['-c', fileCommand({ container: '', file: join(dir, 'app.log') }, null, o)], { encoding: 'utf8' });
+      expect(bad.stdout).not.toContain('PRIVATE-KEY-LINE');
+      expect(bad.stderr).toMatch(/^tail: .*kept from logs/m);
+      // A link to an ordinary log is read as before.
+      const ok = spawnSync('sh', ['-c', fileCommand({ container: '', file: join(dir, 'rotated.log') }, null, o)], { encoding: 'utf8' });
+      expect(ok.stdout).toContain('a log line');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

@@ -37,6 +37,8 @@ fi
 [ -f android/keystore/burrow.jks ] || { echo "android/keystore/burrow.jks missing: bash scripts/apk.sh keystore"; exit 1; }
 VERSION="$(sed -n 's/^  "version": "\(.*\)",$/\1/p' package.json | head -1)"
 export BURROW_VERSION="$VERSION"
+# X.Y.Z only: the version code below is made from it (a -rc version broke the arithmetic, audit 2026-11-09).
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "apk: version $VERSION is not X.Y.Z" >&2; exit 1; }
 compose build android-build
 # APK_DIRECT_BUILT=1: the page was built already, before the signing key was
 # there (the release in CI: npm's packages never run beside it, A3-OPS-07).

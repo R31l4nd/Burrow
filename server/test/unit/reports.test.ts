@@ -184,6 +184,15 @@ describe('status', () => {
     expect(overall(cs, { ok: 1, attention: 1, problem: 1 }, 'en')).toBe('Problems: web. Needs attention: db. New errors in web. Resolved in db.');
     expect(overall([r('a', 'ok')], { ok: 1, attention: 0, problem: 0 }, 'nl')).toBe('Alle 1 containers zijn in orde.');
   });
+
+  it('a host log file by its path, not its encoded name (audit 2026-11-09)', () => {
+    const r = (container: string, status: ContainerReport['status']) => ({ container, status, problems: [], resolved: [], reasons: [], hostName: 'pi' }) as unknown as ContainerReport;
+    const cs = [r(':%2Fvar%2Flog%2Fsyslog', 'problem')];
+    expect(overall(cs, { ok: 0, attention: 0, problem: 1 }, 'en')).not.toContain('%2F');
+    const n = reportNotice({ name: 'Daily', counts: { ok: 0, attention: 0, problem: 1 }, containers: cs, unreachable: [], updates: [] } as unknown as Report);
+    expect(n.body).not.toContain('%2F');
+    expect(n.body).toContain('x syslog (pi)');
+  });
 });
 
 describe('logs of a period', () => {

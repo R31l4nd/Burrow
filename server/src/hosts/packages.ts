@@ -72,6 +72,8 @@ export function refreshCommand(password: string | null): string {
 export class PackageChecks {
   onTrouble: TroubleSink | null = null;
   readonly #runs = new Map<number, Promise<PackageReport>>();
+  /** Each host's last check that read the list, while a failed one is the stored one. */
+  readonly #lastOk = new Map<number, PackageReport>();
 
   constructor(
     private readonly ctx: Ctx,
@@ -103,9 +105,12 @@ export class PackageChecks {
       .values({ hostId, checkedAt: now, report: JSON.stringify(report) })
       .onConflictDoUpdate({ target: hostPackages.hostId, set: { checkedAt: now, report: JSON.stringify(report) } })
       .run();
-    // Security updates not there at the last check that read the list: told once.
+    // Security updates not there at the last check that read the list: told once. A failed check
+    // between keeps that list: it told the same updates again (audit 2026-11-09).
+    if (before?.state === 'ok') this.#lastOk.set(hostId, before);
     if (report.state === 'ok') {
-      const known = new Set(before?.state === 'ok' ? before.updates.filter((u) => u.security).map((u) => `${u.name} ${u.to}`) : []);
+      const base = before?.state === 'ok' ? before : this.#lastOk.get(hostId);
+      const known = new Set(base ? base.updates.filter((u) => u.security).map((u) => `${u.name} ${u.to}`) : []);
       const fresh = report.updates.filter((u) => u.security && !known.has(`${u.name} ${u.to}`));
       if (fresh.length) {
         const names = fresh.slice(0, 5).map((u) => u.name).join(', ') + (fresh.length > 5 ? ', ...' : '');

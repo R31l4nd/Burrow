@@ -271,11 +271,24 @@
     Object.assign(terminalState, { cols: dims.cols, rows: dims.rows });
   }
 
+  // A phone's keyboard slides in and out in steps (Android animates it): fitted
+  // once it has settled, not at every step. The steps before it counted as a
+  // keyboard went out as fewer rows (the program in the terminal redrew for
+  // each) and were taken for the rows without it (report b00aad).
+  const SETTLE_MS = 200;
+  let settling: ReturnType<typeof setTimeout> | undefined;
+  function refitSettled(): void {
+    clearTimeout(settling);
+    if (!keyBars.show) return refit(false);
+    settling = setTimeout(() => refit(false), SETTLE_MS);
+  }
+  $effect(() => () => clearTimeout(settling));
+
   // The keyboard's coming and going is measured on its own (keyboard.svelte.ts),
   // not always before the terminal's box resizes: fit again when it changes.
   $effect(() => {
     void softKeyboard.open;
-    queueMicrotask(() => refit(false));
+    queueMicrotask(refitSettled);
   });
 
   /**
@@ -751,7 +764,7 @@
     };
     xterm.element?.addEventListener('wheel', onWheel, { capture: true, passive: false });
 
-    const ro = new ResizeObserver(() => refit(false));
+    const ro = new ResizeObserver(refitSettled);
     ro.observe(el);
 
     return () => {

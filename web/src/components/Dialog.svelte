@@ -207,7 +207,9 @@
       overlay var(--dur-2) allow-discrete,
       display var(--dur-2) allow-discrete;
   }
+  /* Fading out: no tap lands on it (a quick second tap ran a menu item twice, audit 2026-11-09). */
   dialog:not([open]) {
+    pointer-events: none;
     opacity: 0;
     transform: var(--from);
     transition-timing-function: var(--ease-in);
@@ -225,6 +227,7 @@
       display var(--dur-2) allow-discrete;
   }
   dialog:not([open])::backdrop {
+    pointer-events: none;
     background-color: transparent;
   }
   @starting-style {

@@ -183,6 +183,14 @@ jobs:
         run: |
           bash scripts/node.sh npm ci --no-fund --no-audit
           bash scripts/direct-assets.sh
+      # Nothing that ran above changed what gradle runs with the key: a package's script could
+      # have written the app's build files (audit 2026-11-09). Only the direct page's assets may differ.
+      - name: The app's sources as committed
+        if: env.HAS_KEY == 'true'
+        run: |
+          git diff --exit-code --stat -- android ':!android/app/src/main/assets/direct'
+          extra=$(git ls-files --others --exclude-standard -- android ':!android/app/src/main/assets/direct')
+          [ -z "$extra" ] || { echo "files under android/ that are not in git: $extra"; exit 1; }
       - name: APK
         if: env.HAS_KEY == 'true'
         env:

@@ -574,7 +574,7 @@ class Bridge(private val activity: MainActivity, private val web: TermWebView, p
 
             // Android's share list for files of the phone (one or a selection).
             "phoneShare" -> {
-                val paths = BridgeRules.holdPaths(p.getJSONArray("paths"))
+                val paths = BridgeRules.sharePaths(p.getJSONArray("paths"))
                 app.whenUnlocked {
                     background(answer) {
                         val items = paths.map { phone.forViewing(it) }

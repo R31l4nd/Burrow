@@ -56,10 +56,19 @@ object BridgeRules {
     fun tunnelHosts(list: JSONArray): Set<String> =
         (0 until list.length()).map { list.getString(it).trim() }.filter { it.matches(HOST) }.toSet()
 
-    /** Where a WireGuard configuration sends the phone's traffic (its peers' Endpoint lines), for the app's question; null when none. */
+    /**
+     * Where a WireGuard configuration sends the phone's traffic (its peers' Endpoint lines), for the
+     * app's question; null when none. Read as the tunnel reads it (android/wg parseConfig: a comment
+     * cut off, any space trimmed, the key in any case): a stricter reading left out a peer the tunnel
+     * then used (audit 2026-11-09). An endpoint that says nothing shows as "?".
+     */
     fun wgEndpoint(conf: String): String? =
-        conf.lines().mapNotNull { l -> Regex("^\\s*Endpoint\\s*=\\s*(\\S+)\\s*$", RegexOption.IGNORE_CASE).find(l)?.groupValues?.get(1) }
-            .distinct().joinToString(", ").ifEmpty { null }?.take(200)
+        conf.lines().mapNotNull { raw ->
+            val line = raw.substringBefore('#').trim()
+            val eq = line.indexOf('=')
+            if (eq < 0 || !line.substring(0, eq).trim().equals("endpoint", ignoreCase = true)) null
+            else line.substring(eq + 1).trim().ifEmpty { "?" }
+        }.distinct().joinToString(", ").ifEmpty { null }?.take(400)
 
     /** The status bar's colour from the page's own CSS: "#rrggbb" for "#rgb" or "#rrggbb", null for anything else. */
     fun topColor(top: String): String? {
@@ -89,6 +98,9 @@ object BridgeRules {
 
     /** The paths to hold: one more than allowed at most, so PhoneFolders.hold refuses too many instead of holding a part. */
     fun holdPaths(a: JSONArray): List<String> = (0 until minOf(a.length(), PhoneFolders.MAX_HOLD + 1)).map { a.getString(it) }
+
+    /** Files to share: at least one (an empty list ended the app on its main thread, audit 2026-11-09). */
+    fun sharePaths(a: JSONArray): List<String> = holdPaths(a).also { require(it.isNotEmpty()) { "nothing to share" } }
 
     /** Held to upload (the share page's list) or only to show. */
     fun holdKind(purpose: String): HeldFiles.Kind = if (purpose == "upload") HeldFiles.Kind.SHARED else HeldFiles.Kind.LOCAL

@@ -477,7 +477,10 @@ func (t *Tunnel) handle(c net.Conn) {
 	if err := req.Write(up); err != nil {
 		return
 	}
-	pipe(c, br, up)
+	// The answer back, and no more from the client: one that kept the connection
+	// open sent its next request (another host's, with its cookies and the
+	// proxy's secret) to this host (audit 2026-11-09).
+	_, _ = io.Copy(c, up)
 }
 
 func pipe(c net.Conn, br *bufio.Reader, up net.Conn) {

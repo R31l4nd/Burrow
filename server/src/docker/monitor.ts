@@ -84,11 +84,11 @@ export class DockerMonitor {
     };
   }
 
-  /** What a host's containers were at most [maxAgeMs] ago (someone watches it), else a poll now. */
-  async recent(hostId: number, maxAgeMs = 30_000, withStats = true): Promise<HostContainers> {
+  /** What a host's containers were at most [maxAgeMs] ago (someone watches it), else a poll now. `background`: a job of Burrow's own, which waits out failing connects (audit 2026-11-09). */
+  async recent(hostId: number, maxAgeMs = 30_000, withStats = true, background = false): Promise<HostContainers> {
     const last = this.#hosts.get(hostId)?.last;
     if (last && !last.error && this.ctx.now() - Date.parse(last.at) <= maxAgeMs) return last;
-    return this.poll(hostId, withStats);
+    return this.poll(hostId, withStats, background);
   }
 
   /** One poll now, without watching (tests, and hosts shown once). */
@@ -138,7 +138,9 @@ export class DockerMonitor {
     // State every poll, CPU and memory every STATS_EVERY polls (the rest
     // carry the last sample on).
     const withStats = (s.polls++ % STATS_EVERY) === 0;
-    const h = await this.poll(hostId, withStats, true);
+    // The first round of a watch is for whoever opened the page: it tries at once, an old failure
+    // held it back for up to half an hour after the host was up again (audit 2026-11-09).
+    const h = await this.poll(hostId, withStats, s.polls > 1);
     if (!withStats && s.last) h.stats = s.last.stats;
     const now = this.ctx.now();
     // A watch just started: the kept hour first, so the list is not empty at every visit.

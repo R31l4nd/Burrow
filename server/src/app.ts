@@ -409,7 +409,7 @@ export async function buildApp(deps: AppDeps): Promise<BurrowApp> {
   registerDirectRoutes(app, ctx);
   const docker = new DockerMonitor(ctx, files);
   // Kept CPU and memory per container (report 428102); the list starts with its last hour.
-  const containerHistory = new ContainerHistory(ctx, (id) => docker.recent(id, 60_000, true), jobs);
+  const containerHistory = new ContainerHistory(ctx, (id) => docker.recent(id, 60_000, true, true), jobs);
   docker.seed = (id) => containerHistory.recent(id, 3_600_000);
   registerDockerRoutes(app, ctx, docker, dockerSockets, files, containerHistory);
   // Hosts or groups changed (a test reads a host's facts, Docker among them): the pages watching

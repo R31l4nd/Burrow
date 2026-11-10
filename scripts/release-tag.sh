@@ -15,6 +15,9 @@ tag="${1:?usage: release-tag.sh vX.Y.Z}"
 fail() { echo "release tag $tag: $*" >&2; exit 1; }
 
 [[ "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)(-[0-9A-Za-z.-]+)?$ ]] || fail "not vMAJOR.MINOR.PATCH[-pre]"
+# No prereleases (audit 2026-11-09): the app's version code and the APK build read X.Y.Z only, so a
+# -rc tag put the images out and then failed before the GitHub release.
+[ -z "${BASH_REMATCH[2]}" ] || fail "a prerelease: Burrow ships none, tag vX.Y.Z"
 version="${tag#v}"
 
 for f in package.json */package.json; do

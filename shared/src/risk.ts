@@ -63,6 +63,20 @@ const RULES: Rule[] = [
   { re: re(String.raw`\bchmod\bREST\s([0-7]?[0-7]{2}[2367]|[ug]*[oa][ugoa]*[+=][rwxXst]*w[rwxXst]*)\sREST/(etc|usr|bin|sbin|lib|lib64|boot|root)/`), risk: 'high', reason: 'chmod makes a system file world-writable' },
   // An append to sudoers or cron grants root or runs as root (audit 2026-11).
   { re: re(String.raw`>>\s*["']?/etc/(sudoers|cron|crontab|anacrontab)|>>\s*["']?/var/spool/cron/|\btee\bREST\s/var/spool/cron/`), risk: 'high', reason: 'appends to sudoers or cron' },
+  // Read too low before (audit 2026-11-09): Proxmox guests and storage, Podman, a branch deleted by a push,
+  // storage rolled back or shrunk, a container with the host's root, the way in (sshd), an instant
+  // reboot, rows deleted, and a command whose name the rules cannot read ($'..', globs, a variable).
+  { re: re(String.raw`\b(qm|pct)\bREST\s(destroy|purge)\b|\bpvesm\bREST\s(remove|free)\b`), risk: 'high', reason: 'removes Proxmox guests or storage' },
+  { re: re(String.raw`\bpodman\bREST\s(system|volume|image|container|network|pod)\s+prune\b|\bpodman\bREST\s(rm|rmi|volume\s+rm)\b`), risk: 'high', reason: 'removes Podman data' },
+  { re: re(String.raw`\bgit\bREST\spush\bREST\s(--delete|-d)\b|\bgit\bREST\spush\bREST\s\S+\s+\+?:\S`), risk: 'high', reason: 'git push deletes a branch' },
+  { re: re(String.raw`\bzfs\bREST\srollback\b|\blvreduce\b|\bresize2fs\b`), risk: 'high', reason: 'rolls back or shrinks storage' },
+  { re: re(String.raw`\b(docker|podman)\bREST\s(run|create)\bREST\s(--privileged\b|(-v|--volume)[=\s]+/:)|\bnsenter\bREST\s(-t|--target)[=\s]*1\b`), risk: 'high', reason: 'reaches into the host as root' },
+  { re: re(String.raw`\bsystemctl\bREST\s(stop|disable|mask|kill)\bREST\s(ssh|sshd|openssh-server)(\.service)?\b|\bservice\s+(ssh|sshd)\s+stop\b`), risk: 'high', reason: 'stops SSH, the way in' },
+  { re: /\/proc\/sysrq-trigger/, risk: 'high', reason: 'sysrq acts on the machine at once' },
+  { re: /\bDELETE\s+FROM\b/i, risk: 'high', reason: 'deletes database rows' },
+  { re: /(?:^|[;&|(]\s*)(?:sudo\s+)?(?:\S*\$'|\S*[?*[]\S*\s|\$(?:\w|\{|\())/m, risk: 'high', reason: "the command's name is hidden from the rules" },
+  { re: re('RUNNER'), risk: 'medium', reason: 'pipes text into a shell or interpreter' },
+  { re: /\b(python[\d.]*|perl|ruby|node|php)\b\s+-[a-zA-Z]*[ce]\b.*\b(rmtree|unlink|rmSync|rmdirSync|remove|rmdir|system|subprocess|exec|spawn)\b/, risk: 'medium', reason: 'an interpreter one-liner that deletes or runs commands' },
   { re: re(String.raw`\bsed\bREST\s(-[a-zA-Z]*i|--in-place)`), risk: 'medium', reason: 'sed -i edits a file in place' },
   { re: re(String.raw`\bservice\s+\S+\s+(stop|restart)\b`), risk: 'medium', reason: 'stops or restarts a service' },
   { re: /\beval\b|\b(ba|z|da)?sh\s+-c\b/, risk: 'medium', reason: 'eval or sh -c runs a command built at run time' },

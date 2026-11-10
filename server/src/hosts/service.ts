@@ -10,7 +10,7 @@ import {
 } from '@burrow/shared';
 import { hostDefaults } from './defaults.js';
 import type { Ctx } from '../context.js';
-import { hostGroups, hosts, hostTags, sshKeys } from '../db/schema.js';
+import { commandSchedules, hostGroups, hosts, hostTags, reportSchedules, sshKeys, uploads } from '../db/schema.js';
 import { HttpError } from '../http.js';
 import { unsealKey } from '../keys/vault.js';
 import { forgetLimits } from './limits.js';
@@ -220,9 +220,23 @@ export function updateHost(ctx: Ctx, id: number, input: HostInput): Host {
   return getHost(ctx, id);
 }
 
+// What names a host by its id without a foreign key: SQLite gives the next host the id of the
+// newest one deleted, and a schedule then ran its command there (audit 2026-11-09).
+const withoutHost = (json: string, id: number) => JSON.stringify((JSON.parse(json) as number[]).filter((x) => x !== id));
+
 export function deleteHost(ctx: Ctx, id: number): Host {
   const h = getHost(ctx, id);
-  ctx.db.delete(hosts).where(eq(hosts.id, id)).run();
+  ctx.db.transaction((tx) => {
+    tx.delete(hosts).where(eq(hosts.id, id)).run();
+    for (const s of tx.select().from(commandSchedules).all()) {
+      if ((JSON.parse(s.hostIds) as number[]).includes(id)) tx.update(commandSchedules).set({ hostIds: withoutHost(s.hostIds, id) }).where(eq(commandSchedules.id, s.id)).run();
+    }
+    for (const s of tx.select().from(reportSchedules).all()) {
+      if (s.hostIds && (JSON.parse(s.hostIds) as number[]).includes(id)) tx.update(reportSchedules).set({ hostIds: withoutHost(s.hostIds, id) }).where(eq(reportSchedules.id, s.id)).run();
+    }
+    tx.update(hosts).set({ wakeVia: null }).where(eq(hosts.wakeVia, String(id))).run();
+    tx.delete(uploads).where(eq(uploads.hostId, id)).run();
+  });
   forgetLimits(ctx, id);
   return h;
 }

@@ -365,13 +365,27 @@ test('split terminals on a wide screen: panes side by side, kept after a reload,
   };
   await page.getByRole('button', { name: /^test-sshd/ }).first().click();
   await expect(page).toHaveURL(/#\/term\//);
+  // A session of its own: the host's button opens the one open there, another spec's.
+  const opened = page.url();
+  await page.getByTestId('term-new').click();
+  await expect(page).not.toHaveURL(opened);
   await expect(rows(0)).toContainText('$', { timeout: 20_000 });
   // Split: one more terminal beside it (a new session on this host when all are shown).
   const had = await page.getByTestId('term-tab').count();
   await page.getByTestId('term-split').click();
   await expect(page.getByTestId('term-pane')).toHaveCount(2);
   await expect(page.getByTestId('term-tab')).toHaveCount(Math.max(had, 2));
+  // With other specs' sessions open the split shows the first of them: once one of
+  // terminal-history's, left in tmux's copy mode with no prompt (gate 2026-11-06).
+  // This test types only into its own: + puts a new one in the pane typed into.
+  if (had > 1) {
+    await expect(pane(1)).toHaveClass(/active/);
+    await page.getByTestId('term-new').click();
+    await expect(page.getByTestId('term-tab')).toHaveCount(had + 1);
+    await expect(page.getByTestId('term-pane')).toHaveCount(2);
+  }
   await expect(rows(1)).toContainText('$', { timeout: 20_000 });
+  const own = [(await pane(0).getAttribute('aria-label'))!, (await pane(1).getAttribute('aria-label'))!];
   // Each pane its own session: typed into the one clicked.
   await into(1);
   await page.keyboard.type('echo pane-$((1+1))\n');
@@ -445,11 +459,18 @@ test('split terminals on a wide screen: panes side by side, kept after a reload,
   await page.getByTestId('term-split').click();
   await expect(page.getByTestId('term-pane')).toHaveCount(2);
   expect(await sessions()).toBe(before3);
-  // A third: from an open one when there is one, else a new one asked for by name.
+  // The one beside it is the first open one, maybe another spec's (sized by its own viewer:
+  // once its suggestions lay over a pane's head, gate 2026-11-05): this test's own again,
+  // picked from the tabs into the pane typed into.
+  const left = await pane(0).getAttribute('aria-label');
+  const mine = own.find((n) => n !== left)!;
+  await page.getByTestId('term-tab').filter({ hasText: new RegExp(`^\\s*${mine}\\s*$`) }).click();
+  await expect(pane(1)).toHaveAttribute('aria-label', mine);
+  await expect(pane(0)).toHaveAttribute('aria-label', left!);
+  expect(await sessions()).toBe(before3);
+  // A third: a new one asked for by name (an open one could be another spec's).
   await page.getByTestId('term-split').click();
-  const three = panes.getByTestId('term-layout-n').nth(2);
-  if (await three.isEnabled()) await three.click();
-  else await panes.getByTestId('term-layout-new').click();
+  await panes.getByTestId('term-layout-new').click();
   await expect(page.getByTestId('term-pane')).toHaveCount(3);
   await expect(rows(2)).toContainText('$', { timeout: 20_000 });
   const dragBy = async (testid: string, dx: number, dy: number) => {
@@ -676,4 +697,39 @@ test('many sessions on a narrow screen: the tab on screen is scrolled into sight
     await page.setViewportSize({ width: 1280, height: 720 });
     for (const id of ids) await page.evaluate((x) => fetch(`/api/terminal/sessions/${x}`, { method: 'DELETE' }), id);
   }
+});
+
+test("back to the page's own session after its pane was closed: the tab opens it (audit 2026-11-09)", async ({ page }) => {
+  // The address followed the pane typed into without the router: going back to the session the
+  // page was opened for did nothing, the router thought it was there already.
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await signIn(page);
+  const hostId = await page.evaluate(async () => ((await (await fetch('/api/hosts')).json()) as { id: number; name: string }[]).find((h) => h.name === 'test-sshd')!.id);
+  const make = () => page.evaluate((id) => fetch('/api/terminal/sessions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ hostId: id, tmux: 'never' }) }).then((r) => r.json() as Promise<{ id: string }>), hostId);
+  const a = await make();
+  const b = await make();
+  await page.goto('/#/hosts');
+  await page.evaluate(() => localStorage.removeItem('burrow.termSplit'));
+  const nameOf = async (sid: string) => {
+    await page.goto(`/#/term/${sid}`);
+    await expect(page.locator('[data-testid=terminal] .xterm-rows')).toContainText('$', { timeout: 20_000 });
+    return (await page.getByRole('tab', { selected: true }).textContent())!.replace(/\s+/g, ' ').trim();
+  };
+  const nameB = await nameOf(b.id);
+  const nameA = await nameOf(a.id);
+  const tab = (name: string) => page.getByTestId('term-tab').filter({ hasText: new RegExp(`^\\s*${name}\\s*$`) });
+  const pane = (i: number) => page.getByTestId('term-pane').nth(i);
+  // Split, B in the pane typed into: the address is B's.
+  await page.getByTestId('term-split').click();
+  await expect(page.getByTestId('term-pane')).toHaveCount(2);
+  await tab(nameB).click();
+  await expect(page).toHaveURL(new RegExp(`#/term/${b.id}$`));
+  await expect(pane(1)).toHaveAttribute('aria-label', nameB);
+  // A's pane taken out; then A's tab: A on screen again.
+  await pane(0).getByTestId('term-pane-close').click();
+  await expect(page.getByTestId('term-pane')).toHaveCount(1);
+  await tab(nameA).click();
+  await expect(page).toHaveURL(new RegExp(`#/term/${a.id}$`));
+  await expect(pane(0)).toHaveAttribute('aria-label', nameA);
+  for (const s of [a, b]) await page.evaluate((id) => fetch(`/api/terminal/sessions/${id}`, { method: 'DELETE' }), s.id);
 });

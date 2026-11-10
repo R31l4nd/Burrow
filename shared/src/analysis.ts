@@ -15,6 +15,9 @@ import { CONTAINER_NAME, detectLevel, parseJsonLine, type LogLevel } from './doc
 // Names ending in KEY too (SECRET_KEY, ENCRYPTION_KEY, TS_AUTHKEY), a WPA psk and a pw that is
 // no part of a word (DB_PW, not stepwise): they went as they were (audit 2026-11).
 const SECRET_KEY = String.raw`(?:pass(?:word|wd|phrase)?|pwd|(?<![a-z])pw|psk|(?:secret|encryption|enc|master|signing|jwt|app|auth|client|license)[_-]?key|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|auth|credentials?|session(?:id)?|cookie)`;
+// More after the secret word (DB_PASSWORD_ROOT, API_TOKEN_2, secret_key_base), not a path to it
+// (DB_PASSWORD_FILE): those went as they were (audit 2026-11-09).
+const SECRET_NAME = String.raw`${SECRET_KEY}(?:[_-](?!(?:file|path|dir)\b)[a-z0-9]+){0,2}`;
 
 // A private key's markers: PEM and OpenSSH, and PGP's KEY BLOCK (audit 2026-11).
 const KEY_BEGIN = /-----BEGIN [A-Z ]*PRIVATE KEY(?: BLOCK)?-----/;
@@ -30,7 +33,7 @@ const MASKS: [RegExp, string][] = [
   [/\b((?:set-)?cookie\s*:\s*)[^=;\s]+=[^;\s]*(?:;\s*[^=;\s]+=[^;\s]*)*/gi, '$1<secret>'],
   // A secret-looking key with a quoted value: all of it, spaces too, also
   // with escaped quotes (JSON inside a string). Only its first word went.
-  [new RegExp(String.raw`(${SECRET_KEY}(?:\\?["'])?\s*[:=]\s*)(\\?)(["'])(?:(?!\2\3).)*\2\3`, 'gi'), '$1$2$3<secret>$2$3'],
+  [new RegExp(String.raw`(${SECRET_NAME}(?:\\?["'])?\s*[:=]\s*)(\\?)(["'])(?:(?!\2\3).)*\2\3`, 'gi'), '$1$2$3<secret>$2$3'],
   // An Authorization header of any scheme (Token, ApiKey, Digest...): its value.
   [/\b((?:proxy-)?authorization["']?\s*[:=]\s*["']?(?:[A-Za-z-]+\s+)?)[^\s"',;}]{6,}/gi, '$1<secret>'],
   // JSON Web Tokens.
@@ -39,21 +42,29 @@ const MASKS: [RegExp, string][] = [
   [/\b(bearer|basic)\s+[\w.~+/=-]{8,}/gi, '$1 <secret>'],
   // key=value / key: value / "key":"value" for secret-looking keys.
   // Short ones too (pwd=ab), and after an escaped quote (\"password\":).
-  [new RegExp(String.raw`(${SECRET_KEY}(?:\\?["'])?\s*[:=]\s*(?:\\?["'])?)(?!<secret>)([^\s"',;&}\\]+)`, 'gi'), '$1<secret>'],
+  [new RegExp(String.raw`(${SECRET_NAME}(?:\\?["'])?\s*(?:[:=]|%3[dD])\s*(?:\\?["'])?)(?!<secret>)([^\s"',;&}\\]+)`, 'gi'), '$1<secret>'],
+  // Passwords in SQL (a statement log), in config files of words and values (redis, keepalived,
+  // .netrc), and in XML: they went as they were (audit 2026-11-09).
+  [/\b(PASSWORD|IDENTIFIED\s+BY)(\s*\(?\s*)'[^'\n]*'/gi, "$1$2'<secret>'"],
+  [/^(\s*(?:requirepass|masterauth|auth_pass)\s+)(?!<secret>)\S+/gim, '$1<secret>'],
+  [/\b(AUTH\s+)(?!<secret>)\S+/g, '$1<secret>'],
+  [/(\blogin\s+\S+\s+password\s+)(?!<secret>)\S+/gi, '$1<secret>'],
+  [/(<(password|passwd|secret|token|api[_-]?key)>)[^<]*(<\/\2>)/gi, '$1<secret>$3'],
+  [/(\bkey\s*=\s*"[^"]*(?:password|passwd|secret|token|api[_-]?key|connectionstring)[^"]*"\s+value\s*=\s*")[^"]*"/gi, '$1<secret>"'],
   // Credentials in URLs: scheme://user:password@host, the user empty too (redis://:pw@host, A3-SRV-05).
   // The password up to the @ before the host, a / or @ in it too (mongodb://u:p@ss@db); not a port
   // before a path (host:443/@scope/pkg), audit 2026-11.
-  [/(\b[a-z][\w+.-]*:\/\/[^\s:/@]*:)(?!\d+\/)\S*?@(?=[^\s@/?#]*(?:[/?#\s]|$))/gi, '$1<secret>@'],
+  [/(\b[a-z][\w+.-]*:\/\/[^\s:/@]*:)(?!\d+\/)\S{0,300}?@(?=[^\s@/?#]*(?:[/?#\s]|$))/gi, '$1<secret>@'],
   // A secret as a command line option's next word (--password X, --token=X) and mysql's -pX (A3-SRV-05).
   // With a prefix too (--http-password, --db-password).
-  [/((?:^|\s)--?(?:[a-z]+-)*(?:password|passwd|pass|passphrase|token|secret|api[_-]?key)(?:=|\s+))(?!<secret>)(?!-)[^\s"']+/gi, '$1<secret>'],
-  [/(\b(?:mysql|mariadb|mysqldump|mariadb-dump|mysqladmin)\b[^\n]*?\s-p)(?!<secret>)[^\s"']+/g, '$1<secret>'],
+  [/((?:^|\s)--?(?:[a-z]+-)*(?:password|passwd|pass|passphrase|token|secret|api[_-]?key)(?:=|\s+))(?!<secret>)(?!-)(?:"[^"\n]*"|'[^'\n]*'|[^\s"']+)/gi, '$1<secret>'],
+  [/(\b(?:mysql|mariadb|mysqldump|mariadb-dump|mysqladmin)\b[^\n]{0,300}?\s-p)(?!<secret>)(?:"[^"\n]*"|'[^'\n]*'|[^\s"']+)/g, '$1<secret>'],
   // A password as a tool's short option (audit 2026-11): curl -u user:pw (the user kept), sshpass -p pw,
   // a registry login's -p pw, and htpasswd -b's last word.
-  [/(\bcurl\b[^\n]*?\s(?:-u|--user)(?:=|\s*)[^\s:"']*:)(?!<secret>)[^\s"']+/g, '$1<secret>'],
-  [/(\bsshpass\b[^\n]*?\s-p\s*)(?!<secret>)[^\s"']+/g, '$1<secret>'],
-  [/(\b(?:docker|podman|buildah|skopeo|nerdctl|helm)\b[^\n]*?\blogin\b[^\n]*?\s-p(?:=|\s+))(?!<secret>)[^\s"']+/g, '$1<secret>'],
-  [/(\bhtpasswd\b[^\n;&|]*\s-[a-zA-Z]*b[^\n;&|]*\s)(?!<secret>)[^\s"';&|]+(?=\s*(?:$|[;&|]))/gm, '$1<secret>'],
+  [/(\bcurl\b[^\n]{0,300}?\s(?:-u|--user)(?:=|\s*)[^\s:"']*:)(?!<secret>)[^\s"']+/g, '$1<secret>'],
+  [/(\bsshpass\b[^\n]{0,300}?\s-p\s*)(?!<secret>)[^\s"']+/g, '$1<secret>'],
+  [/(\b(?:docker|podman|buildah|skopeo|nerdctl|helm)\b[^\n]{0,300}?\blogin\b[^\n]{0,300}?\s-p(?:=|\s+))(?!<secret>)[^\s"']+/g, '$1<secret>'],
+  [/(\bhtpasswd(?=[^\n;&|]{0,100}?\s-[a-zA-Z]*b)(?:\s+[^\s;&|]+){1,8}?\s+)(?!<secret>)[^\s"';&|]+(?=\s*(?:$|[;&|]))/gm, '$1<secret>'],
   // A query parameter that carries a signature or key (Azure SAS sig=, S3 and GCS signatures, key=, code=).
   [/([?&](?:sig|signature|key|code|x-amz-signature|x-amz-credential|x-amz-security-token|x-goog-signature|x-goog-credential)=)[^&\s"'#]+/gi, '$1<secret>'],
   // Webhook addresses whose path is the secret: Discord, Home Assistant, Slack.

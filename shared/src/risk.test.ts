@@ -28,7 +28,7 @@ describe('assessCommand', () => {
   });
 
   it('options before the action do not hide a medium one either (AUDIT ST-04: "systemctl --now disable sshd" read as low)', () => {
-    for (const c of ['systemctl --now disable sshd', 'systemctl --user stop app', 'sudo systemctl -q restart nginx', 'docker --context prod stop web', 'docker compose -f prod.yaml down', 'docker compose -p app restart', 'apt-get -y remove nginx', 'apt -qq purge foo']) {
+    for (const c of ['systemctl --now disable nginx', 'systemctl --user stop app', 'sudo systemctl -q restart nginx', 'docker --context prod stop web', 'docker compose -f prod.yaml down', 'docker compose -p app restart', 'apt-get -y remove nginx', 'apt -qq purge foo']) {
       expect(assessCommand(c).risk, c).toBe('medium');
     }
     expect(assessCommand('systemctl --no-wall reboot').risk).toBe('high');
@@ -60,7 +60,7 @@ describe('assessCommand', () => {
       'chmod 000 /etc',
     ];
     for (const c of high) expect(assessCommand(c).risk, c).toBe('high');
-    for (const c of ['service sshd stop', 'eval "$cmd"', 'bash -c "ls"', 'sed -i s/a/b/ notes.txt']) expect(assessCommand(c).risk, c).toBe('medium');
+    for (const c of ['service nginx stop', 'eval "$cmd"', 'bash -c "ls"', 'sed -i s/a/b/ notes.txt']) expect(assessCommand(c).risk, c).toBe('medium');
     for (const c of ['cp /etc/nginx/nginx.conf ~/backup/', 'find /var/log -name "*.gz" -mtime +30', 'grep -r DROP /etc/iptables', 'rsync -a /src/ /dst/', 'ip link show', 'zfs list', 'crontab -l', 'chmod 644 /etc/motd']) {
       expect(assessCommand(c).risk, c).toBe('low');
     }
@@ -114,5 +114,55 @@ describe('assessCommand: what the audit of 2026-11 found', () => {
   it('git, rsync, find and chmod that were under-rated', () => {
     at('high', ['git push origin +main', 'git push --mirror backup', 'git checkout -- .', 'git checkout .', 'git restore src/', 'git branch -D main', 'git stash clear', 'rsync -a --del src/ dst/', 'chmod 777 /etc/shadow', 'chmod u+s /bin/bash', 'chmod 4755 /usr/local/bin/x', 'chmod g+s /srv/x', 'find / -exec /bin/rm {} +', 'find /srv -execdir sudo /usr/bin/rm -f {} ;']);
     at('low', ['git push origin main', 'git checkout main', 'git checkout -b feature', 'git restore --staged x', 'git branch -a', 'chmod 644 /etc/motd', 'chmod 755 /usr/local/bin/x', 'chmod 1777 /srv/tmp', 'find / -name x -exec ls {} +']);
+  });
+});
+
+describe('commands the rules read too low (audit 2026-11-09)', () => {
+  it('high: guests, storage, git, containers with the host, sshd, sysrq, SQL deletes, a command hidden from the rules', () => {
+    for (const c of [
+      'qm destroy 100',
+      'systemctl --now disable sshd',
+      'service sshd stop',
+      'pct destroy 101 --purge',
+      'pvesm remove local-lvm',
+      'podman system prune -af',
+      'git push --delete origin main',
+      'git push origin :main',
+      'zfs rollback -r tank/data@yesterday',
+      'lvreduce -L 10G /dev/vg/data',
+      'resize2fs /dev/vg/data 10G',
+      'docker run --privileged -v /:/host alpine chroot /host',
+      'nsenter -t 1 -m -u -i -n sh',
+      'systemctl stop sshd',
+      'systemctl stop ssh',
+      'echo b > /proc/sysrq-trigger',
+      'psql -c "DELETE FROM users"',
+      "mysql -e 'delete from users'",
+      "r$'m' -rf /srv",
+      "$'\\x72\\x6d' -rf /srv",
+      '/???/r? -rf /srv',
+      '$cmd -rf /srv',
+      '$(printf rm) -rf /srv',
+    ]) {
+      expect(assessCommand(c).risk, c).toBe('high');
+    }
+  });
+
+  it('medium at least: a pipe into a shell, an interpreter told to delete', () => {
+    for (const c of [
+      "tr a-z n-za-m <<< 'ez -es /fei' | sh",
+      'cat script | bash',
+      'python3 -c "import shutil; shutil.rmtree(\'/srv\')"',
+      'perl -e "unlink glob q(*)"',
+      'node -e "require(\'fs\').rmSync(\'/srv\', { recursive: true })"',
+    ]) {
+      expect(['medium', 'high'], c).toContain(assessCommand(c).risk);
+    }
+  });
+
+  it('their harmless neighbours stay low', () => {
+    for (const c of ['qm list', 'pct status 101', 'git push origin main', 'zfs list', 'systemctl status sshd', 'echo $HOME', 'ls /usr/bin/', 'cat /proc/cpuinfo', 'psql -c "SELECT 1"', 'python3 -c "print(1)"']) {
+      expect(assessCommand(c).risk, c).toBe('low');
+    }
   });
 });

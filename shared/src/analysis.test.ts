@@ -318,3 +318,55 @@ describe('masking what the audit of 2026-11 found leaving for a model', () => {
     }
   });
 });
+
+describe('masking a very long line (audit 2026-11-09)', () => {
+  // A container printing 64 KB of "docker login docker login ..." froze the
+  // server for minutes: unbounded scans in the tool rules backtracked.
+  it('takes milliseconds, whatever the line repeats', () => {
+    for (const word of ['docker login ', 'mysql ', 'curl ', 'sshpass ', 'htpasswd -b ', 'https://u:']) {
+      const line = word.repeat(Math.ceil(65_536 / word.length));
+      const t0 = performance.now();
+      maskText(line, { ips: true });
+      expect(performance.now() - t0, word).toBeLessThan(250);
+    }
+  });
+
+  it('still masks what it did', () => {
+    expect(maskText('docker login -u me -p hunter2 registry.example', { ips: false })).toBe('docker login -u me -p <secret> registry.example');
+    expect(maskText('mysql -u root -phunter2 db', { ips: false })).toBe('mysql -u root -p<secret> db');
+    expect(maskText('curl -u me:hunter2 https://x', { ips: false })).toBe('curl -u me:<secret> https://x');
+  });
+});
+
+describe('secrets that went out unmasked (audit 2026-11-09)', () => {
+  it('quoted option values, names with more after the secret word, SQL, config words, XML and URL-encoded ones', () => {
+    for (const [line, secret] of [
+      ["mysqldump --password 'S3cr3t pw' db", 'S3cr3t'],
+      ['restic --token "abc123xyz" backup', 'abc123xyz'],
+      ["mysql -u root -p'hunter2' db", 'hunter2'],
+      ['DB_PASSWORD_ROOT=hunter2', 'hunter2'],
+      ['API_TOKEN_2=abc123xyz', 'abc123xyz'],
+      ['GITHUB_TOKEN_RO=abc123xyz', 'abc123xyz'],
+      ['secret_key_base: 3c2b1a9f', '3c2b1a9f'],
+      ["LOG: statement: ALTER USER app WITH PASSWORD 'hunter2'", 'hunter2'],
+      ["CREATE ROLE x LOGIN PASSWORD 'hunter2'", 'hunter2'],
+      ["CREATE USER 'a'@'%' IDENTIFIED BY 'hunter2'", 'hunter2'],
+      ["SET PASSWORD FOR 'a'@'%' = PASSWORD('hunter2')", 'hunter2'],
+      ['machine x login me password hunter2', 'hunter2'],
+      ['requirepass hunter2', 'hunter2'],
+      ['masterauth hunter2', 'hunter2'],
+      ['AUTH hunter2', 'hunter2'],
+      ['auth_pass hunter2', 'hunter2'],
+      ['<password>hunter2</password>', 'hunter2'],
+      ['<add key="ApiKey" value="abc123xyz"/>', 'abc123xyz'],
+      ['GET /login?next=%2Fapi%3Ftoken%3Dabc123def HTTP/1.1', 'abc123def'],
+      ['GET /x?password%3Dhunter2', 'hunter2'],
+    ]) {
+      expect(maskText(line!, { ips: false }), line).not.toContain(secret);
+    }
+  });
+
+  it('a path to a secret is no secret: its name says so', () => {
+    expect(maskText('DB_PASSWORD_FILE=/run/secrets/db', { ips: false })).toBe('DB_PASSWORD_FILE=/run/secrets/db');
+  });
+});

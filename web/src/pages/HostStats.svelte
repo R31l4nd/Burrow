@@ -105,7 +105,10 @@
     limits = v;
     own = { ...v.own };
   };
-  get<HostLimitsView>(`/api/hosts/${hostId}/limits`).then(showLimits, () => {});
+  // Not read: said with Try again; the card went without a word and the colours fell back to 90 % / 80 C (audit 2026-11-09).
+  let limitsError = $state('');
+  const readLimits = () => get<HostLimitsView>(`/api/hosts/${hostId}/limits`).then((v) => ((limitsError = ''), showLimits(v)), (err: unknown) => (limitsError = errorMessage(err)));
+  void readLimits();
   // Changed limits, not saved: another page asks first (AUDIT2 PAGE-09).
   warnUnsaved(() => limitsChanged);
   const limitsChanged = $derived(!!limits && (['cpuCelsius', 'diskCelsius', 'diskPercent'] as const).some((k) => (own[k] ?? null) !== limits!.own[k]));
@@ -268,6 +271,7 @@
       </section>
     {/if}
       {/if}
+  {#if limitsError}<LoadFailed inline message={limitsError} onretry={readLimits} />{/if}
   {#if limits}
     <section class="card stack" aria-label={t('stats.limits')} data-testid="limits">
       <h2>{t('stats.limits')} <HelpTip text={t('help.limits')} /></h2>

@@ -1,6 +1,6 @@
 {
   "name": "@burrow/server",
-  "version": "2.22.0",
+  "version": "2.23.0",
   "license": "AGPL-3.0-only",
   "private": true,
   "type": "module",
@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.131.0",
-    "@burrow/shared": "2.22.0",
+    "@burrow/shared": "2.23.0",
     "@fastify/cookie": "11.1.2",
     "@fastify/rate-limit": "11.2.0",
     "@fastify/static": "10.1.5",

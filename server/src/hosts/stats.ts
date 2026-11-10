@@ -664,6 +664,9 @@ export class HostStatsService {
       // At warn, once per host and message: at debug nobody saw it (OPS-W-14).
       failed((err as Error).message);
       this.jobs?.failed('host statistics', h.name, (err as Error).message, { hostId: h.id });
+      // Only a host that cannot be reached or refuses Burrow: numbers that could not be read, a
+      // slow command or full sessions are the job's failure, said above (audit 2026-11-09).
+      if (!connectFailure(err)) return void (await this.#afterSample(h));
       // Two samples in a row, five minutes apart: one that fails alone (a reboot, a blip) is no outage.
       const m = this.#misses.get(h.id) ?? { since: this.ctx.now(), count: 0, told: false };
       m.count += 1;
@@ -673,10 +676,22 @@ export class HostStatsService {
         this.onTrouble?.(h.id, { subject: '@reachable', event: 'unreachable', title: `not reachable: ${(err as Error).message.slice(0, 200)}` }, new Date(this.ctx.now()).toISOString());
       }
     }
+    await this.#afterSample(h);
+  }
+
+  /** SMART and the packages when due, after a host's sample. */
+  async #afterSample(h: { id: number; name: string }): Promise<void> {
     if (this.#stopped) return;
     const last = this.ctx.db.select().from(hostSmart).where(eq(hostSmart.hostId, h.id)).get();
     if (!last || this.ctx.now() - last.checkedAt > SMART_MS) await this.smart(h.id, true).catch(() => {});
     if (this.#stopped) return;
     await this.packages?.checkIfDue(h.id).catch(() => {});
   }
+}
+
+// A failed connect (the pool's codes, or the socket's own error), not a host that answered.
+const CONNECT_CODES = new Set(['unreachable', 'auth_failed', 'unknown_host_key', 'host_key_mismatch', 'connect_timeout', 'error']);
+function connectFailure(err: unknown): boolean {
+  if (err instanceof HttpError) return CONNECT_CODES.has(err.code);
+  return /\b(ECONNREFUSED|EHOSTUNREACH|ENETUNREACH|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ECONNRESET)\b|handshake/i.test(err instanceof Error ? err.message : String(err));
 }

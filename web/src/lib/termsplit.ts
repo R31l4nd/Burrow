@@ -1,3 +1,4 @@
+import { isTermReply } from '@burrow/shared';
 // Several terminals side by side on the terminal page (F4): which sessions
 // are in the panes, how the space is divided, and the order of the session
 // tabs. Kept per device (a phone shows one pane, a wide screen up to four).
@@ -76,4 +77,14 @@ export function moveTab(ids: string[], from: string, to: string): string[] {
   // Dropped on a later tab: after it; on an earlier one: before it.
   out.splice(ids.indexOf(from) < ids.indexOf(to) ? at + 1 : at, 0, from);
   return out;
+}
+
+/**
+ * Typed into all panes: only what was typed. The terminal's own answers (where the cursor is,
+ * what it is, focus in or out) and mouse reports went to the other shells as escape junk
+ * (audit 2026-11-09).
+ */
+export function broadcastable(d: string): boolean {
+  // eslint-disable-next-line no-control-regex -- escape sequences are what it reads
+  return !isTermReply(d) && !/^\x1b\[(?:<[\d;]+[mM]|M[\s\S]{3})/.test(d);
 }

@@ -107,14 +107,28 @@ export function registerAuthRoutes(
   // elsewhere blocked a signed-in admin's step-up, from any address (A3-SRV-02).
   const stepUpKeys = (a: { session: { idHash: string } }) => [`session:${a.session.idHash}`];
 
-  /** Wait out the delay, or refuse when blocked. */
+  // One attempt at a time per key (audit 2026-11-09): a failure is counted only after the check,
+  // so attempts sent together all passed the block while the first ones waited out their delay.
+  const inFlight = new Set<string>();
+  const held = new WeakMap<FastifyRequest, string[]>();
+  const release = (req: FastifyRequest) => {
+    for (const k of held.get(req) ?? []) inFlight.delete(k);
+    held.delete(req);
+  };
+  app.addHook('onResponse', async (req) => release(req));
+  app.addHook('onRequestAbort', async (req) => release(req));
+
+  /** Wait out the delay, or refuse when blocked or while another attempt on these keys is checked. */
   async function gateAttempt(req: FastifyRequest, keys: string[]) {
     const t = throttle.check(ctx, keys);
     if (t.blockedUntil) {
       throw new HttpError(429, 'blocked', `Too many failed attempts. Try again after ${new Date(t.blockedUntil).toISOString()}.`);
     }
+    const mine = held.get(req) ?? [];
+    if (keys.some((k) => inFlight.has(k) && !mine.includes(k))) throw new HttpError(429, 'busy', 'Another attempt is still being checked. Try again in a moment.');
+    for (const k of keys) inFlight.add(k);
+    held.set(req, [...new Set([...mine, ...keys])]);
     if (t.delayMs) await throttle.timing.sleep(t.delayMs);
-    void req;
   }
 
   function failAttempt(req: FastifyRequest, keys: string[], action: string, username: string | null) {

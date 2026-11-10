@@ -153,4 +153,24 @@ class BridgeProtocolTest {
             dir.deleteRecursively()
         }
     }
+
+    // Audit 2026-11-09: the app's question read Endpoint lines more strictly than the tunnel does,
+    // so a second peer behind a comment or a no-break space was configured but not shown.
+    @Test
+    fun wgEndpointReadsTheConfigAsTheTunnelDoes() {
+        val conf = "[Interface]\nPrivateKey = x\n[Peer]\nEndpoint = home.example:51820\nAllowedIPs = 10.0.0.0/24\n[Peer]\nEndpoint = 203.0.113.9:51820 # backup\nAllowedIPs = 0.0.0.0/0\n[Peer]\nendpoint\u00a0= 198.51.100.7:51820\n"
+        val shown = BridgeRules.wgEndpoint(conf)!!
+        assertTrue(shown, shown.contains("home.example:51820"))
+        assertTrue(shown, shown.contains("203.0.113.9:51820"))
+        assertTrue(shown, shown.contains("198.51.100.7:51820"))
+        assertFalse(shown, shown.contains("backup"))
+        // A peer whose endpoint says nothing is said, not left out.
+        assertTrue(BridgeRules.wgEndpoint("[Peer]\nEndpoint =   # none\n")!!.contains("?"))
+    }
+
+    @Test
+    fun aShareOfNothingIsRefused() {
+        assertThrows(IllegalArgumentException::class.java) { BridgeRules.sharePaths(JSONArray()) }
+        assertEquals(listOf("/a"), BridgeRules.sharePaths(JSONArray(listOf("/a"))))
+    }
 }

@@ -1,0 +1,1 @@
+Containers in the order you choose: by name, the busiest or most memory first, or problems first, from the icon beside the filter. The terminal no longer jumps or changes size when the keyboard opens or closes. And the fixes of a full code audit.

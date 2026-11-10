@@ -125,6 +125,27 @@ describe('a host that stops answering (Host unreachable)', () => {
   });
 });
 
+describe('a host that answers but whose numbers cannot be read (audit 2026-11-09)', () => {
+  it('is no unreachable host: read numbers, a slow command or full sessions are told by the job, not as Host unreachable', async () => {
+    const { HttpError } = await import('../../src/http.js');
+    const h = await t.json<Host>('POST', '/api/hosts', { name: 'old-nas', address: 'old-nas.lan', username: 'me' });
+    t.ctx.db.update(hosts).set({ facts: JSON.stringify({ checkedAt: new Date(t.clock.now).toISOString() }) }).where(eq(hosts.id, h.id)).run();
+    const s = new HostStatsService(t.ctx, {} as never);
+    const told: string[] = [];
+    s.onTrouble = (_id, tr) => told.push(tr.title);
+    s.smart = async () => ({}) as never;
+    const errors = [new HttpError(502, 'stats_unreadable', 'The numbers could not be read (/proc/meminfo)'), new Error('Command timed out after 30 s'), new Error('No channel within 15 s: the connection does not answer')];
+    s.sample = async () => {
+      throw errors.shift() ?? new Error('stats_unreadable');
+    };
+    for (let i = 0; i < 4; i++) {
+      await s.tick();
+      t.clock.now += 5 * 60_000;
+    }
+    expect(told).toEqual([]);
+  });
+});
+
 describe('a disk asleep at a SMART check (decision 5)', () => {
   it('is not woken: smartctl -n standby; its last reading stands, said from when, and no trouble from it', async () => {
     const { smartCommand } = await import('../../src/hosts/stats.js');
@@ -147,5 +168,29 @@ describe('a disk asleep at a SMART check (decision 5)', () => {
     t.clock.now += 86_400_000;
     expect((await s.smart(h.id)).disks[0]).toMatchObject({ asleep: true, readAt: first.checkedAt });
     expect(told).toEqual([]);
+  });
+});
+
+describe('security updates told once, also with a failed check between (audit 2026-11-09)', () => {
+  it('a check that failed is no reason to tell the same updates again', async () => {
+    const { PackageChecks } = await import('../../src/hosts/packages.js');
+    const h = await t.json<Host>('POST', '/api/hosts', { name: 'pk', address: 'pk.lan', username: 'me' });
+    const ok = ['@@pkg apt', '@@age 1761998400', 'Listing...', 'tar/trixie-security 1.35-4 amd64 [upgradable from: 1.35-3]', '@@burrow-exit 0', '@@reboot no'].join('\n');
+    const answers: (string | null)[] = [ok, null, ok];
+    const pool = {
+      with: async () => {
+        const a = answers.shift();
+        if (a === null) throw new Error('connect ECONNREFUSED');
+        return { code: 0, stdout: a, stderr: '', truncated: false };
+      },
+    };
+    const p = new PackageChecks(t.ctx, pool as never);
+    const told: string[] = [];
+    p.onTrouble = (_id, tr) => told.push(tr.title);
+    for (let i = 0; i < 3; i++) {
+      await p.check(h.id);
+      t.clock.now += 6 * 3_600_000;
+    }
+    expect(told).toEqual(['1 security update waiting: tar']);
   });
 });

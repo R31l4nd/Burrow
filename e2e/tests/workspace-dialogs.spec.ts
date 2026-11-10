@@ -168,9 +168,10 @@ test('a dialog closing keeps its layout and its title while it fades out (report
     (d.querySelector('header button[aria-label="Close"]') as HTMLButtonElement).click();
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     const cs = getComputedStyle(d);
-    return { open: d.open, display: cs.display, direction: cs.flexDirection, overflow: cs.overflow, title: d.querySelector('h2')!.textContent };
+    return { open: d.open, display: cs.display, direction: cs.flexDirection, overflow: cs.overflow, title: d.querySelector('h2')!.textContent, pointer: cs.pointerEvents };
   });
-  expect(during).toEqual({ open: false, display: 'flex', direction: 'column', overflow: 'hidden', title: 'fade-out snippet' });
+  // And no tap lands on it while it fades: a quick second tap on a menu item ran it twice (audit 2026-11-09).
+  expect(during).toEqual({ open: false, display: 'flex', direction: 'column', overflow: 'hidden', title: 'fade-out snippet', pointer: 'none' });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.evaluate(async (id) => fetch(`/api/snippets/${id}`, { method: 'DELETE' }), made.id);
 });
