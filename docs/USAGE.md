@@ -390,7 +390,11 @@ every host with Docker, grouped by compose stack - also a stack that runs on
 several hosts - with state, health, restarts and live CPU and memory. A
 host still being read is named, and the counts say "(so far)" until it
 answers; a host silent for 20 s says so, and what is shown is how it was
-then.
+then. The page is live, no reload needed: while someone looks, Burrow reads
+each host's containers every 5 seconds and their CPU and memory every 15
+seconds, and stops 30 seconds after the last viewer leaves. CPU is as
+`docker stats` says it: 100% is one full core, so 30% is a third of a core
+and a busy container on several cores goes over 100%.
 
 - The arrow before a stack folds it away (kept on this device); folded, it
   still says how many of its containers need a look. A search or a state
@@ -399,7 +403,10 @@ then.
   memory first, or problems first; stacks by what they use together. The
   rows hold their place while the numbers move, sorted again when you
   choose, when a container comes or goes, and every 30 s. Kept
-  on this device.
+  on this device. On a wider screen (from 720 px) the column names
+  (Name, Status, CPU, Memory) in a stack's table set the same order for
+  every stack; pressed again, the other way round, an arrow at the one in
+  use.
 - Tap a container for its details and logs; *Logs* at a stack, or *Select*
   and pick any containers (also from different hosts), for one merged
   timeline in time order, each source in its own colour.

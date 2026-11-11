@@ -136,13 +136,26 @@
   .toggle.on {
     background: color-mix(in srgb, var(--accent) 14%, transparent);
   }
+  /* As wide as its word: the app's .btn spans the width, so on a phone it took the options' row's rest (report 696298). */
   .more {
     margin-left: 4px;
+    width: auto;
+    white-space: nowrap;
+  }
+  /* As high as the options beside it, and so as the field: 36 px under 44 px toggles on a phone (report 703c76). */
+  .opts > .btn {
+    align-self: stretch;
   }
   /* A phone: the options and Replace a row of their own under the field, so the field keeps its room. */
   @media (max-width: 599px) {
     .first {
       flex-wrap: wrap;
+    }
+    /* The field's 120 px start counted in where the row breaks: with a count ("1 van 20") and three
+       44 px buttons on a 343 px phone the close button fell to a row of its own (report 696298).
+       From nothing the field still takes the rest of the row. */
+    .field {
+      flex-basis: 0;
     }
     .opts {
       order: 1;

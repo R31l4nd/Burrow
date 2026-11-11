@@ -113,6 +113,10 @@ export type ClientMessage =
   // The session's history at once, for the viewer's history layer (scrolled on the device itself, 2.19.0).
   // `mouse`: a program took the mouse; only a tmux of the person's own has a history to show then.
   | { t: 'history'; mouse?: boolean }
+  // The screen drawn again whole (reports d1113b, 92eaa5): a tab come back replays what was kept, a fit here
+  // moves what xterm shows, and a program draws only what changed since, over what may differ. Burrow's tmux
+  // draws it again; without it, this viewer gets a snapshot of the server's copy of the screen.
+  | { t: 'redraw' }
   // Type the host's stored password into the session (for sudo prompts).
   // The server does it; the password never reaches the browser.
   | { t: 'password' };
@@ -133,7 +137,8 @@ export interface ShellState {
 
 export type ServerMessage =
   // Full current screen and scrollback, sent once after attaching.
-  | { t: 'snapshot'; data: string; cols: number; rows: number; mode: TerminalMode; shell: ShellState; alt?: boolean }
+  // `redraw`: the screen drawn again on this viewer's asking (ClientMessage redraw), not a new attach.
+  | { t: 'snapshot'; data: string; cols: number; rows: number; mode: TerminalMode; shell: ShellState; alt?: boolean; redraw?: true }
   // Without tmux: a program on its alternate screen or off it again (less, vim); a scroll then goes to it as arrow keys.
   | { t: 'alt'; on: boolean }
   | { t: 'shell'; shell: ShellState }
@@ -161,6 +166,7 @@ export const clientMessage: z.ZodType<ClientMessage> = z.discriminatedUnion('t',
   z.object({ t: z.literal('scroll'), lines: z.number().int().min(-1000).max(1000) }),
   z.object({ t: z.literal('password') }),
   z.object({ t: z.literal('history'), mouse: z.boolean().optional() }),
+  z.object({ t: z.literal('redraw') }),
 ]);
 
 // ---- Snippets

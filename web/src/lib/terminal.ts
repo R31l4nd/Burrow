@@ -9,7 +9,8 @@ import type { ClientMessage, ServerMessage, ShellState, TerminalMode, TerminalVi
 export type ConnState = 'connecting' | 'open' | 'reconnecting' | 'ended' | 'signed-out' | 'failed';
 
 export interface TerminalEvents {
-  snapshot(data: string, cols: number, rows: number, mode: TerminalMode, shell: ShellState): void;
+  /** `again`: the screen drawn again on our asking (a redraw), not a new start: only the screen changes. */
+  snapshot(data: string, cols: number, rows: number, mode: TerminalMode, shell: ShellState, again?: boolean): void;
   shell(state: ShellState): void;
   /** `replayed`: recorded earlier and played again (lib/termpool.ts), not new. */
   output(data: string, replayed?: boolean): void;
@@ -87,7 +88,7 @@ export class TerminalConnection {
       const m = JSON.parse(String(e.data)) as ServerMessage;
       switch (m.t) {
         case 'snapshot':
-          this.on.snapshot(m.data, m.cols, m.rows, m.mode, m.shell);
+          this.on.snapshot(m.data, m.cols, m.rows, m.mode, m.shell, m.redraw === true);
           return this.on.alt?.(!!m.alt);
         case 'alt':
           return this.on.alt?.(m.on);

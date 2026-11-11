@@ -904,6 +904,56 @@ test('the app this Burrow offers is older than Burrow itself (after a self-updat
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
 
+test("the app this Burrow offers older than Burrow, or none: Burrow gets its own version's app from the release on GitHub and offers it (report a5ace5)", async ({ page }) => {
+  await signIn(page);
+  let apk: { versionName: string; versionCode: number; sha256: string; size: number } | null = { versionName: '2.21.0', versionCode: 22100, sha256: 'a'.repeat(64), size: 28 * 1048576 };
+  await page.route('**/api/android', (r) => r.fulfill({ json: { apk } }));
+  await page.route('**/api/version', (r) => r.fulfill({ json: { server: '2.22.0' } }));
+  // Burrow's side of it (server/test/integration/android.test.ts): routed here, GitHub is not asked from a test.
+  let asked = 0;
+  let answer: () => Promise<void> = async () => {};
+  await page.route('**/api/android/fetch-release', async (r) => {
+    asked++;
+    await answer();
+    apk = { versionName: '2.22.0', versionCode: 22200, sha256: 'b'.repeat(64), size: 29 * 1048576 };
+    await r.fulfill({ json: { apk } });
+  });
+  await page.goto('/#/settings/android');
+  await page.reload();
+  await expect(page.getByTestId('apk-older')).toBeVisible();
+  const fetch = page.getByTestId('apk-fetch-release');
+  await expect(fetch).toHaveText('Get the app 2.22.0 from GitHub');
+  // Meanwhile said what it does and how long it takes.
+  let done!: () => void;
+  answer = () => new Promise<void>((resolve) => (done = resolve));
+  await fetch.click();
+  await expect(fetch).toBeDisabled();
+  await expect(page.getByRole('status').filter({ hasText: 'Some 30 MB from the release on GitHub' })).toBeVisible();
+  await lookAt(page, 'settings-android-fetching-release');
+  done();
+  await expect(page.getByText('The app 2.22.0 is ready: this Burrow offers it now.')).toBeVisible();
+  expect(asked).toBe(1);
+  await expect(page.getByTestId('apk-older')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /Download the app \(2\.22\.0/ })).toBeVisible();
+  // None offered at all: the same way to one.
+  apk = null;
+  answer = async () => {};
+  await page.reload();
+  await expect(page.getByText('No app has been built for this server yet')).toBeVisible();
+  await page.getByTestId('apk-fetch-release').click();
+  await expect(page.getByRole('link', { name: /Download the app \(2\.22\.0/ })).toBeVisible();
+  expect(asked).toBe(2);
+  // GitHub's answer when it went wrong: said in words, nothing else changed.
+  await page.unroute('**/api/android/fetch-release');
+  await page.route('**/api/android/fetch-release', (r) => r.fulfill({ status: 404, json: { error: 'no_release_apk', message: 'The release 2.22.0 on GitHub has no app (burrow.apk.json).' } }));
+  apk = null;
+  await page.reload();
+  await page.getByTestId('apk-fetch-release').click();
+  await expect(page.getByText('The release 2.22.0 on GitHub has no app (burrow.apk.json).')).toBeVisible();
+  await expect(page.getByText('No app has been built for this server yet')).toBeVisible();
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 test("the app's version while Burrow's side could not be read: no 'up to date' (audit 2026-11-09)", async ({ page }) => {
   // Failed is not empty: with /api/android failing it said the app was up to date.
   await signIn(page);

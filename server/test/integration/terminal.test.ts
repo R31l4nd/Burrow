@@ -85,6 +85,32 @@ describe('tmux by default (decision 21)', () => {
 });
 
 describe('memory mode', () => {
+  it("a viewer asking to be drawn again, without Burrow's tmux: that viewer gets the screen as the server has it, the others nothing (reports d1113b, 92eaa5)", async () => {
+    const s = await t.json<TerminalSessionInfo>('POST', '/api/terminal/sessions', { hostId: host.id, cols: 90, rows: 25 });
+    expect(s.mode).toBe('memory');
+    const a = await openTerminal(t, s.id);
+    const b = await openTerminal(t, s.id);
+    const snapshots = (c: typeof a) => c.messages.filter((m) => m.t === 'snapshot');
+    await a.waitFor((m) => m.t === 'snapshot');
+    await b.waitFor((m) => m.t === 'snapshot');
+    a.send({ t: 'resize', cols: 90, rows: 25, active: true });
+    a.send({ t: 'input', d: 'echo drawn-$((6*7))\r' });
+    await waitForText(a, 'drawn-42');
+    await waitForText(b, 'drawn-42');
+    b.send({ t: 'redraw' });
+    await expect.poll(() => snapshots(b).length).toBe(2);
+    const again = snapshots(b)[1] as Extract<ServerMessage, { t: 'snapshot' }>;
+    expect(again).toMatchObject({ cols: 90, rows: 25, mode: 'memory' });
+    expect(again.data).toContain('drawn-42');
+    await new Promise((r) => setTimeout(r, 500));
+    expect(snapshots(b)).toHaveLength(2);
+    expect(snapshots(a)).toHaveLength(1);
+    a.close();
+    b.close();
+    await Promise.all([a.closed, b.closed]);
+    await t.request('DELETE', `/api/terminal/sessions/${s.id}`);
+  });
+
   it('two viewers share one shell; the late one gets the current screen', async () => {
     const s = await t.json<TerminalSessionInfo>('POST', '/api/terminal/sessions', { hostId: host.id, cols: 100, rows: 30 });
     expect(s).toMatchObject({ mode: 'memory', attached: true, cols: 100 });

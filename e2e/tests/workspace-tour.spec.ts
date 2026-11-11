@@ -550,6 +550,11 @@ async function tour(page: Page, vp: (typeof VARIANTS)[number][0], size: { width:
               await p.keyboard.press('Control+f');
               await expect(p.locator('.cm-search')).toBeVisible();
               await expect(p.locator('.cm-search input[name=search]')).toBeFocused();
+              // With a match chosen, its count as wide as it gets ("1 van 20"): with that the close button
+              // fell to a row of its own on a 343 px phone, three rows under the keyboard (report 696298).
+              await p.locator('.cm-search input[name=search]').pressSequentially('e');
+              await p.locator('.cm-search input[name=search]').press('Enter');
+              await expect(p.getByTestId('editor-find-count')).toHaveText(/^\d+ (of|van) \d\d+$/);
               // One row on a computer (report a4f865: CodeMirror's panel broke over two there too), two on a phone.
               const rows = wideOf(p.viewportSize()!) ? 1 : 2;
               expect(await rowsOf(p, '.cm-search'), `the find panel: ${rows} row(s) at most`).toBeLessThanOrEqual(rows);
@@ -796,8 +801,10 @@ async function tour(page: Page, vp: (typeof VARIANTS)[number][0], size: { width:
   ];
 
   await page.setViewportSize(size);
-  // A confirmation lasts fifteen minutes; the tour can take longer.
+  // A confirmation lasts fifteen minutes; a pass can take longer on a busy machine (17 minutes in
+  // the 2.24.0 gate: making a pairing code asked again): confirmed again after ten.
   await stepUpAgain(page, key);
+  let steppedUp = Date.now();
   const lang = langOf(vp);
   await page.evaluate((l) => localStorage.setItem('burrow.locale', l), lang);
   await page.evaluate((dark) => localStorage.setItem('burrow.appearance', JSON.stringify({ mode: dark ? 'dark' : 'light', accent: 'green' })), darkOf(vp));
@@ -807,6 +814,10 @@ async function tour(page: Page, vp: (typeof VARIANTS)[number][0], size: { width:
     if (ONLY && !ONLY.test(where)) continue;
     await test.step(where, async () => {
       const setUp = async () => {
+        if (Date.now() - steppedUp > 10 * 60_000) {
+          await stepUpAgain(page, key);
+          steppedUp = Date.now();
+        }
         await page.goto(s.url);
         await page.reload();
         await (s.ready ? s.ready(page) : expect(page.locator('h1').first()).toBeVisible());

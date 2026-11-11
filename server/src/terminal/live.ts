@@ -34,6 +34,8 @@ export interface Viewer {
   watching: string | null;
   /** That person's user id: the sweep keeps them while the session is still shared with them, whatever their role (A3-SRV-06). */
   watcherId: number | null;
+  /** A fresh screen asked for and not sent yet: one more asked meanwhile is the same one. */
+  redrawing?: boolean;
 }
 
 export type Row = typeof terminalSessions.$inferSelect;
@@ -103,6 +105,9 @@ export class LiveSession {
   /** Lines to scroll that wait for the scroll under way (one at a time). */
   scrollPending = 0;
   scrolling = false;
+  /** A whole redraw asked of tmux and not yet done (redraw()): one at a time. */
+  redrawing = false;
+  redrawAgain = false;
   /**
    * The tmux commands for this session, one after the other: leaving the
    * history always comes after the last scroll step (a step still on its

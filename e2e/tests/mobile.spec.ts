@@ -909,20 +909,25 @@ test('the keyboard coming up and going down in steps, as Android animates it: no
   await page.waitForTimeout(500);
   const size = sizes.at(-1)!;
   sizes.length = 0;
+  // The page's clock in the test's hands: the steps 30 ms apart on it, however long a resize takes on a
+  // busy machine (in the gate one took over the 200 ms the terminal waits, and its size went out).
+  await page.clock.install();
   // Up in steps of 40 px, a frame or two apart, then down again the same way.
   for (let h = 676; h >= 356; h -= 40) {
     await page.setViewportSize({ width: 343, height: h });
-    await page.waitForTimeout(30);
+    await page.clock.runFor(30);
   }
   await page.setViewportSize({ width: 343, height: 356 });
-  await page.waitForTimeout(800);
+  await page.clock.runFor(800);
+  await page.waitForTimeout(300);
   expect(sizes.filter((x) => x !== size), 'sizes sent while the keyboard came up').toEqual([]);
   for (let h = 396; h <= 711; h += 40) {
     await page.setViewportSize({ width: 343, height: h });
-    await page.waitForTimeout(30);
+    await page.clock.runFor(30);
   }
   await page.setViewportSize({ width: 343, height: 711 });
-  await page.waitForTimeout(800);
+  await page.clock.runFor(800);
+  await page.waitForTimeout(300);
   expect(sizes.filter((x) => x !== size), 'sizes sent while it went down').toEqual([]);
   await page.evaluate((id) => fetch(`/api/terminal/sessions/${id}`, { method: 'DELETE' }), s.id);
 });
@@ -1308,7 +1313,7 @@ test('several lines pasted reach a program as one paste, from the keyboard and t
   await page.keyboard.type("printf '\\033[?2004l'\n");
 });
 
-test("a phone's title bar is dark like the rail; the browser's and the app's bar above it follow, light again on a wide screen", async ({ page }) => {
+test("a phone's title bar is dark like the rail; the browser's and the app's bar above it follow, light again on a wide screen and on a phone held sideways, in the title bar's colour (report dfc5b0)", async ({ page }) => {
   await signIn(page);
   // A stand-in for the app's bridge, keeping what the page tells it.
   await page.addInitScript(() => {
@@ -1342,12 +1347,19 @@ test("a phone's title bar is dark like the rail; the browser's and the app's bar
   await expect.poll(() => page.evaluate(() => document.querySelector('meta[name="theme-color"]')?.getAttribute('content'))).toBe(side);
   await expect.poll(() => page.evaluate(() => (window as unknown as { __chrome: string[] }).__chrome.at(-1))).toBe(side);
   await lookAt(page, 'phone-dark-topbar');
-  // Wide: the title bar light, the bar above it the page's background.
-  await page.setViewportSize({ width: 1280, height: 800 });
-  const bg = await hexOf('html');
-  await expect.poll(() => page.evaluate(() => document.querySelector('meta[name="theme-color"]')?.getAttribute('content'))).toBe(bg);
-  await expect.poll(() => page.evaluate(() => (window as unknown as { __chrome: string[] }).__chrome.at(-1))).toBe(bg);
-  expect(await hexOf('.topbar')).not.toBe(side);
+  // Wide, and a phone held sideways (the report's 750 x 342): the title bar light, the bar above it
+  // in the title bar's colour; it was the page's background, a grey strip over the white bar (report dfc5b0).
+  const near = (a: string, b: string) => [1, 3, 5].every((i) => Math.abs(parseInt(a.slice(i, i + 2), 16) - parseInt(b.slice(i, i + 2), 16)) <= 3);
+  for (const size of [{ width: 750, height: 342 }, { width: 1280, height: 800 }]) {
+    await page.setViewportSize(size);
+    const top = await hexOf('.topbar');
+    const bg = await hexOf('html');
+    expect(top, `the title bar light at ${size.width} px`).not.toBe(side);
+    expect(near(top, bg), `title bar ${top} and page ${bg} apart at ${size.width} px`).toBe(false);
+    await expect.poll(() => page.evaluate(() => document.querySelector('meta[name="theme-color"]')?.getAttribute('content') ?? '').then((c) => near(c, top)), { message: `theme-color as the title bar ${top} at ${size.width} px` }).toBe(true);
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __chrome: string[] }).__chrome.at(-1) ?? '').then((c) => near(c, top)), { message: `the app's bar as the title bar ${top} at ${size.width} px` }).toBe(true);
+  }
+  await lookAt(page, 'phone-sideways-topbar');
 });
 
 test('Settings -> Appearance in Dutch on a narrow phone: the language it is in, and the themes fit', async ({ page }) => {
@@ -1472,3 +1484,108 @@ test('volume up in the app: a line says what the next key does, gone after a tap
   await page.getByTestId('volume-up-key').click();
   await expect(hint).toHaveCount(0);
 });
+
+test('find in a file on a 343 px phone with the keyboard up: field, count and its buttons on one row, all as high as the field (reports 696298, 703c76)', async ({ page }) => {
+  // Reported: with a match chosen ("1 van 20") the close button fell to a row of its own, and
+  // Replace stretched over the options' row: three rows, half the screen left over the keyboard.
+  await page.setViewportSize({ width: 343, height: 396 });
+  await signIn(page);
+  await page.evaluate(() => localStorage.setItem('burrow.locale', 'nl'));
+  const hostId = await page.evaluate(async () => ((await (await fetch('/api/hosts')).json()) as { id: number; name: string }[]).find((h) => h.name === 'test-sshd')!.id);
+  await page.evaluate((id) => fetch('/api/snippets/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ hostIds: [id], command: 'for i in $(seq 1 25); do echo "image: web-$i"; done > ~/find-phone.yml' }) }).then((r) => r.json()), hostId);
+  await page.goto(`/#/edit/${hostId}?p=${encodeURIComponent('/home/tester/find-phone.yml')}`);
+  // Dutch, as reported: the locale is read as the app starts.
+  await page.reload();
+  await expect(page.locator('.cm-content')).toContainText('web-25');
+  await page.locator('.cm-content').click();
+  await page.keyboard.press('Control+f');
+  const panel = page.locator('.cm-search');
+  const field = panel.locator('input[name=search]');
+  await field.pressSequentially('image');
+  await field.press('Enter');
+  await expect(page.getByTestId('editor-find-count')).toHaveText(/^\d+ van 25$/);
+  const middle = (l: import('@playwright/test').Locator) => l.evaluate((e) => { const r = e.getBoundingClientRect(); return r.top + r.height / 2; });
+  const row = await middle(field);
+  for (const name of ['Vorige', 'Volgende', 'Sluiten']) expect(Math.abs((await middle(panel.getByRole('button', { name, exact: true }))) - row), `${name} beside the field`).toBeLessThan(12);
+  // Replace as wide as its word at the end of the options' row, not the row's rest.
+  const replace = await panel.getByTestId('editor-find-replace').boundingBox();
+  expect(replace!.width).toBeLessThan(140);
+  // And as high as the field and the options beside it (report 703c76: lower than both).
+  const fieldHigh = (await field.boundingBox())!.height;
+  const aa = (await panel.getByRole('button', { name: 'Hoofdletters gelijk' }).boundingBox())!.height;
+  expect(Math.abs(replace!.height - fieldHigh), 'Replace as high as the field').toBeLessThanOrEqual(1);
+  expect(Math.abs(replace!.height - aa), 'Replace as high as Aa').toBeLessThanOrEqual(1);
+  await lookAt(page, 'mobile-editor-find-nl');
+});
+
+// Reported: Claude Code in a session in tmux, its spinner and prompt twice and letters of two frames
+// through each other after a switch of tabs. A tab come back replays what was kept into a new terminal,
+// which a busy phone fits to its size after the screen was drawn again: xterm moves its lines, and the
+// program in tmux draws only what changed since, over what differed. A program as such an assistant
+// draws: three lines at the bottom drawn again in place, a line of output now and then. In Burrow's tmux,
+// and in a tmux of the person's own attached in a session without it (the reporter's way).
+for (const [how, tmuxMode] of [["Burrow's tmux", 'always'], ['a tmux of your own (a session without Burrow\'s)', 'never']] as const) {
+  test(`a tab back in ${how} with a program drawing in it, on a busy phone: the screen as tmux has it, no two frames through each other (reports d1113b, 92eaa5)`, async ({ page }) => {
+    test.setTimeout(150_000);
+    await page.setViewportSize({ width: 698, height: 750 });
+    await signIn(page);
+    const api = (path: string, body: unknown) => page.evaluate(([p, b]) => fetch(p as string, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) }).then((r) => r.json()), [path, body] as const);
+    const hostId = await page.evaluate(async () => ((await (await fetch('/api/hosts')).json()) as { id: number; name: string }[]).find((h) => h.name === 'test-sshd')!.id);
+    const script = [
+      "i=0; while [ $i -lt 60 ]; do i=$((i+1)); printf 'history line %s %s\\n' $i \"$(printf '%0120d' $i)\"; done",
+      "blk() { printf '\\r\\033[KSpin %s\\n\\r\\033[K> prompt\\n\\r\\033[KTip %s' \"$1\" \"$1\"; }",
+      'blk 0',
+      'i=0',
+      "while :; do i=$((i+1)); printf '\\r\\033[2A'; if [ $((i%5)) = 0 ]; then printf '\\r\\033[Kout %s %s\\n' $i \"$(printf '%090d' $i)\"; fi; blk $i; sleep 0.2; done",
+    ];
+    const ink = `/tmp/ink-${tmuxMode}.sh`;
+    await api('/api/snippets/run', { hostIds: [hostId], command: `printf '%s\\n' ${script.map((l) => `'${l.replace(/'/g, `'\\''`)}'`).join(' ')} > ${ink}` });
+    const s = (await api('/api/terminal/sessions', { hostId, tmux: tmuxMode })) as { id: string };
+    const other = (await api('/api/terminal/sessions', { hostId, tmux: tmuxMode })) as { id: string };
+    const ours = 'tmux -L burrow -f /dev/null';
+    const own = 'tmux -L own-e2e -f /dev/null';
+    const tmux = tmuxMode === 'always' ? ours : own;
+    const target = tmuxMode === 'always' ? `burrow-${s.id.replace(/[^A-Za-z0-9]/g, 'x')}` : 'own';
+    const run = async (command: string) => ((await api('/api/snippets/run', { hostIds: [hostId], command })) as { stdout: string }[])[0]!.stdout;
+    await page.goto(`/#/term/${s.id}`);
+    const rows = page.locator('[data-testid=terminal] .xterm-rows');
+    await expect(rows).toContainText('$', { timeout: 20_000 });
+    await page.locator('[data-testid=terminal] textarea').focus();
+    if (tmuxMode === 'never') {
+      await page.keyboard.type(`${own} new -s own \\; set status off\n`);
+      await expect.poll(() => run(`${own} has -t own && echo yes`)).toContain('yes');
+    }
+    await page.keyboard.type(`sh ${ink}\n`);
+    await expect(rows).toContainText('Spin');
+    // Each row on the phone as in tmux's own picture of the screen, the program stopped meanwhile (and
+    // going on after: the shell's lines of that come before the tab is left, as in the report's session).
+    const same = async (what: string) => {
+      await page.waitForTimeout(1500);
+      await run(`${tmux} send-keys -t ${target} C-z`);
+      await page.waitForTimeout(800);
+      const height = Number((await run(`${tmux} display-message -p -t ${target} '#{pane_height}'`)).trim());
+      const tm = (await run(`${tmux} capture-pane -p -t ${target}`)).split('\n').slice(0, height).map((l) => l.trimEnd());
+      const xt = (await rows.locator(':scope > div').allInnerTexts()).slice(0, height).map((l) => l.replace(/\u00a0/g, ' ').trimEnd());
+      expect(tm.some((l) => l.startsWith('Spin')), `the program on the screen ${what}`).toBe(true);
+      expect(xt, `the phone as tmux has it ${what}`).toEqual(tm);
+      await page.keyboard.type('fg\n');
+      await page.waitForTimeout(500);
+    };
+    await same('before');
+    // To the other tab a moment, the program drawing on meanwhile, and back on a phone six times slower
+    // (as in the 2.24.0 gate: fitted only after the screen came), twice.
+    const cdp = await page.context().newCDPSession(page);
+    for (const n of [1, 2]) {
+      await page.evaluate((i) => (location.hash = `#/term/${i}`), other.id);
+      await page.waitForTimeout(2000);
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+      await page.evaluate((i) => (location.hash = `#/term/${i}`), s.id);
+      await expect(rows).toContainText('Spin');
+      await page.waitForTimeout(1500);
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+      await page.locator('[data-testid=terminal] textarea').focus();
+      await same(`after tab ${n}`);
+    }
+    await run(`${ours} kill-session -t burrow-${s.id.replace(/[^A-Za-z0-9]/g, 'x')}; ${ours} kill-session -t burrow-${other.id.replace(/[^A-Za-z0-9]/g, 'x')}; ${own} kill-server; rm -f ${ink}`);
+  });
+}

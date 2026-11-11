@@ -327,7 +327,8 @@ describe('masking a very long line (audit 2026-11-09)', () => {
       const line = word.repeat(Math.ceil(65_536 / word.length));
       const t0 = performance.now();
       maskText(line, { ips: true });
-      expect(performance.now() - t0, word).toBeLessThan(250);
+      // Minutes before the fix; 260 ms once on a busy machine under coverage (the 2.24.0 gate).
+      expect(performance.now() - t0, word).toBeLessThan(2000);
     }
   });
 

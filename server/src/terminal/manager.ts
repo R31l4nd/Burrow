@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import type { Client, ClientChannel, SFTPWrapper } from 'ssh2';
-import { AI_TURNS_KEPT, AltScreenFilter, effectiveConnection, isTermReply, type AiTurn, type PathEntry, type SharedSession, type TerminalMode, type TerminalSessionInfo } from '@burrow/shared';
+import { AI_TURNS_KEPT, AltScreenFilter, effectiveConnection, isTermReply, type AiTurn, type PathEntry, type ServerMessage, type SharedSession, type TerminalMode, type TerminalSessionInfo } from '@burrow/shared';
 import { recordCommand } from '../history/service.js';
 import { audit, type Actor } from '../audit.js';
 import { hostDefaults } from '../hosts/defaults.js';
@@ -29,6 +29,19 @@ import { typeWhenReady } from './ready.js';
 
 // Lines of scrollback sent to a viewer that attaches.
 const SNAPSHOT_SCROLLBACK = 2000;
+/** The screen as the server's copy has it, with its scrollback: what a viewer starts from (attach, redraw). */
+function snapshotOf(live: LiveSession): Extract<ServerMessage, { t: 'snapshot' }> {
+  return {
+    t: 'snapshot',
+    data: live.serializer.serialize({ scrollback: SNAPSHOT_SCROLLBACK }) + screenModes(live.term) + mouseEncoding(live.term),
+    cols: live.cols,
+    rows: live.rows,
+    mode: live.row.mode,
+    shell: live.shell,
+    ...(live.alt?.on ? { alt: true } : {}),
+  };
+}
+
 // The history layer (history()): tmux's history-limit, at most this much of it, and the exit code for "a program on the alternate screen".
 const HISTORY_LINES = 10_000;
 const HISTORY_BYTES = 3 << 20;
@@ -494,15 +507,7 @@ export class TerminalManager {
     await new Promise<void>((resolve) =>
       live.term.write('', () => {
         live.viewers.set(viewer.id, viewer);
-        live.send(viewer, {
-          t: 'snapshot',
-          data: live.serializer.serialize({ scrollback: SNAPSHOT_SCROLLBACK }) + screenModes(live.term) + mouseEncoding(live.term),
-          cols: live.cols,
-          rows: live.rows,
-          mode: live.row.mode,
-          shell: live.shell,
-          ...(live.alt?.on ? { alt: true } : {}),
-        });
+        live.send(viewer, snapshotOf(live));
         resolve();
       }),
     );
@@ -529,6 +534,44 @@ export class TerminalManager {
    * viewer's own scrollback stayed nearly empty). Scrolled back to the
    * bottom, copy mode ends by itself (-e).
    */
+  /**
+   * Burrow's tmux draws the session's screen again whole (reports d1113b, 92eaa5). tmux sends only what
+   * changed since what it last sent; a tab come back shows what was kept, replayed into a new
+   * terminal, and where that differs from tmux's own picture the rest stayed: two frames of a program
+   * through each other. A redraw of tmux's client only: the programs in it get no resize. Without
+   * Burrow's tmux (a shell, a tmux of the person's own, an assistant run straight in it), this viewer
+   * gets the screen again from the server's own copy, which is what those programs drew on.
+   */
+  redraw(id: string, viewerId: string): void {
+    const live = this.#live.get(id);
+    if (!live) return;
+    const name = live.row.tmuxName;
+    if (!name) {
+      const v = live.viewers.get(viewerId);
+      if (!v || v.redrawing) return;
+      v.redrawing = true;
+      // After what the headless terminal still parses, as on attach: no output lost or sent twice.
+      live.term.write('', () => {
+        v.redrawing = false;
+        if (live.viewers.get(viewerId) === v) live.send(v, { ...snapshotOf(live), redraw: true });
+      });
+      return;
+    }
+    if (!live.client) return;
+    // One at a time; one asked for meanwhile (the terminal fitted after the first, a moment later) runs after it.
+    if (live.redrawing) return void (live.redrawAgain = true);
+    live.redrawing = true;
+    const cmd = `${TMUX} list-clients -t ${name} -F '#{client_tty}' | while read -r c; do ${TMUX} refresh-client -t "$c"; done`;
+    void exec(live.client, cmd, 5_000)
+      .catch(() => {})
+      .finally(() => {
+        live.redrawing = false;
+        if (!live.redrawAgain) return;
+        live.redrawAgain = false;
+        this.redraw(id, viewerId);
+      });
+  }
+
   scroll(id: string, viewerId: string, lines: number): void {
     const live = this.#live.get(id);
     // Someone watching scrolls their own view only; tmux's history is the session's.

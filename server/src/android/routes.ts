@@ -1,8 +1,10 @@
 import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
+import type { Fetcher } from '../apps/probe.js';
 import type { Ctx } from '../context.js';
 import { contentDisposition, HttpError } from '../http.js';
+import { fetchReleaseApk } from './release.js';
 
 // The Android app: the APK is offered to signed-in users from the data
 // directory (downloads/burrow.apk, with burrow.apk.json describing it), and
@@ -16,7 +18,7 @@ interface ApkInfo {
   size: number;
 }
 
-export function registerAndroidRoutes(app: FastifyInstance, ctx: Ctx): void {
+export function registerAndroidRoutes(app: FastifyInstance, ctx: Ctx, version: string, f: Fetcher = fetch): void {
   const dir = join(ctx.config.dataDir, 'downloads');
   const apk = join(dir, 'burrow.apk');
 
@@ -31,6 +33,13 @@ export function registerAndroidRoutes(app: FastifyInstance, ctx: Ctx): void {
   };
 
   app.get('/api/android', { config: { auth: 'user' } }, async () => ({ apk: info() }));
+
+  // The app of this Burrow's own release, from GitHub, in place of an older one (report a5ace5): what
+  // every phone that updates from here installs, so an admin's, confirmed as the person.
+  app.post('/api/android/fetch-release', { config: { stepUp: true } }, async () => {
+    await fetchReleaseApk(dir, version, f);
+    return { apk: info() };
+  });
 
   app.get('/api/android/burrow.apk', { config: { auth: 'user' } }, async (_req, reply) => {
     const i = info();

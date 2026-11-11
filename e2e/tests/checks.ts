@@ -197,8 +197,9 @@ export async function textLinksUnderlined(page: Page, where: string) {
         const cs = getComputedStyle(e);
         const plain = cs.backgroundColor === 'rgba(0, 0, 0, 0)' && parseFloat(cs.borderTopWidth) === 0 && parseFloat(cs.borderBottomWidth) === 0;
         const coloured = cs.color !== getComputedStyle(document.body).color;
-        // Inside a list row, a tab bar or a heading the look says enough.
-        const structural = e.closest('.list-item, [role=tablist], nav, h1, h2, h3, .segmented, .chips, .crumbs, [aria-label=Path]');
+        // Inside a list row, a tab bar, a heading or a table's column names (pressed for their order,
+        // the one in use with its arrow: report faf150) the look says enough.
+        const structural = e.closest('.list-item, [role=tablist], nav, h1, h2, h3, .segmented, .chips, .crumbs, [aria-label=Path], .chead');
         return plain && coloured && !structural && !cs.textDecorationLine.includes('underline');
       })
       .map((e) => e.textContent!.trim().slice(0, 30)),

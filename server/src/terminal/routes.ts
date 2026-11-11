@@ -91,6 +91,7 @@ export function registerTerminalRoutes(app: FastifyInstance, ctx: Ctx, manager: 
         else if (msg.t === 'password') manager.pastePassword(id, viewerId, actor(req));
         else if (msg.t === 'scroll') manager.scroll(id, viewerId, msg.lines);
         else if (msg.t === 'history') void manager.history(id, viewerId, msg.mouse ?? false);
+        else if (msg.t === 'redraw') manager.redraw(id, viewerId);
         else send({ t: 'pong' });
       } catch (err) {
         if (!failed) ctx.log.error({ err, session: id }, 'terminal: a message from a viewer could not be handled');

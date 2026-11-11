@@ -439,7 +439,9 @@
       </div>
     {/if}
   </nav>
-  {#if railSheet}<HostSheet host={railHost} bind:open={railSheet} />{/if}
+  <!-- Kept once a host was picked, as the Hosts page keeps its menu: what the menu opens after closing
+       (its remembered commands) is part of it, and went with it (report 63e44b). -->
+  {#if railHost}<HostSheet host={railHost} bind:open={railSheet} />{/if}
 {/if}
 
 <StepUpDialog />

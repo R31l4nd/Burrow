@@ -298,7 +298,9 @@
         <!-- Scrolled in their own part, the state line above them and the log below staying put (report 5d0b33). -->
         <div class="more" data-content data-testid="container-more">
         {#if st}
-          <div class="meters">
+          <!-- The last hour's lines where the state line has no numbers (a phone): on a computer it says them,
+               and the history below draws them; there they were said twice (report 73982d). -->
+          <div class="meters narrow-only" data-testid="container-meters">
             <div class="meter"><span class="dim small">CPU {st.cpu.toFixed(1)}%</span><Sparkline values={hist?.cpu ?? []} width={140} height={28} label="CPU" format={(v) => `${v.toFixed(1)}%`} /></div>
             <div class="meter"><span class="dim small">{t('containers.memory')} {st.memKnown === false ? t('containers.memUnknown') : formatBytesShort(st.memBytes)}</span><Sparkline values={hist?.mem ?? []} width={140} height={28} label={t('containers.memory')} format={formatBytesShort} /></div>
           </div>
@@ -552,6 +554,8 @@
     max-height: clamp(70px, calc(100dvh - var(--nav-h) - 420px), 35dvh);
     overflow-y: auto;
     overscroll-behavior: contain;
+    /* Room before their scrollbar: the history's range touched it (report 73982d). */
+    padding-right: 8px;
   }
   .summary > :not(.info-toggle, .sources, .pill-btn) {
     flex-basis: 100%;

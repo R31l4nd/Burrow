@@ -6,6 +6,78 @@ says how it was verified.
 
 ## [Unreleased]
 
+## [2.24.0] - 2026-11-10
+
+Eleven reports from the computer and the phone: the containers sorted by
+their columns and in one line, a container's details and the editor's
+find panel tidied, a host's remembered commands from the side rail, the
+phone's status bar held sideways, the app fetched from the release, and a
+program in Burrow's tmux drawn right after a switch of tabs.
+
+### Added
+
+- Burrow gets the app from GitHub (report a5ace5): an update of Burrow
+  builds no app, so the one it offered stayed behind. When it offers none,
+  or one older than itself, an admin can press *Get the app X from GitHub*
+  under Settings -> Android app: Burrow downloads the APK from the release
+  of the version it runs, keeps it only when it is that version with the
+  SHA-256 the release names, and offers it to the phones. Nothing is
+  fetched unless an admin asks (docs/DEPLOY.md).
+
+- Containers sorted by a column's name (report faf150): on a wider screen,
+  Name, Status, CPU or Memory pressed in a stack's table puts every stack
+  in that order, the same as the order menu; pressed again, the other way
+  round. The column in use has an arrow; kept on this device.
+
+### Fixed
+
+- The editor's find panel on a narrow phone: with a match chosen, the close
+  button fell to a row of its own and Replace stretched over the options'
+  row, three rows over the keyboard. Now two: the field, the count and its
+  buttons, then the options with Replace as wide as its word and as high
+  as the field and the options beside it (reports 696298, 703c76).
+- The columns of the Containers page in one line in every stack (report
+  94465b): each stack's table sized its state and update columns by what
+  it held, so Status, CPU and Memory stood elsewhere in each. The state
+  column has a set width now, and the update column is as wide in every
+  stack once one has an update.
+- A container's details on a computer said CPU and memory twice: in the
+  state line and again in the last hour's lines under it. Those lines now
+  show only on a phone, whose state line has no numbers; the history's
+  range no longer touches the details' scrollbar (report 73982d).
+- Remembered commands opened from a host's menu in the side rail showed
+  nothing: the menu took the list with it as it closed (report 63e44b).
+- The status bar above the app a grey strip over the white title bar on a
+  phone held sideways (or a wider screen): it took the page's background;
+  it now takes the title bar's colour, as it does upright (report dfc5b0).
+- A program in tmux, such as Claude Code, drawn through itself after a
+  switch of terminal tabs: its spinner and prompt twice, letters of two
+  frames mixed (reports d1113b, 92eaa5). A tab come back replays what was
+  kept into a new terminal, a busy phone fits that terminal to its size
+  a moment later (which moves its lines), and tmux draws only what
+  changed since, over whatever differed. The screen is now drawn again
+  whole when a tab comes back and whenever the terminal is fitted to
+  another size on the device: by Burrow's tmux, or, in a session without
+  it (a tmux of your own attached in it, a program run straight in it),
+  from the server's copy of the screen. No resize: the program notices
+  nothing.
+- A test of 2.23.0's keyboard fix (report b00aad) failed when the machine
+  running it was busy: its steps now run on the page's own clock.
+- The tour asks for a fresh confirmation after ten minutes: on a busy
+  machine a pass took longer than a confirmation lasts. Two more tests
+  steady on a busy machine: Firefox's report form waits for its
+  screenshot, and masking a long line is bounded at 2 s, not 250 ms.
+
+### Verified
+
+- Each fix with a test that failed on the code before it (unit and e2e),
+  the screens it changes looked at in the tour and at every size.
+- Report 473350 asked how often the pages read again: answered in
+  docs/USAGE.md (containers every 5 s, CPU and memory every 15 s, files
+  every 10 s), with what a CPU percentage means.
+- The gate, the Android test on the emulator and a fresh install on a new
+  Debian VM, before the release.
+
 ## [2.23.0] - 2026-11-10
 
 Three reports from the phone (the containers in another order, a terminal

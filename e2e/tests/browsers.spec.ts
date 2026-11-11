@@ -56,7 +56,8 @@ test('Ctrl+Shift+B reports the screen from any page in this browser too (Firefox
   await expect(page.getByRole('heading', { name: 'Alerts' }).first()).toBeVisible();
   await page.keyboard.press('Control+Shift+B');
   const form = page.getByRole('dialog', { name: 'Report a problem' });
-  await expect(form).toBeVisible();
+  // The screenshot is taken first: over 5 s in Firefox on a busy machine (the 2.24.0 gate).
+  await expect(form).toBeVisible({ timeout: 20_000 });
   await form.getByRole('button', { name: 'Cancel' }).click();
   await expect(form).toBeHidden();
 });

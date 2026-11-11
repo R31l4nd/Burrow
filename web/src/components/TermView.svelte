@@ -53,6 +53,7 @@
     onai = null,
     oninput: toSession,
     onresize,
+    onreflow = null,
     onready = null,
     onswipe = null,
     onforget = null,
@@ -78,6 +79,8 @@
     onai?: ((question: string) => void) | null;
     oninput: (data: string) => void;
     onresize: (cols: number, rows: number, active: boolean) => void;
+    /** Fitted here to another size than the terminal had: what it shows moved (xterm reflows), not what the session has. */
+    onreflow?: (() => void) | null;
     onready?: ((term: XTerm) => void) | null;
     onswipe?: ((step: number) => void) | null;
     /** A history suggestion held down (or right-clicked): forget that command. */
@@ -205,7 +208,7 @@
   /** The size the session runs at; ours when we own it, else shown as is. */
   export function applySize(cols: number, rows: number, isOwner: boolean): void {
     if (!isOwner) return inTurn((t) => t.resize(cols, rows));
-    fit?.fit();
+    fitHere();
     // Ours, but the session runs at another size (reported while the
     // keyboard or the text box took room): tell it this one, or the program
     // draws for fewer rows than shown and leaves empty rows below it.
@@ -252,6 +255,16 @@
   let keptHeight = $state<number | null>(null);
   let rowsDown = 0;
 
+  // A fit to other rows moves what xterm shows (lines go into or come out of its scrollback); when
+  // the session keeps its size, nothing draws it again. A tab back in front fitted after the screen
+  // was drawn again whole, on a busy phone: two frames through each other (reports d1113b, 92eaa5).
+  function fitHere(): void {
+    if (!term || !fit) return;
+    const [cols, rows] = [term.cols, term.rows];
+    fit.fit();
+    if (term.cols !== cols || term.rows !== rows) onreflow?.();
+  }
+
   /** Our own fitted size; applied locally only while this device is the active one. */
   export function refit(active = false): void {
     if (!term || !fit) return;
@@ -265,7 +278,7 @@
     }
     const dims = fit.proposeDimensions();
     if (!dims || !dims.cols || !dims.rows) return;
-    if (owner || active) fit.fit();
+    if (owner || active) fitHere();
     onresize(dims.cols, dims.rows, active);
     if (!softKeyboard.open) rowsDown = dims.rows;
     Object.assign(terminalState, { cols: dims.cols, rows: dims.rows });

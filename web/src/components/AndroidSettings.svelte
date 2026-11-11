@@ -75,6 +75,22 @@
     loaded = true;
   }
   const apkOlder = $derived(!!apk && !!server && apk.versionName !== '?' && compareVersions(apk.versionName, server) < 0);
+  // The app of Burrow's own release, fetched by Burrow from GitHub in place of an older one or none
+  // (report a5ace5): an admin's, confirmed as the person; some tens of MB, so it says so meanwhile.
+  let fetching = $state(false);
+  async function fetchRelease() {
+    fetching = true;
+    try {
+      const r = await post<{ apk: Apk | null }>('/api/android/fetch-release');
+      apk = r.apk;
+      toast(t('android.fetchedRelease', { version: r.apk?.versionName ?? '' }));
+    } catch (err) {
+      const m = errorMessage(err);
+      if (m) toast(m, 'error');
+    } finally {
+      fetching = false;
+    }
+  }
   // The phones not read: said here with Try again, not "none paired" (A3-WEB-01).
   let loadError = $state('');
   const firstLoad = () => {
@@ -225,6 +241,14 @@
       {t('android.apkOlder', { apk: apk?.versionName ?? '', server: server ?? '' })}
       {#if projectPublished()}<a href={`${PROJECT_URL}/releases`} target="_blank" rel="noopener noreferrer">{t('android.releases')}</a>{/if}
     </p>
+    {@render fromRelease()}
+  {/if}
+{/snippet}
+
+{#snippet fromRelease()}
+  {#if user?.role === 'admin' && server && projectPublished()}
+    <button class="btn small" disabled={fetching} onclick={fetchRelease} data-testid="apk-fetch-release">{fetching ? t('android.fetchingRelease') : t('android.fetchRelease', { version: server })}</button>
+    {#if fetching}<p class="dim small" role="status">{t('android.fetchingReleaseHint')}</p>{/if}
   {/if}
 {/snippet}
 
@@ -250,6 +274,7 @@
         <p class="small dim">{t('android.versionOnly', { version: info.version })}</p>
       {/if}
       {@render olderApk()}
+      {#if loaded && !apk}{@render fromRelease()}{/if}
     </div>
     {#if thisPaired}
       <p class="small">{t('android.thisPaired')}</p>
@@ -349,6 +374,7 @@
     {:else}
       <!-- An install on the prebuilt images has no checkout to build one: the release has it. -->
       <p class="dim small">{t('android.noApk')} {#if projectPublished()}<a href={`${PROJECT_URL}/releases`} target="_blank" rel="noopener noreferrer">{t('android.releases')}</a>{/if}</p>
+      {@render fromRelease()}
     {/if}
   </div>
 

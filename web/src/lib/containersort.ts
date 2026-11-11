@@ -18,19 +18,20 @@ export function readSort(v: unknown): ContainerSort {
 }
 
 const byName = (a: SortKeys, b: SortKeys) => a.name.localeCompare(b.name);
-// The larger first; not measured after every measured one.
-const larger = (a: number | null, b: number | null) => (a === null ? (b === null ? 0 : 1) : b === null ? -1 : b - a);
+// The larger first (`back`: the smaller); not measured after every measured one either way.
+const larger = (a: number | null, b: number | null, back = false) => (a === null ? (b === null ? 0 : 1) : b === null ? -1 : back ? a - b : b - a);
 
-function compare(by: ContainerSort, a: SortKeys, b: SortKeys): number {
-  if (by === 'cpu') return larger(a.cpu, b.cpu) || byName(a, b);
-  if (by === 'memory') return larger(a.mem, b.mem) || byName(a, b);
-  if (by === 'problems') return a.trouble - b.trouble || byName(a, b);
-  return byName(a, b);
+function compare(by: ContainerSort, a: SortKeys, b: SortKeys, back: boolean): number {
+  const dir = back ? -1 : 1;
+  if (by === 'cpu') return larger(a.cpu, b.cpu, back) || byName(a, b);
+  if (by === 'memory') return larger(a.mem, b.mem, back) || byName(a, b);
+  if (by === 'problems') return dir * (a.trouble - b.trouble) || byName(a, b);
+  return dir * byName(a, b);
 }
 
-/** The rows in the order chosen; the list given is left as it was. */
-export function sortRows<T>(rows: readonly T[], by: ContainerSort, keys: (r: T) => SortKeys): T[] {
-  return [...rows].sort((a, b) => compare(by, keys(a), keys(b)));
+/** The rows in the order chosen, `back` the other way round (report faf150: a column's name pressed again); the list given is left as it was. */
+export function sortRows<T>(rows: readonly T[], by: ContainerSort, keys: (r: T) => SortKeys, back = false): T[] {
+  return [...rows].sort((a, b) => compare(by, keys(a), keys(b), back));
 }
 
 interface GroupParts<G, T> {
@@ -42,7 +43,9 @@ interface GroupParts<G, T> {
 }
 
 /** The stacks in the order chosen: by what they use together, or by their worst container; else stacks by name, then the loose ones. */
-export function sortGroups<G, T>(groups: readonly G[], by: ContainerSort, p: GroupParts<G, T>): G[] {
+export function sortGroups<G, T>(groups: readonly G[], by: ContainerSort, p: GroupParts<G, T>, back = false): G[] {
+  const dir = back ? -1 : 1;
+  // The containers of no stack after the stacks either way.
   const named = (a: G, b: G) => Number(p.loose(a)) - Number(p.loose(b)) || p.title(a).localeCompare(p.title(b));
   const total = (g: G, k: 'cpu' | 'mem') => {
     const vs = p.rows(g).map((r) => p.keys(r)[k]).filter((v): v is number => v !== null);
@@ -50,9 +53,9 @@ export function sortGroups<G, T>(groups: readonly G[], by: ContainerSort, p: Gro
   };
   const worst = (g: G) => Math.min(...p.rows(g).map((r) => p.keys(r).trouble));
   return [...groups].sort((a, b) => {
-    if (by === 'cpu') return larger(total(a, 'cpu'), total(b, 'cpu')) || named(a, b);
-    if (by === 'memory') return larger(total(a, 'mem'), total(b, 'mem')) || named(a, b);
-    if (by === 'problems') return worst(a) - worst(b) || named(a, b);
-    return named(a, b);
+    if (by === 'cpu') return larger(total(a, 'cpu'), total(b, 'cpu'), back) || named(a, b);
+    if (by === 'memory') return larger(total(a, 'mem'), total(b, 'mem'), back) || named(a, b);
+    if (by === 'problems') return dir * (worst(a) - worst(b)) || named(a, b);
+    return Number(p.loose(a)) - Number(p.loose(b)) || dir * p.title(a).localeCompare(p.title(b));
   });
 }

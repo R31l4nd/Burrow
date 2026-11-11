@@ -40,7 +40,7 @@ const snapshot = (data: string) => ({ t: 'snapshot', data, cols: 80, rows: 24, m
 function page() {
   const seen: string[] = [];
   const on: TerminalEvents = {
-    snapshot: (d) => seen.push(`snapshot ${d}`),
+    snapshot: (d, _c, _r, _m, _s, again) => seen.push(`${again ? 'redrawn' : 'snapshot'} ${d}`),
     output: (d, replayed) => seen.push(`${replayed ? 'replayed' : 'output'} ${d}`),
     size: (c, r) => seen.push(`size ${c}x${r}`),
     shell: () => seen.push('shell'),
@@ -96,6 +96,21 @@ describe('terminal tabs stay connected (report cfdea9)', () => {
     const back = page();
     attach('b', back.on);
     expect(back.seen).toEqual(['state open', 'snapshot new']);
+  });
+
+  it('a screen drawn again on asking is passed on as such; a tab back starts from it as from any screen (reports d1113b, 92eaa5)', () => {
+    const first = page();
+    attach('r', first.on);
+    const ws = FakeSocket.all[0]!;
+    ws.open();
+    ws.push(snapshot('old'));
+    ws.push({ t: 'output', d: 'x' });
+    ws.push({ ...snapshot('again'), redraw: true });
+    expect(first.seen.slice(-2)).toEqual(['output x', 'redrawn again']);
+    detach('r');
+    const back = page();
+    attach('r', back.on);
+    expect(back.seen).toEqual(['state open', 'snapshot again']);
   });
 
   it('only the last few are kept; the oldest unseen one is closed', () => {

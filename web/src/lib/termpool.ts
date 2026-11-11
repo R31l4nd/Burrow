@@ -37,7 +37,8 @@ const kept = new Map<string, Kept>();
 function recorder(k: Kept): TerminalEvents {
   return {
     snapshot(...a) {
-      k.snapshot = a;
+      // Kept as the screen a tab back starts from, drawn again or not.
+      k.snapshot = [a[0], a[1], a[2], a[3], a[4]];
       k.steps = [];
       k.outLen = 0;
       k.overflow = false;
@@ -108,6 +109,10 @@ export function attach(sessionId: string, on: TerminalEvents): TerminalConnectio
     on.alt?.(k.alt);
     // Kept unseen a while: make sure it is still there.
     k.conn.nudge();
+    // What was kept, replayed into a new terminal, can differ from tmux's own picture of the screen,
+    // and tmux draws only what changed: two frames of a program through each other after a tab came
+    // back (reports d1113b, 92eaa5). In Burrow's tmux, the screen drawn again whole.
+    if (k.snapshot?.[3] === 'tmux') k.conn.send({ t: 'redraw' });
     return k.conn;
   }
   if (k) drop(sessionId);

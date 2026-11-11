@@ -73,17 +73,32 @@
       return 'name';
     }
   }
+  // The other way round (report faf150): a column's name pressed again.
+  const BACK_KEY = 'burrow.containers.sortBack';
+  let sortBack = $state(storedBack());
+  function storedBack(): boolean {
+    try {
+      return localStorage.getItem(BACK_KEY) === '1';
+    } catch {
+      return false;
+    }
+  }
   let sortMenu = $state(false);
-  function setSort(s: ContainerSort) {
+  function setSort(s: ContainerSort, back = false) {
     sortBy = s;
+    sortBack = back;
     resort++;
     sortMenu = false;
     try {
       localStorage.setItem(SORT_KEY, s);
+      localStorage.setItem(BACK_KEY, back ? '1' : '0');
     } catch {
       // Not kept: this order until the page is left.
     }
   }
+  /** A column's name pressed (report faf150): its order, the same as the menu's, for every stack; pressed again, the other way round. */
+  const byColumn = (s: ContainerSort) => setSort(s, sortBy === s && !sortBack);
+  const sortWords = $derived(sortBack ? t('containers.sortBack', { by: t(`containers.sort.${sortBy}`) }) : t(`containers.sort.${sortBy}`));
   const TROUBLE = { bad: 0, warn: 1, ok: 2, off: 3 } as const;
   const sortKeys = (r: Row): SortKeys => {
     const up = r.c.state === 'running' && r.stats;
@@ -185,6 +200,8 @@
           (stateFilter === 'running' ? r.c.state === 'running' : stateFilter === 'stopped' ? tone(r.c) === 'off' : stateFilter === 'update' ? hasUpdate(r) : tone(r.c) === 'bad' || tone(r.c) === 'warn')),
     );
   });
+  // An update flag in any stack: its column as wide in every stack's table (report 94465b).
+  const anyUpdate = $derived(rows.some(hasUpdate));
 
   /** Stacks (compose projects) across hosts first, then loose containers per host. */
   function groupsOf(rs: Row[]) {
@@ -209,9 +226,10 @@
     void resort;
     void rowSet;
     const by = sortBy;
+    const back = sortBack;
     return untrack(() => {
-      const gs = groupsOf(rows).map((g) => ({ ...g, rows: sortRows(g.rows, by, sortKeys) }));
-      const ordered = sortGroups(gs, by, { rows: (g) => g.rows, keys: sortKeys, title: (g) => g.title, loose: (g) => !g.stack });
+      const gs = groupsOf(rows).map((g) => ({ ...g, rows: sortRows(g.rows, by, sortKeys, back) }));
+      const ordered = sortGroups(gs, by, { rows: (g) => g.rows, keys: sortKeys, title: (g) => g.title, loose: (g) => !g.stack }, back);
       return { groups: new Map(ordered.map((g, i) => [g.key, i])), rows: new Map(ordered.flatMap((g) => g.rows).map((r, i) => [`${r.hostId}:${r.c.name}`, i])) };
     });
   });
@@ -332,7 +350,7 @@
     </select>
     <!-- Not while picking: the pick-all box takes its place (on a 343 px phone the filter's word was cut off). -->
     {#if !selecting}
-      <button class="icon-btn" aria-haspopup="dialog" aria-label={t('containers.sortLabel', { by: t(`containers.sort.${sortBy}`) })} title={t('containers.sortLabel', { by: t(`containers.sort.${sortBy}`) })} onclick={() => (sortMenu = true)} data-testid="containers-sort"
+      <button class="icon-btn" aria-haspopup="dialog" aria-label={t('containers.sortLabel', { by: sortWords })} title={t('containers.sortLabel', { by: sortWords })} onclick={() => (sortMenu = true)} data-testid="containers-sort"
         ><Icon name="sort-az" /></button
       >
     {/if}
@@ -425,9 +443,15 @@
         {/if}
       </div>
       <div class="list ctable" class:selecting class:hidden={isFolded(g.key)}>
-        <!-- Column names, on a wide screen where the rows are a table. -->
-        <div class="chead" aria-hidden="true">
-          {#if selecting}<span></span>{/if}<span></span><span>{t('containers.colName')}</span><span>{t('containers.colState')}</span><span class="r">{t('containers.colCpu')}</span><span class="r">{t('containers.colMem')}</span><span>{t('containers.colTrend')}</span><span>{t('containers.colTrendMem')}</span><span></span>
+        <!-- Column names, on a wide screen where the rows are a table; pressed, the order by that column (report faf150). -->
+        <div class="chead">
+          {#if selecting}<span></span>{/if}<span></span>
+          {#each [{ s: 'name', col: t('containers.colName'), r: false }, { s: 'problems', col: t('containers.colState'), r: false }, { s: 'cpu', col: t('containers.colCpu'), r: true }, { s: 'memory', col: t('containers.colMem'), r: true }] as const as h (h.s)}
+            <button type="button" class="colsort" class:r={h.r} class:on={sortBy === h.s} aria-pressed={sortBy === h.s} aria-label={t('containers.sortByCol', { col: h.col })} title={t('containers.sortByCol', { col: h.col })} onclick={() => byColumn(h.s)} data-testid="containers-col-sort"
+              >{#if h.r && sortBy === h.s}<Icon name={sortBack ? 'arrow-up' : 'arrow-down'} size={12} />{/if}{h.col}{#if !h.r && sortBy === h.s}<Icon name={sortBack ? 'arrow-up' : 'arrow-down'} size={12} />{/if}</button
+            >
+          {/each}
+          <span aria-hidden="true">{t('containers.colTrend')}</span><span aria-hidden="true">{t('containers.colTrendMem')}</span><span></span>
         </div>
         {#each g.rows as r (key(r))}
           <!-- Picking: the row itself is the toggle (aria-pressed); the box is
@@ -447,7 +471,7 @@
               <!-- Memory beside CPU, the kept hour first (report 428102). -->
               <span class="c-spark" data-testid="mem-spark"><Sparkline values={r.history?.mem ?? []} at={r.history?.at} label={t('containers.memOf', { name: r.c.name })} format={formatBytesShort} /></span>
             {/if}
-            <span class="c-upd">{#if hasUpdate(r)}<span class="flag upd" data-testid="row-update">{t('updates.available')}</span>{/if}</span>
+            <span class="c-upd">{#if hasUpdate(r)}<span class="flag upd" data-testid="row-update">{t('updates.available')}</span>{:else if anyUpdate}<span class="flag upd room" aria-hidden="true">{t('updates.available')}</span>{/if}</span>
           </button>
         {/each}
       </div>
@@ -695,6 +719,10 @@
   .c-upd {
     grid-area: upd;
   }
+  /* The flag's room, kept in a table's row without one (below); a phone's row has no columns to keep. */
+  .room {
+    display: none;
+  }
   .chead {
     display: none;
   }
@@ -706,14 +734,15 @@
   }
   /* A tablet up (720 px) too: the phone's rows stretched over 760 px left the buttons far from the names (A3-WEB-15). */
   @media (min-width: 720px) {
-    /* One table: the rows share its columns (subgrid), so the state is as wide as its longest words
-       (up to 40 characters) and the update column only as wide as a flag in it; the name takes the
-       rest. Each row its own grid of shares, "draait 14 dagen | gezond" broke over two lines beside
-       an empty update column (report 6fa349). The name never under 16 characters (UIB-07). */
+    /* One table: the rows share its columns (subgrid); the name takes the rest. Each row its own grid
+       of shares, "draait 14 dagen | gezond" broke over two lines beside an empty update column (report
+       6fa349). The name never under 16 characters (UIB-07). The state's width set, not its longest
+       words, and the update column as wide as a flag in every stack once one stack has one: sized by
+       what each table held, no two stacks had their columns in one line (report 94465b). */
     /* The first and last columns "auto": a row's own padding is part of them in a subgrid (a fixed
        10 px for the dot left it against the name). */
     .ctable:not(.hidden) {
-      --cols: minmax(16ch, 1fr) fit-content(40ch) 58px 64px 76px 76px auto;
+      --cols: minmax(16ch, 1fr) minmax(14ch, 36ch) 58px 64px 76px 76px auto;
       display: grid;
       grid-template-columns: auto var(--cols);
       column-gap: 14px;
@@ -745,6 +774,10 @@
     .c-spark {
       display: block;
     }
+    .room {
+      display: inline;
+      visibility: hidden;
+    }
     .c-upd {
       text-align: right;
       /* The last column also on a stopped container's row, which has no numbers before it. */
@@ -761,12 +794,35 @@
     }
     .chead .r {
       text-align: right;
+      justify-content: flex-end;
+    }
+    /* A column's name, pressed for its order (report faf150): the words as they were, the order in use marked. */
+    .colsort {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      min-width: 0;
+      padding: 0;
+      border: 0;
+      background: none;
+      font: inherit;
+      color: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+    .colsort.on {
+      color: var(--text);
+    }
+  }
+  @media (hover: hover) and (min-width: 720px) {
+    .colsort:hover {
+      color: var(--text);
     }
   }
   /* A tablet: the same columns, closer together. */
   @media (min-width: 720px) and (max-width: 899px) {
     .ctable:not(.hidden) {
-      --cols: minmax(12ch, 1fr) fit-content(20ch) 52px 64px 76px 76px auto;
+      --cols: minmax(12ch, 1fr) minmax(10ch, 20ch) 52px 64px 76px 76px auto;
       column-gap: 10px;
     }
   }

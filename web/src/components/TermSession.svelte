@@ -106,11 +106,14 @@
     // Untracked: a kept one is replayed right here, and what its handlers
     // read must not make this effect run again (it did, in a loop).
     const c = untrack(() => attach(id, {
-      snapshot(snap, cols, rows, m, sh) {
+      snapshot(snap, cols, rows, m, sh, again) {
         mode = m;
         terminalState.mode = m;
         shell = sh;
         v.reset(snap, cols, rows);
+        // Drawn again on our asking (onreflow): the screen only. Fitted and sent as a size here, it went
+        // out while a keyboard slid (report b00aad), and a fit to another size asked for it again.
+        if (again) return;
         // Opening a session makes this the active device.
         owner = true;
         v.refit(true);
@@ -216,6 +219,7 @@
       ontyped?.(d);
     }}
     onresize={(cols, rows, active) => conn?.send({ t: 'resize', cols, rows, active })}
+    onreflow={() => mode && conn?.send({ t: 'redraw' })}
     {onswipe}
     onforget={forgetCommand}
     canSend={connState === 'open'}

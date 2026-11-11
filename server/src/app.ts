@@ -405,7 +405,7 @@ export async function buildApp(deps: AppDeps): Promise<BurrowApp> {
   registerLintRoutes(app, ctx, files, fileGuard);
   const uptime = new UptimeMonitor(ctx, deps.fetch ?? fetch, null);
   registerAppRoutes(app, ctx, files, frames, deps.fetch, uptime);
-  registerAndroidRoutes(app, ctx);
+  registerAndroidRoutes(app, ctx, SERVER_VERSION, deps.fetch);
   registerDirectRoutes(app, ctx);
   const docker = new DockerMonitor(ctx, files);
   // Kept CPU and memory per container (report 428102); the list starts with its last hour.

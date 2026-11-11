@@ -313,7 +313,7 @@ test("a container's details open on a phone held sideways: they scroll in their 
   await expect(page.getByTestId('container-history')).toHaveCount(0);
 });
 
-test('containers in the order chosen: by name, the busiest, the most memory or problems first, kept on this device (report d36ec8)', async ({ page }) => {
+test("containers in the order chosen: by name, the busiest, the most memory or problems first, kept on this device; also by a column's name, pressed again the other way round (reports d36ec8, faf150)", async ({ page }) => {
   await signIn(page);
   // A stack of four on the first host's snapshot, with stats that stay put (that host's later changes left out).
   const MB = 1048576;
@@ -383,6 +383,97 @@ test('containers in the order chosen: by name, the busiest, the most memory or p
   await expect(page.getByTestId('containers-sort')).toHaveAttribute('aria-label', 'Order: Problems first');
   await choose('By name');
   await expect.poll(order).toEqual(['sort-a', 'sort-b', 'sort-c', 'sort-d']);
+  // A column's name pressed (report faf150): the same order as the menu's, for every stack;
+  // pressed again, the other way round (those not measured still last).
+  const col = (name: string) => stack.getByTestId('containers-col-sort').filter({ hasText: name });
+  await col('CPU').click();
+  await expect.poll(order).toEqual(['sort-b', 'sort-d', 'sort-a', 'sort-c']);
+  await expect(col('CPU')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('containers-sort')).toHaveAttribute('aria-label', 'Order: Busiest first (CPU)');
+  await col('CPU').click();
+  await expect.poll(order).toEqual(['sort-a', 'sort-d', 'sort-b', 'sort-c']);
+  await expect(page.getByTestId('containers-sort')).toHaveAttribute('aria-label', 'Order: Busiest first (CPU), the other way round');
+  await lookAt(page, 'containers-col-sort');
+  await col('Name').click();
+  await expect.poll(order).toEqual(['sort-a', 'sort-b', 'sort-c', 'sort-d']);
+  await col('Name').click();
+  await expect.poll(order).toEqual(['sort-d', 'sort-c', 'sort-b', 'sort-a']);
+  await col('Status').click();
+  await expect.poll(order).toEqual(['sort-c', 'sort-a', 'sort-b', 'sort-d']);
+  await col('Memory').click();
+  await col('Memory').click();
+  await expect.poll(order).toEqual(['sort-b', 'sort-a', 'sort-d', 'sort-c']);
+  // Kept on this device, the way round too.
+  await page.reload();
+  await expect.poll(order).toEqual(['sort-b', 'sort-a', 'sort-d', 'sort-c']);
+  // The menu's choice starts the usual way round.
+  await choose('By name');
+  await expect.poll(order).toEqual(['sort-a', 'sort-b', 'sort-c', 'sort-d']);
+});
+
+test("a container's details on a computer: CPU and memory said once, the history's range clear of the details' scrollbar (report 73982d)", async ({ page }) => {
+  await signIn(page);
+  const hosts = await api<{ id: number; address: string }[]>(page, 'GET', '/api/hosts');
+  const id = hosts.find((h) => h.address === DOCKER_HOST)!.id;
+  // The computer of the report.
+  await page.setViewportSize({ width: 1528, height: 794 });
+  await page.goto(`/#/containers/${id}/burrowtest-web`);
+  await expect(page.getByTestId('log-line').first()).toBeVisible({ timeout: 20_000 });
+  await page.getByTestId('container-info').click();
+  await expect(page.getByTestId('container-history')).toBeVisible();
+  // CPU and memory now are in the state line on a computer: not again in the last hour's lines
+  // under it, the history below already draws them (reported: "cpu en geheugen staan nu dubbel").
+  await expect(page.getByTestId('container-info')).toContainText('CPU');
+  await expect(page.getByTestId('container-meters')).toBeHidden();
+  // The range kept off the details' right edge, where their scrollbar runs (it touched it).
+  const more = page.getByTestId('container-more');
+  const edge = await more.evaluate((e) => e.getBoundingClientRect().left + e.clientLeft + e.clientWidth);
+  const range = (await page.getByTestId('container-history-range').boundingBox())!;
+  expect(edge - (range.x + range.width), 'room between the range and the scrollbar').toBeGreaterThanOrEqual(6);
+  await lookAt(page, 'container-info-wide');
+  // A phone has no numbers in its state line: there the last hour's lines say them.
+  await page.setViewportSize({ width: 698, height: 434 });
+  await expect(page.getByTestId('container-meters')).toBeVisible();
+});
+
+test("the columns of every stack's table in one line: a long state or an update flag in one stack moves no other's (report 94465b)", async ({ page }) => {
+  await signIn(page);
+  // Two stacks on the first host's snapshot: one with short states, one with a long one and an image with an update.
+  const at = new Date(Date.now() - 3_600_000).toISOString();
+  const c = (name: string, project: string, image: string, restarts: number, health: string | null) => ({ id: name, name, image, imageId: `sha256:${name}`, state: 'running', health, restarts, startedAt: at, finishedAt: null, exitCode: 0, oomKilled: false, createdAt: at, project, service: name, configFiles: null, workingDir: null });
+  let into: number | null = null;
+  await page.routeWebSocket(/\/api\/docker\/ws/, (ws) => {
+    const server = ws.connectToServer();
+    server.onMessage((m) => {
+      const j = JSON.parse(String(m)) as { t: string; host?: { hostId: number; containers: unknown[]; stats: Record<string, unknown> }; d?: { hostId: number } };
+      if (j.t === 'host' && j.host && (into === null || into === j.host.hostId)) {
+        into = j.host.hostId;
+        j.host.containers.push(c('align-short', 'alignshort', 'nginx:1-align', 0, null), c('align-long', 'alignlong', 'nginx:2-align', 12, 'healthy'));
+        Object.assign(j.host.stats, { 'align-short': { cpu: 1, memBytes: 1048576, memLimitBytes: 0 }, 'align-long': { cpu: 1, memBytes: 1048576, memLimitBytes: 0 } });
+        return ws.send(JSON.stringify(j));
+      }
+      if (j.t === 'delta' && j.d?.hostId === into) return;
+      ws.send(m);
+    });
+  });
+  // The update said for that image on every host (the snapshot's host is not known before the page asks).
+  const hostIds = await page.evaluate(async () => ((await (await fetch('/api/hosts')).json()) as { id: number }[]).map((h) => h.id));
+  await page.route(/\/api\/docker\/updates(\?|$)/, async (r) => {
+    if (r.request().method() !== 'GET') return r.fallback();
+    const o = (await (await r.fetch()).json()) as { checks: Record<string, unknown>[] };
+    for (const hostId of hostIds) o.checks.push({ hostId, image: 'nginx:2-align', status: 'update', localDigest: null, remoteDigest: null, error: null, source: null, version: null, newerTag: null, checkedAt: at });
+    await r.fulfill({ json: o });
+  });
+  await page.goto('/#/containers');
+  await page.reload();
+  const long = page.getByTestId('stack').filter({ hasText: 'alignlong' });
+  await expect(long.getByTestId('row-update')).toBeVisible();
+  await expect(page.getByTestId('stack').filter({ hasText: 'alignshort' }).locator('.crow')).toHaveCount(1);
+  // Each column name's left edge, per stack: the same in every one.
+  const edges = await page.getByTestId('stack').evaluateAll((ss) => ss.map((s) => [...s.querySelectorAll('.chead > *')].map((e) => Math.round(e.getBoundingClientRect().left))));
+  expect(edges.length).toBeGreaterThan(1);
+  for (const e of edges) expect(e, 'the columns as in the first stack').toEqual(edges[0]);
+  await lookAt(page, 'containers-aligned');
 });
 
 test("a part that could not be read says so with Try again: the stacks brought down, a host's alert limits (audit 2026-11-09)", async ({ page }) => {

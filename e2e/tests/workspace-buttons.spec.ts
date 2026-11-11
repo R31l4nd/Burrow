@@ -326,6 +326,22 @@ test('the rail lists the hosts; one opens its menu (a wide screen only)', async 
   await page.setViewportSize({ width: 1280, height: 720 });
 });
 
+test("a host's remembered commands opened from the rail's menu: the list shows (report 63e44b)", async ({ page }) => {
+  // The rail's menu is there only while open: closed for the list, it took the list with it, and
+  // the button opened nothing (the Hosts page keeps its menu, so it worked there).
+  await page.goto('/#/containers');
+  await page.getByTestId('rail-host').filter({ hasText: 'test-sshd' }).click();
+  const sheet = page.getByRole('dialog', { name: 'test-sshd', exact: true });
+  await expect(sheet).toBeVisible();
+  await sheet.getByText('Completion and history').click();
+  await sheet.getByTestId('history-manage').click();
+  await expect(page.getByRole('dialog', { name: 'Remembered commands on test-sshd' })).toBeVisible();
+  await expect(page.getByTestId('history-search')).toBeVisible();
+  await expect(sheet).toBeHidden();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('history-search')).toBeHidden();
+});
+
 test('adding a host: the button in the title bar, on a wide screen and on a phone (no round one over the list, decision 25)', async ({ page }) => {
   await page.goto('/#/hosts');
   await page.getByTestId('hosts-add-top').click();

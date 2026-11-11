@@ -191,6 +191,14 @@ Each GitHub release also carries an APK signed with the project's key
 update only over an app signed with the same key: once you use one kind,
 stay with it, or uninstall the app first (pairing again afterwards).
 
+Burrow can offer that release APK itself: when it offers none, or one older
+than Burrow, an admin finds *Get the app X from GitHub* under Settings ->
+Android app. Burrow then downloads `burrow.apk` and `burrow.apk.json` from
+the release of the version it runs (some 30 MB), keeps the APK only when it
+is that version and its SHA-256 is the one `burrow.apk.json` names, and
+offers it to the phones from then on. Nothing is fetched until an admin
+presses it. With your own signing key, keep using `make apk`.
+
 ## Upgrade, roll back, recover
 
 ### Upgrade

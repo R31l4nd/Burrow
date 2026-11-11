@@ -77,8 +77,8 @@ describe('bad input on every route', () => {
     const bodies: unknown[] = [null, [], 'text', 12, { id: 'x', path: '../../etc/passwd', name: 'x'.repeat(5000) }, { hostId: -1, hostIds: ['a'], port: 70000 }];
     const wrong: string[] = [];
     for (const r of api()) {
-      // A few routes end the session or the server's state for the rest.
-      if (/logout|sign-?out|account\/sessions|setup\/|restart|self-?update|backups\/restore/i.test(r.url)) continue;
+      // A few routes end the session or the server's state for the rest; one fetches from GitHub (its own test, android.test.ts).
+      if (/logout|sign-?out|account\/sessions|setup\/|restart|self-?update|backups\/restore|fetch-release/i.test(r.url)) continue;
       const tries: [string, unknown][] = [[fill(r.url, 'odd'), undefined]];
       if (r.method !== 'GET' && r.method !== 'DELETE') for (const b of bodies) tries.push([fill(r.url), b]);
       for (const [url, body] of tries) {
@@ -127,6 +127,8 @@ const MUST_STEP_UP = [
   'DELETE /api/hosts/:id',
   'POST /api/hosts/:id/trust',
   'POST /api/hosts/:id/install-key',
+  // The app every phone that updates from here installs (report a5ace5).
+  'POST /api/android/fetch-release',
   'PUT /api/users/:id',
   'DELETE /api/users/:id',
   'DELETE /api/users/:id/sso',
