@@ -67,6 +67,19 @@ program in Burrow's tmux drawn right after a switch of tabs.
   machine a pass took longer than a confirmation lasts. Two more tests
   steady on a busy machine: Firefox's report form waits for its
   screenshot, and masking a long line is bounded at 2 s, not 250 ms.
+  The alerts test checks the test hosts' packages first: their security
+  updates' alerts came at a moment of their own and were counted with the
+  crash.
+- The direct route on a phone no longer puts a "limited completion" row
+  above the terminal when typing starts, as Burrow's own terminal page on a
+  phone: the terminal lost a row while typing, and once was not fitted
+  again (its last rows under the edge).
+
+### Security
+
+- The app's WireGuard built with Go 1.27.4 (was 1.27.2): GO-2026-6859 in
+  net/http, which the tunnel's HTTP relay calls. shfmt in the image and
+  the gate's Go checks on the same Go.
 
 ### Verified
 

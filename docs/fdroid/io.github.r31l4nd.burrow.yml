@@ -31,8 +31,8 @@ Builds:
       - tar -xJf /tmp/node.tar.xz -C /opt
       - ln -s /opt/node-v24.22.2-linux-x64/bin/node /opt/node-v24.22.2-linux-x64/bin/npm /usr/local/bin/
       # Go for the app's own WireGuard (android/wg), bound with gomobile.
-      - curl -fsSLo /tmp/go.tgz https://go.dev/dl/go1.27.2.linux-amd64.tar.gz
-      - echo "ecbadb99091a3f46e31f5f934b068b1864eafa7995211b39eaddf76996045fe5  /tmp/go.tgz" | sha256sum -c -
+      - curl -fsSLo /tmp/go.tgz https://go.dev/dl/go1.27.4.linux-amd64.tar.gz
+      - echo "7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840  /tmp/go.tgz" | sha256sum -c -
       - tar -C /usr/local -xzf /tmp/go.tgz
       - GOPATH=/opt/gotools GOBIN=/usr/local/bin /usr/local/go/bin/go install golang.org/x/mobile/cmd/gomobile@v0.0.0-20260908204917-8b95e45f8d3e golang.org/x/mobile/cmd/gobind@v0.0.0-20260908204917-8b95e45f8d3e
     ndk: 30.0.16248370

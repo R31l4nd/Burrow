@@ -56,8 +56,8 @@ RUN curl -sSL -o /tmp/gradle.zip "https://services.gradle.org/distributions/grad
 # with the SHA-256 from go.dev/dl; gomobile and gobind by version through
 # the module proxy (checked against sum.golang.org).
 ARG NDK_VERSION=30.0.16248370
-ARG GO_VERSION=1.27.2
-ARG GO_SHA256=ecbadb99091a3f46e31f5f934b068b1864eafa7995211b39eaddf76996045fe5
+ARG GO_VERSION=1.27.4
+ARG GO_SHA256=7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840
 ARG GOMOBILE_VERSION=v0.0.0-20260908204917-8b95e45f8d3e
 RUN sdkmanager --install "ndk;${NDK_VERSION}" > /dev/null \
  && curl -sSL -o /tmp/go.tgz "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" \

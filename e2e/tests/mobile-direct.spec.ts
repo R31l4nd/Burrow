@@ -172,12 +172,19 @@ for (const pass of PASSES) {
     await hostRow('nas').click();
     await expect(page.locator('.xterm-rows')).toContainText('tester@nas:~$');
     await shot('terminal');
+    const boxHeight = () => page.locator('.term-wrap').evaluate((e) => e.getBoundingClientRect().height);
+    const before = await boxHeight();
     await page.getByRole('button', { name: tr(pass.lang, 'term.snippets') }).click();
     const snippets = page.locator('dialog[data-tour=direct-snippets][open]');
     await expect(snippets).toContainText('Restart the media stack');
     await shot('snippets');
     await snippets.getByRole('button', { name: tr(pass.lang, 'snippets.paste') }).first().click();
     await expect(snippets).toBeHidden();
+    // Typing starts on a phone: the terminal keeps its rows. A "limited completion" row came above it
+    // then, the box 23 px lower and the terminal not fitted again in a CI run (2.24.0): 41 rows cut.
+    await expect(page.locator('.xterm-rows')).toContainText('df -h /');
+    await page.waitForTimeout(500);
+    expect(await boxHeight(), 'the terminal box keeps its height when typing starts').toBe(before);
     await page.getByRole('button', { name: tr(pass.lang, 'term.sessions') }).click();
     const menu = page.locator('dialog[data-tour=direct-menu][open]');
     await expect(menu).toBeVisible();

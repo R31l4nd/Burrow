@@ -85,6 +85,12 @@ test('a crash arrives as a push; Analyse gives a cause', async ({ page }) => {
   await channel.scrollIntoViewIfNeeded();
   await shoot(page, 'desktop-channels');
 
+  // The test hosts offer two security updates (a local apt repository: workspace-packages), and each
+  // host says so in a Host health alert once, when its packages are first checked: with the
+  // statistics, at a moment of their own. Checked now, before the Alerts tab reads them all: one
+  // came after it in a gate, and the count said 3 for the one crash (2026-11-11).
+  await Promise.allSettled(all.map((x) => api(page, 'POST', `/api/hosts/${x.id}/packages`)));
+
   // The Alerts tab: Docker on the host is watched.
   await page.goto('/#/alerts');
   await expect(page.getByTestId('watching')).toContainText('docker-real', { timeout: 20_000 });

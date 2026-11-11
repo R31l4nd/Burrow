@@ -14,6 +14,7 @@
   import { remembered } from './history.js';
   import { t } from '../lib/i18n/index.svelte.js';
   import { prefs } from '../lib/sessions.svelte.js';
+  import { keyBars } from '../lib/keyboard.svelte.js';
   import { direct } from './bridge.js';
 
   // One direct SSH session, drawn by the same TermView as Burrow's own
@@ -176,7 +177,9 @@
     <button class="icon-btn" aria-label={t('term.sessions')} onclick={() => (menuOpen = true)}><Icon name="more" /></button>
   </header>
 
-  {#if limited && !shell?.integration}
+  <!-- Not on a phone, as on Burrow's own terminal page: the row came when typing started and took
+       a row from the terminal while typing (a CI run of 2.24.0 showed it cut, not fitted again). -->
+  {#if limited && !shell?.integration && !keyBars.show}
     <div class="status-row"><span class="badge">{t('term.limited')}</span></div>
   {/if}
 
