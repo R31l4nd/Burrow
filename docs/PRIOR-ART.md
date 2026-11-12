@@ -86,6 +86,12 @@ Checked 2026-10-06.
   many groups. Taken over (reports 42f337, 1d2fd4): a pane alone and back
   from its head (button or double click), and the split button as a layout
   of one to four panes from the open sessions.
+- **Windows Terminal**, **VS Code** (terminal tabs) and the browsers open a
+  tab's menu on a right click: rename, close, split or duplicate; VS Code
+  also renames on a double click. Taken over (report 076380): a right click
+  brings the tab in front with Burrow's menu for it (rename, share, close);
+  the double click and a phone's long press still rename. Not taken over: a
+  menu of its own at the pointer, a second list of the same actions.
 - A browser's password manager fills form fields, never a terminal (xterm
   draws its own text). **iTerm2**'s Password Manager types a saved password
   into the session ("Enter Password", and a trigger on a sudo prompt can

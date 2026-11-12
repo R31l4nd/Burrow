@@ -330,6 +330,22 @@ async function tour(page: Page, vp: (typeof VARIANTS)[number][0], size: { width:
     { name: 'folder-sheet', url: `/#/files/${sshd.id}?p=~`, open: (p, T) => click(p, T('files.more')) },
     { name: 'files-search', url: `/#/files/${sshd.id}?p=~`, open: (p, T) => click(p, T('files.search')) },
     { name: 'files-new', url: `/#/files/${sshd.id}?p=~`, open: async (p, T) => (await click(p, T('files.more')), click(p, T('files.newFolder'))) },
+    // A folder only root may read (report 4d30e6): refused with Open with sudo, sudo asking its password, then shown as root.
+    { name: 'files-denied', url: `/#/files/${sshd.id}?p=%2Fsrv%2Fburrowtest-root`, ready: (p) => expect(p.getByTestId('files-open-as-root')).toBeVisible() },
+    { name: 'files-sudo-ask', url: `/#/files/${sshd.id}?p=%2Fsrv%2Fburrowtest-root&sudo=1`, ready: (p) => expect(p.getByTestId('files-sudo-password')).toBeVisible() },
+    {
+      name: 'files-as-root',
+      url: `/#/files/${sshd.id}?p=%2Fsrv%2Fburrowtest-root&sudo=1`,
+      noDialog: true,
+      ready: (p) => expect(p.getByTestId('files-sudo-password')).toBeVisible(),
+      open: async (p) => {
+        const form = p.getByTestId('files-sudo-password');
+        await form.locator('input[type=password]').fill('burrow-test-password');
+        await form.locator('button[type=submit]').click();
+        await expect(p.getByTestId('files-as-root')).toBeVisible();
+        await expect(p.getByTestId('file-row')).toHaveCount(3);
+      },
+    },
     { name: 'sessions', url: '/#/term' },
     { name: 'terminal', url: `/#/term/${term.id}`, ready: (p) => expect(p.locator('.xterm').first()).toBeVisible() },
     // On a phone the top bar keeps only the tabs and the menu: these two are in the menu there.

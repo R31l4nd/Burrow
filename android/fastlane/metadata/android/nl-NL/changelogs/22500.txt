@@ -1,0 +1,1 @@
+Het log van een container volgt op een telefoon lange regels weer tot het eind. Een map die alleen root mag lezen, opent met sudo: om te kijken en de bestanden te bewerken. Rechtsklik op een terminaltab opent het menu. Met het toetsenbord omhoog bedekt de rij suggesties de regel waarop je typt niet meer. De details van een container tonen CPU en geheugen op een telefoon één keer.

@@ -1,3 +1,13 @@
+<script module lang="ts">
+  // A right click on a tab behind: its page opens with its menu (the page is made anew per session).
+  let menuOnOpen = false;
+  function takeMenuOnOpen() {
+    const open = menuOnOpen;
+    menuOnOpen = false;
+    return open;
+  }
+</script>
+
 <script lang="ts">
   import { scrollCue } from '../lib/scrollcue.js';
   import { keyBars } from '../lib/keyboard.svelte.js';
@@ -255,7 +265,7 @@
     for (const p of shown) if (p !== pid) refs[p]?.send(data);
   }
 
-  let switcherOpen = $state(false);
+  let switcherOpen = $state(takeMenuOnOpen());
   // A phone's width: the top bar keeps only the tabs and the menu.
   const narrowQuery = typeof window !== 'undefined' ? matchMedia('(max-width: 599px)') : null;
   const narrow = $state({ on: narrowQuery?.matches ?? false });
@@ -345,6 +355,19 @@
     if (holdTimer) clearTimeout(holdTimer);
     holdTimer = null;
     setTimeout(() => (pressed = false), 0);
+  }
+  // A right click on a tab: that one in front and its menu (rename, share, close), as tabs on a computer
+  // do (report 076380). A finger's hold sends a context menu too on Android (report fa1a85): there the
+  // hold renames, no menu over it.
+  let tabPointer = 'mouse';
+  function tabMenu(e: MouseEvent, id: string) {
+    e.preventDefault();
+    if (tabPointer !== 'mouse') return;
+    letGo();
+    if (id === active) return void (switcherOpen = true);
+    menuOnOpen = !split;
+    pick(id);
+    if (split) switcherOpen = true;
   }
 
   async function newHere() {
@@ -460,7 +483,8 @@
     <div use:scrollCue class="tabs" role="tablist" bind:this={tabStrip}>
       {#each tabs as s (s.id)}
         <!-- Its own name, or the host's: "test-sshd", "test-sshd 2". The one
-             in front: renamed by a double click or a long press. -->
+             in front: renamed by a double click or a long press; a right click
+             brings it in front with its menu (report 076380). -->
         <button
           role="tab"
           class="tab"
@@ -474,7 +498,8 @@
           ondrop={(e) => (e.preventDefault(), dropTab(s.id))}
           onclick={() => !pressed && pick(s.id)}
           ondblclick={() => s.id === active && void rename()}
-          onpointerdown={() => s.id === active && hold()}
+          onpointerdown={(e) => ((tabPointer = e.pointerType), e.button === 0 && s.id === active && hold())}
+          oncontextmenu={(e) => tabMenu(e, s.id)}
           onpointerup={letGo}
           onpointerleave={letGo}
           onkeydown={(e) => tabKey(e, s.id) || (s.id === active && e.key === 'Delete' && void closeThis())}

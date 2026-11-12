@@ -510,7 +510,8 @@
       {/if}
     </div>
 
-    {#if bookmarks.length || recent.length > 1}
+    <!-- Not as root: they lead to other folders, as root too (the tour: with them the bars took a phone's room). -->
+    {#if !asRoot && (bookmarks.length || recent.length > 1)}
       <div use:scrollCue class="quick">
         {#each bookmarks as b (b.id)}<button class="chip-link" onclick={() => nav(b.path)}><Icon name="star" size={12} /> {b.name}</button>{/each}
         {#each recent.filter((r) => r !== listing?.path && !bookmarks.some((b) => b.path === r)).slice(0, 4) as r (r)}
@@ -522,7 +523,7 @@
     {#if asRoot && !needSudoPw}
       <!-- Said on every folder shown as root, with the way back to the host user (report 4d30e6). -->
       <div class="alert warn small asroot" data-testid="files-as-root">
-        <span><Icon name="key" size={14} /> {t('files.asRoot')}</span>
+        <span><Icon name="key" size={14} /> {t('files.asRoot')} <HelpTip text={t('help.filesAsRoot')} /></span>
         <button class="btn small" onclick={leaveRoot} data-testid="files-leave-root">{t('files.leaveRoot')}</button>
       </div>
     {/if}
@@ -692,6 +693,14 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
+    /* Clear of the list under it (the tour: it touched the header row). */
+    margin-bottom: 8px;
+  }
+  /* Its way back a trailing action on the banner's line, as in a list row: on a line of its own it took
+     a phone's room above the folder (the tour's check of the bars above the content). */
+  .asroot > .btn {
+    width: auto;
+    flex: none;
   }
   .sudo-offer {
     display: flex;
@@ -709,6 +718,11 @@
   .sudo-pw input {
     flex: 1;
     min-width: 0;
+  }
+  /* On one line: "Openen met sudo" wrapped on a small phone, taller than the field beside it (the tour). */
+  .sudo-pw button {
+    flex: none;
+    white-space: nowrap;
   }
   .pathrow {
     display: flex;

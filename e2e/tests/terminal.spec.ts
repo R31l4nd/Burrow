@@ -197,6 +197,43 @@ test('on the tabs: + opens another session on the host, a double click renames, 
   await expect(page.getByRole('tab', { selected: true }).getByTestId('term-tab-close')).toHaveCount(1);
 });
 
+test("a right click on a terminal tab: that tab in front and its menu, to rename it there; a finger's hold still renames, no menu too (report 076380)", async ({ page }) => {
+  await signIn(page);
+  await page.getByRole('button', { name: /^test-sshd/ }).first().click();
+  await expect(page).toHaveURL(/#\/term\//);
+  await expect(page.getByTestId('term-tab').first()).toBeVisible();
+  const first = (await page.getByRole('tab', { selected: true }).textContent())!.trim();
+  await page.getByTestId('term-new').click();
+  // The new one in front, the first one behind it.
+  await expect(page.getByRole('tab', { selected: true })).not.toHaveText(first);
+  const made = (await page.getByRole('tab', { selected: true }).textContent())!.trim();
+  const behind = page.getByRole('tab', { name: first, exact: true });
+  await expect(behind).toHaveAttribute('aria-selected', 'false');
+  const name = first;
+  // Reported: "rechtermuisknop op terminal tabbladen ... nu moet je lang drukken om de naam te wijzigen".
+  await behind.click({ button: 'right' });
+  await expect(page.getByRole('tab', { selected: true })).toHaveText(name);
+  await expect(page.getByTestId('term-rename')).toBeVisible();
+  await page.getByTestId('term-rename').click();
+  await page.getByTestId('confirm-input').fill('logs');
+  await page.getByTestId('confirm-ok').click();
+  await expect(page.getByRole('tab', { selected: true })).toHaveText('logs');
+  // A finger held on the tab: Android sends the hold's context menu too (report fa1a85); the hold renames, the menu stays shut.
+  const front = page.getByRole('tab', { selected: true });
+  await front.dispatchEvent('pointerdown', { pointerType: 'touch', button: 0, isPrimary: true });
+  await front.dispatchEvent('contextmenu', { button: 2 });
+  await expect(page.getByTestId('confirm-input')).toBeVisible();
+  await expect(page.getByTestId('term-rename')).toBeHidden();
+  await page.getByTestId('confirm-input').fill('');
+  await page.getByTestId('confirm-ok').click();
+  await expect(page.getByRole('tab', { selected: true })).not.toHaveText('logs');
+  // The one it made closed from its menu too: the specs after this one share the sessions.
+  await page.getByRole('tab', { name: made, exact: true }).click({ button: 'right' });
+  await page.getByRole('button', { name: 'Close this session' }).click();
+  await page.getByTestId('confirm-ok').click();
+  await expect(page.getByRole('tab', { name: made, exact: true })).toHaveCount(0);
+});
+
 test("switching terminal tabs keeps each one connected: no new connection, and what came meanwhile shows at once", async ({ page }) => {
   // Report cfdea9: every switch connected again and drew the screen anew.
   const sockets: string[] = [];

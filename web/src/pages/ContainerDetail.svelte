@@ -16,7 +16,6 @@
   import { toast, inBackground } from '../lib/ui.svelte.js';
   import { checkOf, loadUpdates, updates } from '../lib/updates.svelte.js';
   import LogView from '../components/LogView.svelte';
-  import Sparkline from '../components/Sparkline.svelte';
   import HistoryChart from '../components/HistoryChart.svelte';
   import { data, loadAll } from '../lib/data.svelte.js';
   import { DockerWatch, formatBytesShort, since } from '../lib/docker.svelte.js';
@@ -36,7 +35,6 @@
   const host = $derived(watch.hosts[hostId]);
   const c = $derived(host?.containers.find((x) => x.name === name));
   const st = $derived(c ? host?.stats[c.id] : undefined);
-  const hist = $derived(c ? host?.history[c.id] : undefined);
   const hostName = $derived(data.hosts.find((h) => h.id === hostId)?.name ?? '');
   let showInfo = $state(false);
 
@@ -298,11 +296,11 @@
         <!-- Scrolled in their own part, the state line above them and the log below staying put (report 5d0b33). -->
         <div class="more" data-content data-testid="container-more">
         {#if st}
-          <!-- The last hour's lines where the state line has no numbers (a phone): on a computer it says them,
-               and the history below draws them; there they were said twice (report 73982d). -->
+          <!-- CPU and memory now where the state line has no numbers (a phone): in words only, the history
+               below draws them; on a computer the state line says them (reports 73982d, fd6d27). -->
           <div class="meters narrow-only" data-testid="container-meters">
-            <div class="meter"><span class="dim small">CPU {st.cpu.toFixed(1)}%</span><Sparkline values={hist?.cpu ?? []} width={140} height={28} label="CPU" format={(v) => `${v.toFixed(1)}%`} /></div>
-            <div class="meter"><span class="dim small">{t('containers.memory')} {st.memKnown === false ? t('containers.memUnknown') : formatBytesShort(st.memBytes)}</span><Sparkline values={hist?.mem ?? []} width={140} height={28} label={t('containers.memory')} format={formatBytesShort} /></div>
+            <span class="dim small">CPU {st.cpu.toFixed(1)}%</span>
+            <span class="dim small">{t('containers.memory')} {st.memKnown === false ? t('containers.memUnknown') : formatBytesShort(st.memBytes)}</span>
           </div>
         {/if}
         <section class="kept stack" aria-label={t('stats.history')} data-testid="container-history">
@@ -622,11 +620,6 @@
     gap: 16px;
     flex-wrap: wrap;
     margin-top: 8px;
-  }
-  .meter {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
   }
   .info {
     display: grid;

@@ -456,6 +456,11 @@ test('a folder only root may read: opened with sudo to look and to edit its file
   await expect(page.locator('.alert.error')).toContainText('/srv/burrowtest-root');
   // The path says the folder refused, not "/" (as the report's picture had it).
   await expect(page.getByRole('navigation', { name: 'Path' }).getByRole('button', { name: 'burrowtest-root', exact: true })).toHaveAttribute('aria-current', 'page');
+  // The folders above it in reach from there.
+  await page.getByRole('navigation', { name: 'Path' }).getByRole('button', { name: 'srv', exact: true }).click();
+  await expect(page).toHaveURL(/p=%2Fsrv$/);
+  await page.goBack();
+  await expect(page.locator('.alert.error')).toContainText('/srv/burrowtest-root');
   await page.getByTestId('files-open-as-root').click();
   // This host has no stored password: sudo asks for one, here; a wrong one is said and asked again.
   const form = page.getByTestId('files-sudo-password');
@@ -464,7 +469,7 @@ test('a folder only root may read: opened with sudo to look and to edit its file
   await expect(form).toContainText('not accepted');
   await form.getByLabel('sudo password').fill('burrow-test-password');
   await form.getByRole('button', { name: 'Open with sudo' }).click();
-  await expect(page.getByTestId('files-as-root')).toContainText('Shown as root');
+  await expect(page.getByTestId('files-as-root')).toContainText('As root, through sudo');
   const rows = page.getByTestId('file-row');
   await expect(rows).toHaveCount(3);
   await expect(rows.filter({ hasText: 'current.conf' })).toContainText('-> db.conf');
@@ -478,7 +483,9 @@ test('a folder only root may read: opened with sudo to look and to edit its file
   await expect(page.getByTestId('files-as-root')).toBeVisible();
   await expect(page.getByText('This folder is empty.')).toBeVisible();
   // A file opens in the editor, which reads it through sudo; a hold opens it too, it chooses nothing.
-  await page.goBack();
+  // Up again by the path, still as root.
+  await page.getByRole('navigation', { name: 'Path' }).getByRole('button', { name: 'burrowtest-root', exact: true }).click();
+  await expect(page).toHaveURL(/p=%2Fsrv%2Fburrowtest-root&sudo=1$/);
   await rows.filter({ has: page.locator('.title').getByText('db.conf', { exact: true }) }).getByTestId('file-open').click({ delay: 600 });
   await expect(page).toHaveURL(/#\/edit\/\d+\?p=%2Fsrv%2Fburrowtest-root%2Fdb\.conf/);
   await page.getByTestId('open-sudo').click();

@@ -436,6 +436,26 @@ test("a container's details on a computer: CPU and memory said once, the history
   await expect(page.getByTestId('container-meters')).toBeVisible();
 });
 
+test("a container's details on a phone: CPU and memory now in words, drawn once, in the history (report fd6d27)", async ({ page }) => {
+  await signIn(page);
+  const hosts = await api<{ id: number; address: string }[]>(page, 'GET', '/api/hosts');
+  const id = hosts.find((h) => h.address === DOCKER_HOST)!.id;
+  // The phone of the report, folded (its picture; 396 px high said with the keyboard up for the report's words).
+  await page.setViewportSize({ width: 343, height: 706 });
+  await page.goto(`/#/containers/${id}/burrowtest-web`);
+  await expect(page.getByTestId('log-line').first()).toBeVisible({ timeout: 20_000 });
+  await page.getByTestId('container-info').click();
+  await expect(page.getByTestId('container-history')).toBeVisible();
+  // The numbers now, which the phone's state line has no room for...
+  const meters = page.getByTestId('container-meters');
+  await expect(meters).toContainText('CPU');
+  await expect(meters).toContainText('Memory');
+  // ...but no last hour's lines beside them: the history under them draws the same hour again
+  // (reported: "Wat is het nut van de dubbele CPU/geheugen grafieken?").
+  await expect(meters.locator('svg')).toHaveCount(0);
+  await lookAt(page, 'container-info-phone');
+});
+
 test("the columns of every stack's table in one line: a long state or an update flag in one stack moves no other's (report 94465b)", async ({ page }) => {
   await signIn(page);
   // Two stacks on the first host's snapshot: one with short states, one with a long one and an image with an update.

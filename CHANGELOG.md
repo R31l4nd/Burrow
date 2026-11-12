@@ -6,14 +6,30 @@ says how it was verified.
 
 ## [Unreleased]
 
+## [2.25.0] - 2026-11-12
+
 ### Added
 
 - A folder only root may read opens with sudo from its "No permission" message, for an admin after a step-up, with the host's stored sudo password or one given (kept in that tab only): to look and to open its files in the editor (read and saved through sudo); nothing is moved, added or deleted in it as root (report 4d30e6). The path above a refused folder names it, not "/".
+- A right click on a terminal tab brings it in front with its menu (rename, share, close), as tabs on a computer do; a double click still renames it, a finger's hold on a phone too (report 076380).
 
 ### Fixed
 
 - A container's log on a phone follows again with long lines: they wrap to rows there, and a new line counted at a placeholder's height until it was drawn, so the view stood above the real end and stopped following (report 27519a). The last 100 lines are always drawn.
 - Typing straight into the terminal on a phone with the keyboard up: a row of suggestions that comes no longer covers the line typed on; the terminal follows its cursor when the room for it shrinks (report c2f122).
+- A container's details on a phone draw CPU and memory once, in the history; above it they say the numbers now, without the last hour's lines beside them (report fd6d27).
+
+### Verified
+
+- Each fix with a test that failed on the code before it (integration and
+  e2e), the screens it changes looked at in the tour and at every size.
+- Reports 723e9d, 371c18 and c3b3ab (a Claude Code session garbled after
+  folding the phone, empty rows under it): not Burrow. Ink, the renderer
+  Claude Code uses, leaves the same rows behind in tmux and in xterm.js
+  alone; Burrow shows the screen as tmux has it. Ctrl+L in Claude Code
+  draws it again whole, tried on a stand-in in tmux and in xterm.js.
+- The gate, the Android test on the emulator and a fresh install on a new
+  Debian VM, before the release.
 
 ## [2.24.0] - 2026-11-10
 
