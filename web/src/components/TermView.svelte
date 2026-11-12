@@ -208,11 +208,12 @@
   /** The size the session runs at; ours when we own it, else shown as is. */
   export function applySize(cols: number, rows: number, isOwner: boolean): void {
     if (!isOwner) return inTurn((t) => t.resize(cols, rows));
-    fitHere();
+    const moved = fitHere();
     // Ours, but the session runs at another size (reported while the
     // keyboard or the text box took room): tell it this one, or the program
     // draws for fewer rows than shown and leaves empty rows below it.
     if (term && (term.cols !== cols || term.rows !== rows)) onresize(term.cols, term.rows, false);
+    if (moved) onreflow?.();
   }
 
   // ---- search in what the terminal shows (its scrollback)
@@ -258,11 +259,13 @@
   // A fit to other rows moves what xterm shows (lines go into or come out of its scrollback); when
   // the session keeps its size, nothing draws it again. A tab back in front fitted after the screen
   // was drawn again whole, on a busy phone: two frames through each other (reports d1113b, 92eaa5).
-  function fitHere(): void {
-    if (!term || !fit) return;
+  // Said after the size went out: the screen drawn again is the one at that size (said before it, the
+  // server's copy came at the old size, and the fit after it moved the lines once more: the 2.24.0 gate).
+  function fitHere(): boolean {
+    if (!term || !fit) return false;
     const [cols, rows] = [term.cols, term.rows];
     fit.fit();
-    if (term.cols !== cols || term.rows !== rows) onreflow?.();
+    return term.cols !== cols || term.rows !== rows;
   }
 
   /** Our own fitted size; applied locally only while this device is the active one. */
@@ -278,8 +281,9 @@
     }
     const dims = fit.proposeDimensions();
     if (!dims || !dims.cols || !dims.rows) return;
-    if (owner || active) fitHere();
+    const moved = (owner || active) && fitHere();
     onresize(dims.cols, dims.rows, active);
+    if (moved) onreflow?.();
     if (!softKeyboard.open) rowsDown = dims.rows;
     Object.assign(terminalState, { cols: dims.cols, rows: dims.rows });
   }
@@ -322,6 +326,14 @@
     else if (y + 2 * line > wrapEl.scrollTop + view) wrapEl.scrollTop = Math.ceil(y + 2 * line - view);
     else if (y < wrapEl.scrollTop) wrapEl.scrollTop = Math.max(0, Math.floor(y - line));
   }
+  // The box smaller while the rows are kept (a row of suggestions came under it): the terminal keeps
+  // its size, so nothing else scrolls; the line typed on went under that row (report c2f122).
+  $effect(() => {
+    if (!wrapEl) return;
+    const ro = new ResizeObserver(() => followCursor());
+    ro.observe(wrapEl);
+    return () => ro.disconnect();
+  });
   // For the input recording: how the terminal was set when a report is made.
   $effect(() => void (terminalState.compose = prefs.compose));
 

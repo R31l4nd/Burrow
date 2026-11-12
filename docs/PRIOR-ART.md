@@ -111,6 +111,9 @@ Checked 2026-10-06.
 - **Termix** file manager: SFTP with sudo, viewers for code, images, audio and
   video; transfers between servers with integrity checks.
   - Burrow has: sudo saves, resumable uploads, copy between hosts, LSP.
+  - Taken over (report 4d30e6): a folder only root may read, opened with
+    sudo from its "No permission" message, to look and to edit its files;
+    unlike Termix, nothing is moved, added or deleted in it as root.
   - Taken over: a Markdown preview in the editor (report 8fa899), made by
     Burrow's own escaping converter, never the file served as a page.
   - Taken over: a checksum after a copy between hosts (N8): sha256 of every

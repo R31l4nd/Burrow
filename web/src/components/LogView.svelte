@@ -963,6 +963,12 @@
     contain-intrinsic-size: auto 18px;
     cursor: pointer;
   }
+  /* The last lines always drawn: following scrolls to the end as it is. A line not yet drawn counts
+     at its placeholder's 18 px, and on a phone a long line wraps to rows: the view stood above the
+     real end once it was drawn, and stopped following (report 27519a). */
+  .line:nth-last-child(-n + 100) {
+    content-visibility: visible;
+  }
   /* A problem report's picture: every line drawn (lib/bugreport.svelte.ts). */
   :global(html.capturing) .line {
     content-visibility: visible;

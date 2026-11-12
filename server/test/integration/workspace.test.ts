@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { ConnectResult, GitStatus, Host, ReplaceResult, SearchResult, TextFile, Workspace } from '@burrow/shared';
+import type { ConnectResult, DirListing, GitStatus, Host, ReplaceResult, SearchResult, TextFile, Workspace } from '@burrow/shared';
 import { listLimit } from '../../src/workspace/search.js';
 import { makeApp, setupAdmin, type TestApp } from '../helpers.js';
 
@@ -287,6 +287,24 @@ describe('sudo', () => {
     // Owner and mode kept.
     const ls = await run(`stat -c '%U %a' ${path}`);
     expect(ls[0]!.stdout.trim()).toBe('root 600');
+  });
+
+  it('a folder only root may read: refused as the host user, listed through sudo with its links (report 4d30e6)', async () => {
+    const dir = '/srv/burrowtest-root';
+    expect((await t.request('GET', `/api/files/${h.id}/list?path=${encodeURIComponent(dir)}`)).statusCode).toBe(403);
+    const l = await t.json<DirListing>('POST', `/api/files/${h.id}/sudo/list`, { path: `${dir}/` });
+    expect(l).toMatchObject({ path: dir, parent: '/srv' });
+    const by = (n: string) => l.entries.find((e) => e.name === n);
+    expect(l.entries.map((e) => e.name).sort()).toEqual(['conf.d', 'current.conf', 'db.conf']);
+    expect(by('db.conf')).toMatchObject({ path: `${dir}/db.conf`, type: 'file', size: 10, mode: 0o600, owner: 'root', group: 'root' });
+    expect(by('conf.d')).toMatchObject({ type: 'dir' });
+    expect(by('current.conf')).toMatchObject({ type: 'link', target: 'db.conf', targetType: 'file' });
+    expect(Date.parse(by('db.conf')!.mtime)).toBeGreaterThan(0);
+    // Its files open through sudo as any other root file.
+    expect((await t.json<TextFile>('POST', `/api/files/${h.id}/sudo/read`, { path: `${dir}/current.conf` })).content).toBe('port 5432\n');
+    // A wrong password said as such, a file is no folder.
+    expect((await t.request('POST', `/api/files/${h.id}/sudo/list`, { path: dir, password: 'wrong' })).statusCode).toBe(401);
+    expect((await t.request('POST', `/api/files/${h.id}/sudo/list`, { path: `${dir}/db.conf` })).statusCode).toBe(400);
   });
 
   it('a sudo save replaces the file in one step (never truncated first), through a symlink to its target', async () => {

@@ -6,6 +6,15 @@ says how it was verified.
 
 ## [Unreleased]
 
+### Added
+
+- A folder only root may read opens with sudo from its "No permission" message, for an admin after a step-up, with the host's stored sudo password or one given (kept in that tab only): to look and to open its files in the editor (read and saved through sudo); nothing is moved, added or deleted in it as root (report 4d30e6). The path above a refused folder names it, not "/".
+
+### Fixed
+
+- A container's log on a phone follows again with long lines: they wrap to rows there, and a new line counted at a placeholder's height until it was drawn, so the view stood above the real end and stopped following (report 27519a). The last 100 lines are always drawn.
+- Typing straight into the terminal on a phone with the keyboard up: a row of suggestions that comes no longer covers the line typed on; the terminal follows its cursor when the room for it shrinks (report c2f122).
+
 ## [2.24.0] - 2026-11-10
 
 Eleven reports from the computer and the phone: the containers sorted by

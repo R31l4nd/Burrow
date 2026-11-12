@@ -1,3 +1,9 @@
+<script module lang="ts">
+  // The sudo password given for a host's root-only folders (report 4d30e6): in this tab's memory
+  // only, while it goes from folder to folder (each one is a page of its own). Never stored.
+  const sudoPasswords = new Map<number, string>();
+</script>
+
 <script lang="ts">
   import { scrollCue } from '../lib/scrollcue.js';
   import { pullToRefresh } from '../lib/pull.svelte.js';
@@ -34,6 +40,12 @@
   let { hostId: hostProp }: { hostId: number | null } = $props();
   const hostId = untrack(() => hostProp);
   const wanted = untrack(() => route.query.p ?? '~');
+  // A folder only root may read, shown through sudo (report 4d30e6): to look and to open its text
+  // files (the editor reads and saves them through sudo); nothing chosen, moved, added or deleted
+  // as root here. The folders opened from it are shown the same way.
+  const asRoot = untrack(() => route.query.sudo === '1');
+  let needSudoPw = $state(false);
+  let sudoPwInput = $state('');
 
   const PREFS_KEY = 'burrow.files';
   function readPrefs(): { hidden: boolean; sort: 'name' | 'size' | 'mtime'; grid: boolean } {
@@ -98,21 +110,50 @@
   );
   // Refused here: the folders this person may open, to go to (it was a sentence to read and nothing to tap).
   let refusedOpen = $state<string[]>([]);
+  // Refused by the host for the host user: an admin may open it through sudo.
+  let denied = $state(false);
+  function openAsRoot() {
+    go(to(`/files/${hostId}`, { p: route.query.p ?? wanted, sudo: '1' }));
+  }
+  // Back to the host user, one folder up (this one is root's), also while it is still being read.
+  function leaveRoot() {
+    const here = listing?.path ?? wanted;
+    go(to(`/files/${hostId}`, { p: here.replace(/\/+[^/]+\/*$/, '') || '/' }));
+  }
+  function withSudoPassword(e: SubmitEvent) {
+    e.preventDefault();
+    sudoPasswords.set(hostId!, sudoPwInput);
+    sudoPwInput = '';
+    void load();
+  }
 
   async function load(path = listing?.path ?? wanted) {
     if (hostId === null) return;
     loading = true;
     error = '';
+    denied = false;
     refusedOpen = [];
     try {
-      const l = await get<DirListing>(`/api/files/${hostId}/list?path=${encodeURIComponent(path)}`);
-      // Kept by what was asked and by where it is ("~" and /home/you alike).
-      remember(`files:${hostId}:${path}`, l);
-      listing = remember(`files:${hostId}:${l.path}`, l);
+      const pw = sudoPasswords.get(hostId);
+      const l = asRoot
+        ? await post<DirListing>(`/api/files/${hostId}/sudo/list`, { path, ...(pw !== undefined ? { password: pw } : {}) })
+        : await get<DirListing>(`/api/files/${hostId}/list?path=${encodeURIComponent(path)}`);
+      needSudoPw = false;
+      // Kept by what was asked and by where it is ("~" and /home/you alike); what root may read not.
+      if (asRoot) listing = l;
+      else {
+        remember(`files:${hostId}:${path}`, l);
+        listing = remember(`files:${hostId}:${l.path}`, l);
+      }
       selected = new Set();
       rememberRecent(listing.path);
     } catch (err) {
       error = errorMessage(err);
+      denied = err instanceof ApiFailure && err.code === 'permission_denied';
+      if (asRoot && err instanceof ApiFailure && (err.code === 'sudo_password' || err.code === 'sudo_wrong_password')) {
+        sudoPasswords.delete(hostId);
+        needSudoPw = true;
+      }
       if (err instanceof ApiFailure && err.code === 'no_file_access') {
         await myAccess;
         refusedOpen = myFolders(hostId);
@@ -128,7 +169,8 @@
   // And by itself, when the page is seen again and every few seconds while it is (report 905455, as a
   // workspace's tree): quietly, the selection kept, a failed read leaving the list as it was.
   async function freshen() {
-    if (hostId === null || !listing || loading) return;
+    // Not as root: sudo every few seconds in the host's log, for a folder of root's.
+    if (hostId === null || !listing || loading || asRoot) return;
     const at = listing.path;
     const l = await get<DirListing>(`/api/files/${hostId}/list?path=${encodeURIComponent(at)}`).catch(() => null);
     if (!l || listing?.path !== at || loading) return;
@@ -141,7 +183,8 @@
   $effect(() => keepFresh(() => void freshen()));
 
   if (hostId !== null) {
-    listing = lastSeen<DirListing>(`files:${hostId}:${wanted}`);
+    // What root may read is not kept in the browser.
+    listing = asRoot ? null : lastSeen<DirListing>(`files:${hostId}:${wanted}`);
     void load(wanted);
     get<Bookmark[]>(`/api/files/${hostId}/bookmarks`)
       .then((b) => (bookmarks = b))
@@ -186,19 +229,22 @@
   });
   const images = $derived(entries.filter((e) => e.type !== 'dir' && openKind(e.name) === 'image'));
   const crumbs = $derived.by(() => {
-    const p = listing?.path ?? '/';
+    // Not read (refused, not there): the folder asked for, not "/" over its error (report 4d30e6).
+    const p = listing?.path ?? (wanted.startsWith('/') ? wanted : '/');
     const parts = p.split('/').filter(Boolean);
     return [{ name: '/', path: '/' }, ...parts.map((name, i) => ({ name, path: `/${parts.slice(0, i + 1).join('/')}` }))];
   });
   const isDir = (e: FileEntry) => e.type === 'dir' || (e.type === 'link' && e.targetType === 'dir');
 
   function nav(path: string) {
-    go(to(`/files/${hostId}`, { p: path }));
+    go(to(`/files/${hostId}`, asRoot ? { p: path, sudo: '1' } : { p: path }));
   }
 
   function open(e: FileEntry) {
     if (selected.size) return toggle(e);
     if (isDir(e)) return nav(e.path);
+    // As root, every file goes to the editor, which reads it through sudo (and says so when it is no text).
+    if (asRoot) return go(to(`/edit/${hostId}`, { p: e.path }));
     const kind = openKind(e.name);
     if (kind === 'text') return go(to(`/edit/${hostId}`, { p: e.path }));
     if (kind === 'image') {
@@ -238,6 +284,8 @@
   let pressed = false;
   let byTouch = false;
   function press(e: FileEntry) {
+    // Nothing chosen as root: there is nothing to do with it there.
+    if (asRoot) return;
     pressed = false;
     timer = setTimeout(() => {
       pressed = true;
@@ -311,7 +359,7 @@
   let dropDir = $state<string | null>(null);
   const dropTarget = (ev: DragEvent) => (ev.target as HTMLElement | null)?.closest<HTMLElement>('[data-dir]')?.dataset.dir ?? listing?.path ?? null;
   function onDragOver(ev: DragEvent) {
-    if (!admin || !listing || !hostId || !dragsFiles(ev)) return;
+    if (!admin || asRoot || !listing || !hostId || !dragsFiles(ev)) return;
     ev.preventDefault();
     if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'copy';
     dropDir = dropTarget(ev);
@@ -320,7 +368,7 @@
     if (!(ev.currentTarget as HTMLElement).contains(ev.relatedTarget as Node | null)) dropDir = null;
   }
   function onDrop(ev: DragEvent) {
-    if (!admin || !listing || !hostId || !dragsFiles(ev)) return;
+    if (!admin || asRoot || !listing || !hostId || !dragsFiles(ev)) return;
     ev.preventDefault();
     const dir = dropTarget(ev);
     dropDir = null;
@@ -434,9 +482,9 @@
     <header class="topbar">
       <button class="icon-btn" aria-label={t('files.title')} onclick={() => go('/files')}><Icon name="back" /></button>
       <h1>{host?.name ?? ''}</h1>
-      <button class="icon-btn labeled" aria-label={t('files.search')} title={t('files.search')} onclick={() => (searchOpen = true)}><Icon name="search" /><span class="wide-only" aria-hidden="true">{t('files.search')}</span></button>
+      {#if !asRoot}<button class="icon-btn labeled" aria-label={t('files.search')} title={t('files.search')} onclick={() => (searchOpen = true)}><Icon name="search" /><span class="wide-only" aria-hidden="true">{t('files.search')}</span></button>{/if}
       <!-- Operators read; uploading and the folder's menu are the admin's. -->
-      {#if admin}
+      {#if admin && !asRoot}
         <button class="icon-btn labeled" aria-label={t('files.upload')} title={t('files.upload')} disabled={!listing} onclick={pickUpload}><Icon name="upload" /><span class="wide-only" aria-hidden="true">{t('files.upload')}</span></button>
         <button class="icon-btn" aria-label={t('files.more')} title={t('files.more')} onclick={() => ((sheetItem = null), (sheetOpen = true))}><Icon name="more" /></button>
       {/if}
@@ -456,7 +504,7 @@
         {#if loading}<span class="dim small" aria-live="polite">...</span>{/if}
       </nav>
       {#if admin}
-        <button class="icon-btn star" class:on={bookmarks.some((b) => b.path === listing?.path)} aria-pressed={bookmarks.some((b) => b.path === listing?.path)} aria-label={t('files.bookmark')} title={t('files.bookmark')} onclick={toggleBookmark}
+        <button class="icon-btn star" class:on={bookmarks.some((b) => b.path === listing?.path)} aria-pressed={bookmarks.some((b) => b.path === listing?.path)} aria-label={t('files.bookmark')} title={t('files.bookmark')} disabled={!listing} onclick={toggleBookmark}
           ><Icon name="star" size={18} /></button
         >
       {/if}
@@ -471,8 +519,31 @@
       </div>
     {/if}
 
-    {#if error}
+    {#if asRoot && !needSudoPw}
+      <!-- Said on every folder shown as root, with the way back to the host user (report 4d30e6). -->
+      <div class="alert warn small asroot" data-testid="files-as-root">
+        <span><Icon name="key" size={14} /> {t('files.asRoot')}</span>
+        <button class="btn small" onclick={leaveRoot} data-testid="files-leave-root">{t('files.leaveRoot')}</button>
+      </div>
+    {/if}
+    {#if needSudoPw}
+      <form class="sudo-pw" onsubmit={withSudoPassword} data-testid="files-sudo-password">
+        <label for="files-sudo-pw">{t('editor.sudoPassword')}</label>
+        <div class="row">
+          <input id="files-sudo-pw" type="password" autocomplete="off" bind:value={sudoPwInput} />
+          <button class="btn primary" type="submit">{t('files.openAsRoot')}</button>
+        </div>
+        <p class="dim small">{error}</p>
+      </form>
+    {:else if error}
       <p class="alert error">{error}</p>
+      {#if denied && admin && !asRoot}
+        <!-- Root's folder: through sudo, to look and to open its files (report 4d30e6). -->
+        <div class="sudo-offer">
+          <button class="btn" onclick={openAsRoot} data-testid="files-open-as-root"><Icon name="key" size={16} /> {t('files.openAsRoot')}</button>
+          <HelpTip text={t('help.filesAsRoot')} />
+        </div>
+      {/if}
       {#if refusedOpen.length}
         <div class="list">
           {#each refusedOpen as f (f)}
@@ -506,12 +577,12 @@
               onpointerleave={release}
               oncontextmenu={(ev) => {
                 ev.preventDefault();
-                if (byTouch) return;
+                if (byTouch || asRoot) return;
                 release();
                 openMenu(e);
               }}
             >
-              {#if prefs.grid && openKind(e.name) === 'image' && !isDir(e)}
+              {#if prefs.grid && !asRoot && openKind(e.name) === 'image' && !isDir(e)}
                 <img class="thumb" src={rawUrl(hostId, e.path)} alt="" loading="lazy" />
               {:else}
                 <span class="ico" class:dir={isDir(e)}><Icon name={icon(e)} /></span>
@@ -531,17 +602,17 @@
               {/if}
             </button>
             <!-- A tile too: the hold chooses on a phone, so its menu is here (report fa1a85). -->
-            <button class="icon-btn" aria-label={t('files.menuFor', { name: e.name })} onclick={() => openMenu(e)} data-testid="file-menu"><Icon name="more" size={20} /></button>
+            {#if !asRoot}<button class="icon-btn" aria-label={t('files.menuFor', { name: e.name })} onclick={() => openMenu(e)} data-testid="file-menu"><Icon name="more" size={20} /></button>{/if}
           </div>
         {/each}
       </div>
     {/if}
   </div>
 
-  {#if clipboard.hostId !== null && !selected.size}
+  {#if clipboard.hostId !== null && !selected.size && !asRoot}
     <div class="actionbar" role="toolbar" aria-label={t('files.clipboard')} bind:offsetHeight={barH} use:footBar>
       <span class="count">{t(clipboard.move ? 'files.toMove' : 'files.toCopy', { n: clipboard.paths.length, host: clipboard.hostName })}</span>
-      <button class="btn small primary" onclick={paste} data-testid="paste">{t('files.pasteHere')}</button>
+      <button class="btn small primary" onclick={paste} disabled={!listing} data-testid="paste">{t('files.pasteHere')}</button>
       <button class="icon-btn" aria-label={t('common.cancel')} onclick={clearClipboard}><Icon name="close" size={18} /></button>
     </div>
   {/if}
@@ -614,6 +685,31 @@
 {/if}
 
 <style>
+  /* As root: what it means, and the way back, on one row where there is room. */
+  .asroot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .sudo-offer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sudo-pw {
+    display: grid;
+    gap: 6px;
+  }
+  .sudo-pw .row {
+    display: flex;
+    gap: 8px;
+  }
+  .sudo-pw input {
+    flex: 1;
+    min-width: 0;
+  }
   .pathrow {
     display: flex;
     align-items: center;

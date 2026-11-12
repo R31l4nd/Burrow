@@ -26,7 +26,7 @@ import { actor, HttpError, idParam, noContent, parse, requireAuth } from '../htt
 import { exec } from '../ssh/connect.js';
 import { git, needsIdentity, parseStatus, statusCommand, parseRepos, reposCommand, unsafeSetting } from './git.js';
 import { filesCommand, insideRoot, parseFiles, parseSearch, replaceAll, searchCommand } from './search.js';
-import { sudoRead, sudoWrite } from './sudo.js';
+import { sudoList, sudoRead, sudoWrite } from './sudo.js';
 
 // Workspaces (phase 7): a folder on a host as a project. The editor itself
 // is the one files already have; this adds the saved workspaces, quick
@@ -379,6 +379,16 @@ export function registerWorkspaceRoutes(app: FastifyInstance, ctx: Ctx, pool: Sf
     const f = await pool.with(hostId, ({ client }) => sudoRead(client, b.path, sudoPassword(hostId, b.password)));
     audit(ctx, actor(req), 'file.sudo_read', b.path, { hostId });
     return f;
+  });
+
+  // A folder only root may read, to look in and open its files through sudo (report 4d30e6).
+  app.post('/api/files/:hostId/sudo/list', { config: { stepUp: true } }, async (req) => {
+    const b = parse(z.object({ path: absPath, password: z.string().max(500).optional() }), req.body);
+    const hostId = hostOf(req);
+    const path = posix.normalize(b.path).replace(/(.)\/+$/, '$1');
+    const l = await pool.with(hostId, ({ client, home }) => sudoList(client, home, path, sudoPassword(hostId, b.password)));
+    audit(ctx, actor(req), 'file.sudo_list', path, { hostId });
+    return l;
   });
 
   app.put('/api/files/:hostId/sudo/text', { bodyLimit: TEXT_SAVE_BODY_LIMIT, config: { stepUp: true } }, async (req, reply) => {

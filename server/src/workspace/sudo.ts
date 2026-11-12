@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
+import { posix } from 'node:path';
 import type { Client, SFTPWrapper } from 'ssh2';
-import type { TextFile } from '@burrow/shared';
+import type { DirListing, FileEntry, FileType, TextFile } from '@burrow/shared';
 import { MAX_TEXT_BYTES, oneAtATime, realTarget, savableBytes, sha256, utf8Text } from '../files/service.js';
 import { HttpError } from '../http.js';
 import { exec } from '../ssh/connect.js';
@@ -55,6 +56,36 @@ export async function sudoRead(client: Client, path: string, password: string | 
   if (bytes.subarray(0, 8192).includes(0)) throw new HttpError(415, 'binary', 'This looks like a binary file.');
   const content = utf8Text(bytes);
   return { path, content, hash: sha256(bytes), size: Number(size), mtime: new Date(Number(mtime) * 1000).toISOString(), mode: parseInt(mode, 8) };
+}
+
+const TYPES: Record<string, FileType> = { f: 'file', d: 'dir', l: 'link' };
+const LISTING_BYTES = 8 << 20;
+
+/**
+ * A folder only root may read, listed through sudo (report 4d30e6): to look and to open its text
+ * files through sudoRead, nothing changed in it. GNU find's -printf, every field ended by a NUL (a
+ * name may hold any other byte); a link's target and the type of what it points to (N: none).
+ */
+export async function sudoList(client: Client, home: string, path: string, password: string | null): Promise<DirListing> {
+  const fields = '%y\\0%Y\\0%s\\0%T@\\0%m\\0%u\\0%g\\0%l\\0%f\\0';
+  const cmd = `${sudo(password)} sh -c '[ -d "$1" ] || { echo "not a folder" >&2; exit 3; }; find "$1/" -mindepth 1 -maxdepth 1 -printf "${fields}"' _ ${shellQuote(path)}`;
+  const r = await exec(client, cmd, 20_000, LISTING_BYTES, password !== null ? `${password}\n` : undefined);
+  const fail = sudoFailure(r.stderr);
+  if (fail) throw fail;
+  if (r.code === 3) throw new HttpError(400, 'not_a_folder', `${path} is not a folder.`);
+  if (r.code !== 0) throw new HttpError(r.stderr.includes('No such file') ? 404 : 400, 'sudo_failed', r.stderr.trim().split('\n').pop() || 'sudo failed');
+  const parts = r.stdout.split('\0');
+  const entries: FileEntry[] = [];
+  for (let i = 0; i + 9 <= parts.length; i += 9) {
+    const [y = '', ty = '', size = '0', mtime = '0', mode = '0', owner = '', group = '', target = '', name = ''] = parts.slice(i, i + 9);
+    const e: FileEntry = { name, path: path === '/' ? `/${name}` : `${path}/${name}`, type: TYPES[y] ?? 'other', size: Number(size), mtime: new Date(Math.floor(Number(mtime)) * 1000).toISOString(), mode: parseInt(mode, 8), owner, group };
+    if (e.type === 'link') {
+      e.target = target;
+      e.targetType = ty === 'N' || ty === 'L' ? 'broken' : (TYPES[ty] ?? 'other');
+    }
+    entries.push(e);
+  }
+  return { path, parent: path === '/' ? null : posix.dirname(path), home, entries };
 }
 
 export async function sudoWrite(

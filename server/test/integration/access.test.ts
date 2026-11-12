@@ -118,6 +118,7 @@ const MUST_STEP_UP = [
   'PUT /api/docker/updates/settings',
   'POST /api/files/:hostId/delete',
   'POST /api/files/:hostId/sudo/read',
+  'POST /api/files/:hostId/sudo/list',
   'PUT /api/files/:hostId/sudo/text',
   'POST /api/hosts/:id/guests/:kind/:vmid/:action',
   // The package lists refreshed through sudo (report 1f6c0c).

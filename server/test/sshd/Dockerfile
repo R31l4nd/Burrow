@@ -11,7 +11,8 @@ RUN apt-get update \
  && mkdir -p /run/sshd \
  && ssh-keygen -A \
  && echo 'tester ALL=(ALL) ALL' > /etc/sudoers.d/tester \
- && printf 'listen 80;\n' > /etc/burrowtest.conf && chmod 600 /etc/burrowtest.conf
+ && printf 'listen 80;\n' > /etc/burrowtest.conf && chmod 600 /etc/burrowtest.conf \
+ && mkdir -m 700 /srv/burrowtest-root && printf 'port 5432\n' > /srv/burrowtest-root/db.conf && chmod 600 /srv/burrowtest-root/db.conf && mkdir /srv/burrowtest-root/conf.d && ln -s db.conf /srv/burrowtest-root/current.conf
 COPY --chmod=755 docker /usr/local/bin/docker
 # No systemd in a container: stand-ins for the units and their journal,
 # which the test user may read as a member of the journal's group.

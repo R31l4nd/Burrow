@@ -813,6 +813,34 @@ test("a foldable with the keyboard up, typing straight into the terminal: the te
   await page.getByTestId('compose-toggle').uncheck();
 });
 
+test('the keyboard up, typing straight into the terminal: a row of suggestions that comes does not cover the line typed on (report c2f122)', async ({ page }) => {
+  // With the keyboard up the terminal keeps its rows, scrolled to its cursor. The suggestions'
+  // row came under it while typing, the box smaller, and nothing scrolled: the row lay over the
+  // line typed on (a foldable's inner screen, 698 x 355).
+  await page.setViewportSize({ width: 698, height: 698 });
+  await signIn(page);
+  const hostId = await page.evaluate(async () => ((await (await fetch('/api/hosts')).json()) as { id: number; name: string }[]).find((h) => h.name === 'test-sshd')!.id);
+  const s = await page.evaluate((id) => fetch('/api/terminal/sessions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ hostId: id, tmux: 'never' }) }).then((r) => r.json() as Promise<{ id: string }>), hostId);
+  await page.goto(`/#/term/${s.id}`);
+  const rows = page.locator('[data-testid=terminal] .xterm-rows');
+  await expect(rows).toContainText('$', { timeout: 20_000 });
+  const ta = page.locator('[data-testid=terminal] textarea');
+  await ta.focus();
+  await page.setViewportSize({ width: 698, height: 355 });
+  await page.waitForTimeout(400);
+  // The screen full, the prompt on the last row.
+  await page.keyboard.type('seq 1 80; echo filled-up\n');
+  await expect(rows).toContainText('filled-up');
+  await page.keyboard.type('se');
+  const row = page.getByTestId('suggestions');
+  await expect(row.getByRole('option').first()).toBeVisible();
+  await page.waitForTimeout(400);
+  const [line, under] = [await rows.locator(':scope > div').filter({ hasText: /\$ se\s*$/ }).last().boundingBox(), await row.boundingBox()];
+  expect(line && under && line.y + line.height <= under.y + 1, `the line typed on (${line?.y}+${line?.height}) above the row (${under?.y})`).toBe(true);
+  await page.keyboard.press('Control+c');
+  await page.setViewportSize({ width: 698, height: 698 });
+});
+
 test("the keyboard up over an assistant: its input line and the three lines under it stay in sight", async ({ page }) => {
   // Reported (c7f699): Claude Code in a tmux attach shows its input line with
   // the box's edge and two status lines under it; with the keyboard up the
@@ -1585,6 +1613,16 @@ for (const [how, tmuxMode] of [["Burrow's tmux", 'always'], ['a tmux of your own
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
       await page.locator('[data-testid=terminal] textarea').focus();
       await same(`after tab ${n}`);
+    }
+    // A foldable folded and opened again while the program draws, on the busy phone: the terminal of
+    // other columns drawn again at its new size, not at the one before it (report 723e9d: the letters
+    // of the inner screen's frames through those of the outer one).
+    for (const [what, size] of [['folded', { width: 343, height: 711 }], ['opened', { width: 698, height: 750 }]] as const) {
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+      await page.setViewportSize(size);
+      await page.waitForTimeout(1500);
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+      await same(what);
     }
     await run(`${ours} kill-session -t burrow-${s.id.replace(/[^A-Za-z0-9]/g, 'x')}; ${ours} kill-session -t burrow-${other.id.replace(/[^A-Za-z0-9]/g, 'x')}; ${own} kill-server; rm -f ${ink}`);
   });

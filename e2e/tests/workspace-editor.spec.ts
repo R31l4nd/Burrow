@@ -449,6 +449,53 @@ test('a root file anyone may read: read only at once with Edit with sudo, saved 
   expect(out!.stdout.trim()).toBe('root 644\n# via sudo');
 });
 
+test('a folder only root may read: opened with sudo to look and to edit its files, nothing to change in it as root (report 4d30e6)', async ({ page }) => {
+  await signIn(page);
+  const sshd = await hostNamed(page, 'test-sshd');
+  await page.goto(`/#/files/${sshd}?p=${encodeURIComponent('/srv/burrowtest-root')}`);
+  await expect(page.locator('.alert.error')).toContainText('/srv/burrowtest-root');
+  // The path says the folder refused, not "/" (as the report's picture had it).
+  await expect(page.getByRole('navigation', { name: 'Path' }).getByRole('button', { name: 'burrowtest-root', exact: true })).toHaveAttribute('aria-current', 'page');
+  await page.getByTestId('files-open-as-root').click();
+  // This host has no stored password: sudo asks for one, here; a wrong one is said and asked again.
+  const form = page.getByTestId('files-sudo-password');
+  await form.getByLabel('sudo password').fill('not-it');
+  await form.getByRole('button', { name: 'Open with sudo' }).click();
+  await expect(form).toContainText('not accepted');
+  await form.getByLabel('sudo password').fill('burrow-test-password');
+  await form.getByRole('button', { name: 'Open with sudo' }).click();
+  await expect(page.getByTestId('files-as-root')).toContainText('Shown as root');
+  const rows = page.getByTestId('file-row');
+  await expect(rows).toHaveCount(3);
+  await expect(rows.filter({ hasText: 'current.conf' })).toContainText('-> db.conf');
+  // Nothing to choose, move, add or delete as root: no menus, no upload, no search.
+  await expect(page.getByTestId('file-menu')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Upload' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Search' })).toHaveCount(0);
+  // A folder in it is shown as root too, with the password given (no second ask).
+  await rows.filter({ hasText: 'conf.d' }).getByTestId('file-open').click();
+  await expect(page).toHaveURL(/p=%2Fsrv%2Fburrowtest-root%2Fconf\.d&sudo=1/);
+  await expect(page.getByTestId('files-as-root')).toBeVisible();
+  await expect(page.getByText('This folder is empty.')).toBeVisible();
+  // A file opens in the editor, which reads it through sudo; a hold opens it too, it chooses nothing.
+  await page.goBack();
+  await rows.filter({ has: page.locator('.title').getByText('db.conf', { exact: true }) }).getByTestId('file-open').click({ delay: 600 });
+  await expect(page).toHaveURL(/#\/edit\/\d+\?p=%2Fsrv%2Fburrowtest-root%2Fdb\.conf/);
+  await page.getByTestId('open-sudo').click();
+  const pw = page.getByRole('dialog', { name: 'sudo password' });
+  await pw.getByLabel('sudo password').fill('burrow-test-password');
+  await pw.getByRole('button', { name: 'Next' }).click();
+  await expect(page.locator('.cm-content')).toContainText('port 5432');
+  // Stop sudo: back to the host user, one folder up.
+  await page.goto(`/#/files/${sshd}?p=${encodeURIComponent('/srv/burrowtest-root')}&sudo=1`);
+  await page.getByTestId('files-leave-root').click();
+  await expect(page).toHaveURL(/p=%2Fsrv$/);
+  await expect(page.getByTestId('files-as-root')).toHaveCount(0);
+  // In the audit log as a folder listed with sudo.
+  const audit = await api<{ action: string; target: string }[]>(page, 'GET', '/api/audit?limit=50');
+  expect(audit.some((a) => a.action === 'file.sudo_list' && a.target === '/srv/burrowtest-root/conf.d')).toBe(true);
+});
+
 test('root files through sudo; favourite folders across hosts', async ({ page }) => {
   await sayYes(page);
   await signIn(page);
