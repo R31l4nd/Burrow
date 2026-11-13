@@ -6,6 +6,10 @@ says how it was verified.
 
 ## [Unreleased]
 
+### Fixed
+
+- The tabs atop a terminal on a phone no longer move up and get cut off at the top while swiping between them: every row that scrolls sideways (tabs, chips, keys, paths) now scrolls sideways only (report e020bc). A new layout check finds any row laid out side by side that scrolls up and down too.
+
 ## [2.25.0] - 2026-11-12
 
 ### Added

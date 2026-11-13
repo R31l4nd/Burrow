@@ -1439,6 +1439,28 @@ test('a long press on the tab in front renames it on a phone', async ({ page }) 
   await expect(page.getByRole('tab', { selected: true })).not.toHaveText('held-name');
 });
 
+test('the tabs atop a terminal on a phone scroll sideways only: scrolled over, none moves up or is cut off at the top (report e020bc)', async ({ page }) => {
+  // Reported: swiping between the tabs moved them up and down, sometimes cut off at the top. A row
+  // that scrolls sideways scrolls up and down too (CSS makes the other direction auto), and the
+  // close mark's finger room in the tab in front reached below the row.
+  await signIn(page);
+  await page.getByRole('button', { name: /^test-sshd/ }).first().click();
+  await expect(page).toHaveURL(/#\/term\//);
+  const front = page.getByRole('tab', { selected: true });
+  await expect(front).toBeVisible();
+  const strip = page.locator('.term-top [role=tablist]');
+  // The checks too (with a finger, as here, the close mark has its finger room): no box scrolls by a few pixels.
+  await lookAt(page, 'phone-terminal-tabs');
+  const box = (await strip.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.wheel(10, 60);
+  await page.waitForTimeout(300);
+  expect(await strip.evaluate((e) => e.scrollTop)).toBe(0);
+  const tab = (await front.boundingBox())!;
+  expect(tab.y).toBeGreaterThanOrEqual(box.y);
+  expect(tab.y + tab.height).toBeLessThanOrEqual(box.y + box.height + 0.5);
+});
+
 test('the charts of a host: a finger on one shows that moment in all of them', async ({ page }) => {
   // Reported (4af4ec): no values to see in the charts on a phone.
   await signIn(page);

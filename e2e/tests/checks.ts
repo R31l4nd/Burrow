@@ -332,6 +332,21 @@ export async function buttonsInSight(page: Page, where: string) {
       .map((e) => e.textContent!.trim().slice(0, 60)),
   );
   expect.soft(wide, `folding headers wider than their row (${where})`).toEqual([]);
+  // A row laid out side by side (tabs, chips, keys) that scrolls sideways scrolls up and down too
+  // unless told not to (CSS makes the other direction auto): the tabs atop a terminal moved up
+  // under a swipe, cut off at the top (report e020bc). A column that scrolls is a list, not this.
+  const sliver = await page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>('body *')]
+      .filter((e) => {
+        const s = getComputedStyle(e);
+        const row = s.display.endsWith('flex') && s.flexDirection.startsWith('row') && s.flexWrap === 'nowrap';
+        const sideways = s.overflowX === 'auto' || s.overflowX === 'scroll';
+        const upDown = s.overflowY === 'auto' || s.overflowY === 'scroll';
+        return row && sideways && upDown && e.scrollHeight - e.clientHeight > 1 && e.getClientRects().length && !e.closest('.xterm, .cm-editor');
+      })
+      .map((e) => `${e.tagName.toLowerCase()}.${[...e.classList].join('.')} (${e.scrollHeight - e.clientHeight} px)`),
+  );
+  expect.soft(sliver, `rows that scroll sideways and up and down too (${where})`).toEqual([]);
 }
 
 /**

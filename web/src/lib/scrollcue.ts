@@ -5,6 +5,10 @@
  * as it or its content changes size.
  */
 export function scrollCue(node: HTMLElement) {
+  // Sideways only: CSS makes a row that scrolls sideways scroll up and down too, and a few pixels
+  // that reach below it (a close mark's finger room) let a swipe move its tabs up, cut off at the
+  // top (report e020bc).
+  node.style.overflowY = 'hidden';
   const update = () => {
     const more = node.scrollWidth - node.clientWidth > 1;
     const atStart = node.scrollLeft <= 1;
