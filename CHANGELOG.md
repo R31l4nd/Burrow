@@ -18,6 +18,7 @@ says how it was verified.
 - A container's log on a phone follows again with long lines: they wrap to rows there, and a new line counted at a placeholder's height until it was drawn, so the view stood above the real end and stopped following (report 27519a). The last 100 lines are always drawn.
 - Typing straight into the terminal on a phone with the keyboard up: a row of suggestions that comes no longer covers the line typed on; the terminal follows its cursor when the room for it shrinks (report c2f122).
 - A container's details on a phone draw CPU and memory once, in the history; above it they say the numbers now, without the last hour's lines beside them (report fd6d27).
+- The Dutch app says the errors of Files and the editor in Dutch too ("Geen toegang tot ...", copying, archives, saving); they were in English.
 
 ### Verified
 

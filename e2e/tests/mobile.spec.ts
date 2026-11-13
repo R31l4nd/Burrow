@@ -26,6 +26,8 @@ async function ownHost(page: Page): Promise<void> {
 }
 
 test('works on a phone: sign in, search, open a host', async ({ page }) => {
+  // Many pages in one go (every Settings page's buttons among them): 27-29 s of the default 30, 35 s on a busy gate.
+  test.setTimeout(90_000);
   await signIn(page);
   // No horizontal scrolling at phone width.
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

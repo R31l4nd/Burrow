@@ -103,8 +103,10 @@ function serverErrors(): { code: string; samples: string[]; file: string }[] {
   const out: { code: string; samples: string[]; file: string }[] = [];
   for (const m of src.matchAll(/new HttpError\(/g)) {
     const end = closing(src, m.index + m[0].length - 1);
-    const args = splitTop(src.slice(m.index + m[0].length, end), /,/);
-    const code = /^'([a-z_0-9]+)'$/.exec(args[1] ?? '')?.[1];
+    // A trailing comma (a call over several lines) is no argument.
+    const args = splitTop(src.slice(m.index + m[0].length, end), /,/).filter((a) => a.trim());
+    // Either quote: files/service.ts says its codes in double quotes, and these went unchecked ("No permission" in English in the Dutch app).
+    const code = /^\s*(['"])([a-z_0-9]+)\1\s*$/.exec(args[1] ?? '')?.[2];
     if (!code) continue;
     const file = /\/\/@file (\S+)/.exec(src.slice(src.lastIndexOf('//@file ', m.index)))![1]!;
     out.push({ code, samples: args[2] ? samples(args.slice(2).join(', ')) : [code], file });

@@ -524,7 +524,6 @@ export async function treeChecksums(client: Client, parent: string, names: strin
   return parseChecksums(r.stdout, true);
 }
 
-const NOT_UTF8 = "This file is not UTF-8 text: saved from here its other characters would change. Download it instead.";
 
 /**
  * The bytes as text when they are UTF-8; refused otherwise. Decoded with
@@ -535,7 +534,7 @@ export function utf8Text(buf: Buffer): string {
   try {
     return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(buf);
   } catch {
-    throw new HttpError(415, "not_utf8", NOT_UTF8);
+    throw new HttpError(415, "not_utf8", "This file is not UTF-8 text: saved from here its other characters would change. Download it instead.");
   }
 }
 
