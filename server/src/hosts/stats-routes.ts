@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { hostLimitsInput, type DiskActivity, type DiskHistory, type HostLimitsView, type HostSample, type HostStats, type SmartReport } from '@burrow/shared';
+import { hostLimitsInput, type DiskActivity, type DiskHistory, type ProcessList, type HostLimitsView, type HostSample, type HostStats, type SmartReport } from '@burrow/shared';
 import { audit } from '../audit.js';
 import type { Ctx } from '../context.js';
 import { actor, HttpError, idParam, parse } from '../http.js';
@@ -47,6 +47,20 @@ export function registerHostStatsRoutes(app: FastifyInstance, ctx: Ctx, stats: H
     getHost(ctx, id);
     try {
       return await stats.activity(id);
+    } catch (err) {
+      if (err instanceof HttpError) throw err;
+      throw new HttpError(502, 'host_unreachable', (err as Error).message);
+    }
+  });
+
+  // The processes now, busiest and largest (report 387b0e), sampled while the
+  // view is open. Admins only, as the disk activity above: every process's
+  // command line (a password given on one included) and container.
+  app.post('/api/hosts/:id/processes', { config: { auth: 'admin' } }, async (req): Promise<ProcessList> => {
+    const id = idParam(req);
+    getHost(ctx, id);
+    try {
+      return await stats.processes(id);
     } catch (err) {
       if (err instanceof HttpError) throw err;
       throw new HttpError(502, 'host_unreachable', (err as Error).message);

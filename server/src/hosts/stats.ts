@@ -1,5 +1,5 @@
 import { and, eq, gte, lt } from 'drizzle-orm';
-import { judgeDisk, plural, sameDisk, sensorLabel, type DiskActivity, type DiskAttr, type DiskHistory, type DiskUsage, type HostSample, type HostStats, type SmartDisk, type SmartReport, type Temperature } from '@burrow/shared';
+import { judgeDisk, plural, sameDisk, sensorLabel, type DiskActivity, type DiskAttr, type ProcessList, type DiskHistory, type DiskUsage, type HostSample, type HostStats, type SmartDisk, type SmartReport, type Temperature } from '@burrow/shared';
 import type { Ctx } from '../context.js';
 import { hostDiskSamples, hostSamples, hostSmart, hostSmartHistory, hosts } from '../db/schema.js';
 import type { SftpPool } from '../files/pool.js';
@@ -7,6 +7,7 @@ import { HttpError } from '../http.js';
 import { exec } from '../ssh/connect.js';
 import { shellQuote } from '../ssh/quote.js';
 import { activityCommand, counterRows, diskSamples, IO_BEFORE, IO_AFTER, parseActivity, statsIo, SUDO_OK } from './diskio.js';
+import { parseProcesses, processesCommand } from './processes.js';
 import { ownLimits, setOwnLimits, type OwnLimits } from './limits.js';
 import { hostPassword } from './service.js';
 import { eachLimited, type Jobs } from '../jobs.js';
@@ -537,6 +538,33 @@ export class HostStatsService {
       throw new HttpError(502, 'activity_unreadable', said ? `${(err as Error).message} (${said})` : (err as Error).message);
     }
     return { hostId, at: new Date(this.ctx.now()).toISOString(), rootRefused: parsed.asRoot ? null : rootRefused, ...parsed };
+  }
+
+  readonly #processRuns = new Map<number, Promise<ProcessList>>();
+
+  /**
+   * The processes now, busiest and largest (report 387b0e), on demand while
+   * the page asks: one sample at a time per host, shared by whoever asks meanwhile.
+   */
+  processes(hostId: number): Promise<ProcessList> {
+    const running = this.#processRuns.get(hostId);
+    if (running) return running;
+    const run = this.#processesNow(hostId).finally(() => this.#processRuns.delete(hostId));
+    this.#processRuns.set(hostId, run);
+    return run;
+  }
+
+  async #processesNow(hostId: number): Promise<ProcessList> {
+    const r = await this.pool.with(hostId, ({ client }) => exec(client, processesCommand(), 30_000, 1 << 20));
+    if (r.truncated) throw new HttpError(502, 'processes_unreadable', 'The answer was larger than Burrow reads (1 MB).');
+    try {
+      const ids = new Set([...r.stdout.matchAll(/^@@cg .*?([0-9a-f]{64})/gm)].map((m) => m[1]!));
+      const names = ids.size && this.containerNames ? await this.containerNames(hostId).catch(() => new Map<string, string>()) : new Map<string, string>();
+      return { hostId, at: new Date(this.ctx.now()).toISOString(), ...parseProcesses(r.stdout, names) };
+    } catch (err) {
+      const said = r.stderr.trim().split('\n').pop();
+      throw new HttpError(502, 'processes_unreadable', said ? `${(err as Error).message} (${said})` : (err as Error).message);
+    }
   }
 
   /** Each whole disk's rates over each sample interval, oldest first. */

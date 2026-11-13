@@ -93,6 +93,43 @@ test('who reads and writes, as root and as the SSH user only: each process with 
   await unrouteDisk(page);
 });
 
+const PROCS = /\/api\/hosts\/\d+\/processes$/;
+
+test('the processes behind CPU and memory, htop-like: the busiest and the largest, measured only while open (report 387b0e)', async ({ page }) => {
+  await signIn(page);
+  const sshd = await hostNamed(page, 'test-sshd');
+  let asked = 0;
+  page.on('request', (r) => void (PROCS.test(r.url()) && asked++));
+  await page.goto(`/#/hosts/${sshd}/stats`);
+  await expect(page.getByTestId('tile-cpu')).toBeVisible({ timeout: 20_000 });
+  expect(asked).toBe(0);
+
+  // CPU: the test host's own processes (its sshd among them), the busiest first.
+  await page.getByTestId('tile-cpu').click();
+  const d = page.locator('dialog[open][data-tour=processes]');
+  await expect(d.getByTestId('procs-sampled')).toContainText(/Measured over [\d.]+ s/, { timeout: 20_000 });
+  await expect(d.getByTestId('procs-by-cpu')).toHaveAttribute('aria-checked', 'true');
+  await expect(d.getByTestId('proc').filter({ hasText: 'sshd' }).first()).toBeVisible();
+  const cpus = await d.getByTestId('proc').evaluateAll((li) => li.map((x) => Number(/CPU ([\d.]+)%/.exec(x.textContent ?? '')?.[1])));
+  expect(cpus).toEqual([...cpus].sort((a, b) => b - a));
+  // By memory: the largest first, in RAM's words.
+  await d.getByTestId('procs-by-mem').click();
+  await expect(d.getByTestId('procs-by-mem')).toHaveAttribute('aria-checked', 'true');
+  await expect(d.getByTestId('proc').first()).toContainText('RAM');
+  // Measured again while open.
+  await expect.poll(() => asked, { timeout: 20_000 }).toBeGreaterThan(1);
+  await d.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(d).toBeHidden();
+  const closedAt = asked;
+  await page.waitForTimeout(6000);
+  expect(asked).toBe(closedAt);
+
+  // The memory tile opens it by memory.
+  await page.getByTestId('tile-mem').click();
+  await expect(d.getByTestId('procs-by-mem')).toHaveAttribute('aria-checked', 'true');
+  await page.keyboard.press('Escape');
+});
+
 /** SMART as the host might report it: every kind of reason, one disk getting worse since the oldest check kept. */
 async function judged(p: Page, hostId: number, keptFails: boolean) {
   const at = new Date().toISOString();

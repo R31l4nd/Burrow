@@ -118,14 +118,23 @@ export function registerAuthRoutes(
   app.addHook('onResponse', async (req) => release(req));
   app.addHook('onRequestAbort', async (req) => release(req));
 
-  /** Wait out the delay, or refuse when blocked or while another attempt on these keys is checked. */
+  /**
+   * Wait for another attempt on these keys to be checked first (two people behind one router
+   * sign in at the same moment: the second was refused, and the page called it a block,
+   * 2026-11-13), then wait out the delay, or refuse when blocked. Each is checked after the one
+   * before has counted, so attempts sent together still get no further than the block allows.
+   */
   async function gateAttempt(req: FastifyRequest, keys: string[]) {
+    const mine = held.get(req) ?? [];
+    const waitUntil = Date.now() + 10_000;
+    while (keys.some((k) => inFlight.has(k) && !mine.includes(k))) {
+      if (Date.now() > waitUntil) throw new HttpError(429, 'busy', 'Another attempt is still being checked. Try again in a moment.');
+      await new Promise((r) => setTimeout(r, 25));
+    }
     const t = throttle.check(ctx, keys);
     if (t.blockedUntil) {
       throw new HttpError(429, 'blocked', `Too many failed attempts. Try again after ${new Date(t.blockedUntil).toISOString()}.`);
     }
-    const mine = held.get(req) ?? [];
-    if (keys.some((k) => inFlight.has(k) && !mine.includes(k))) throw new HttpError(429, 'busy', 'Another attempt is still being checked. Try again in a moment.');
     for (const k of keys) inFlight.add(k);
     held.set(req, [...new Set([...mine, ...keys])]);
     if (t.delayMs) await throttle.timing.sleep(t.delayMs);

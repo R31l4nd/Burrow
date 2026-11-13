@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { Alert, ConnectResult, DiskActivity, DiskHistory, Host, HostLimitsView, HostSample, HostStats, SmartReport } from '@burrow/shared';
+import type { Alert, ConnectResult, DiskActivity, DiskHistory, Host, HostLimitsView, HostSample, HostStats, ProcessList, SmartReport } from '@burrow/shared';
 import { eq } from 'drizzle-orm';
 import { hosts } from '../../src/db/schema.js';
 import { makeApp, setupAdmin, totpNow, type TestApp } from '../helpers.js';
@@ -147,6 +147,39 @@ describe('host statistics', () => {
       await t.json('POST', '/api/auth/step-up/totp', { code: await totpNow(secret, t) });
       await t.json('POST', '/api/snippets/run', { hostIds: [other.id], command: "sed -i '/burrow-disk-io/d' ~/.ssh/authorized_keys" });
       await t.json('DELETE', `/api/hosts/${other.id}`);
+    }
+  });
+
+  it('the processes now (report 387b0e): a busy one on top with its CPU, user and command line; the largest by memory too', async () => {
+    t.advance(30_000);
+    await t.json('POST', '/api/auth/step-up/totp', { code: await totpNow(secret, t) });
+    const [r] = await t.json<{ exitCode: number; stderr: string }[]>('POST', '/api/snippets/run', {
+      hostIds: [h.id],
+      command: "nohup sh -c 'burrow_burn=1; while :; do :; done' >/dev/null 2>&1 & echo $! > /tmp/burrow-burner.pid",
+    });
+    expect(r!.exitCode, r!.stderr).toBe(0);
+    try {
+      let p: ProcessList | null = null;
+      await expect
+        .poll(
+          async () => {
+            p = await t.json<ProcessList>('POST', `/api/hosts/${h.id}/processes`);
+            return p.top[0]?.command ?? '';
+          },
+          { timeout: 20_000 },
+        )
+        .toContain('burrow_burn');
+      const got = p! as ProcessList;
+      expect(got.seconds).toBeGreaterThan(1);
+      expect(got.cores).toBeGreaterThan(0);
+      expect(got.total).toBeGreaterThan(2);
+      expect(got.top[0]).toMatchObject({ name: 'sh', user: 'tester', container: null });
+      expect(got.top[0]!.cpu).toBeGreaterThan(50);
+      // sshd (root's) is seen too, with its memory: /proc/<pid>/stat is every user's to read.
+      expect(got.top.some((x) => x.user === 'root' && x.memBytes > 0)).toBe(true);
+      expect(Math.max(...got.top.map((x) => x.memBytes))).toBeLessThan(got.memTotal);
+    } finally {
+      await t.json('POST', '/api/snippets/run', { hostIds: [h.id], command: 'kill $(cat /tmp/burrow-burner.pid); rm -f /tmp/burrow-burner.pid' });
     }
   });
 

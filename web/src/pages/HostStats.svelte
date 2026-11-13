@@ -8,6 +8,7 @@
   import ProxmoxGuests from '../components/ProxmoxGuests.svelte';
   import HostPackages from '../components/HostPackages.svelte';
   import DiskDialog from '../components/DiskDialog.svelte';
+  import ProcessDialog from '../components/ProcessDialog.svelte';
   import { perSecond } from '../lib/diskio.js';
   import { pollEvery } from '../lib/poll.js';
   import Icon from '../components/Icon.svelte';
@@ -41,6 +42,9 @@
   // The disk opened for its activity (DiskDialog), by name: its numbers follow the page's.
   let diskName = $state<string | null>(null);
   let diskOpen = $state(false);
+  // The processes (ProcessDialog), by CPU or by memory as the tile pressed.
+  let procsOpen = $state(false);
+  let procsBy = $state<'cpu' | 'mem'>('cpu');
   let smart = $state<SmartReport | null>(null);
   let checking = $state(false);
 
@@ -183,10 +187,16 @@
   {#if error}<p class="alert error small">{error}</p>{/if}
   {#if now}
     <section class="tiles" data-testid="stats-now" data-content>
-      <div class="tile"><span class="dim small">CPU</span><b>{now.cpu}%</b><span class="dim small">{t('stats.cores', { n: now.cores })}</span></div>
-      <div class="tile">
-        <span class="dim small">{t('containers.memory')}</span><b>{pct(now.memUsed, now.memTotal)}%</b><span class="dim small">{formatBytes(now.memUsed)} / {formatBytes(now.memTotal)}</span>
-      </div>
+      <!-- CPU and memory open the processes behind them, for an admin (report 387b0e). -->
+      {#snippet cpuTile()}<span class="tlabel dim small">CPU{#if admin}<Icon name="chevron" size={14} />{/if}</span><b>{now!.cpu}%</b><span class="dim small">{t('stats.cores', { n: now!.cores })}</span>{/snippet}
+      {#snippet memTile()}<span class="tlabel dim small">{t('containers.memory')}{#if admin}<Icon name="chevron" size={14} />{/if}</span><b>{pct(now!.memUsed, now!.memTotal)}%</b><span class="dim small">{formatBytes(now!.memUsed)} / {formatBytes(now!.memTotal)}</span>{/snippet}
+      {#if admin}
+        <button type="button" class="tile tilebtn" onclick={() => ((procsBy = 'cpu'), (procsOpen = true))} title={t('procs.openCpu')} data-testid="tile-cpu">{@render cpuTile()}</button>
+        <button type="button" class="tile tilebtn" onclick={() => ((procsBy = 'mem'), (procsOpen = true))} title={t('procs.openMem')} data-testid="tile-mem">{@render memTile()}</button>
+      {:else}
+        <div class="tile">{@render cpuTile()}</div>
+        <div class="tile">{@render memTile()}</div>
+      {/if}
       <div class="tile"><span class="dim small">{t('stats.load')}</span><b>{now.load[0].toFixed(2)}</b><span class="dim small">{now.load[1].toFixed(2)} | {now.load[2].toFixed(2)}</span></div>
       <div class="tile"><span class="dim small">{t('stats.uptime')}</span><b>{uptime(now.uptimeSeconds)}</b><span class="dim small">{upSince(now.uptimeSeconds)}</span></div>
     </section>
@@ -361,6 +371,7 @@
   </section>
   <HostPackages {hostId} {admin} />
   {#if host?.facts?.proxmox}<ProxmoxGuests {hostId} {admin} />{/if}
+  {#if admin}<ProcessDialog bind:open={procsOpen} {hostId} bind:by={procsBy} />{/if}
   <DiskDialog bind:open={diskOpen} {hostId} disk={now?.io?.find((d) => d.name === diskName) ?? null} {range} {admin} />
     </div>
   </div>
@@ -473,6 +484,24 @@
   }
   .tile b {
     font-size: 1.4rem;
+  }
+  /* A tile that opens the processes: the tile itself is the button, its arrow beside the label. */
+  .tilebtn {
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  @media (hover: hover) {
+    .tilebtn:hover {
+      border-color: var(--text-dim);
+    }
+  }
+  .tlabel {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
   }
   section {
     min-width: 0;

@@ -579,6 +579,30 @@ Checked 2026-10-06.
     per-value failure-rate buckets (their numbers depend on drive models
     Burrow cannot know).
 
+- A process overview on a host's statistics (report 387b0e: "a process
+  overview like htop"):
+  - **htop** and **top** read /proc/<pid>/stat for each process's CPU time
+    (utime + stime) and compute the share between two refreshes; 100% is
+    one core in full ("Irix mode", top's default; `I` switches to the share
+    of all cores). Memory as RES (resident pages, /proc/<pid>/statm or
+    stat's rss), shared pages counted in each process. Sorted by a chosen
+    column, with user and command line.
+  - **Glances** shows the same through psutil, with each process's I/O
+    when root; **Beszel** shows no processes, only per container (Docker's
+    stats); **netdata**'s apps.plugin groups processes by application
+    (setuid, always running).
+  - **Cockpit** has no process list of its own; its *Services* page and
+    the per-service cgroup's CPU and memory stand in for it.
+  - Taken over: top's numbers (CPU over the sample with 100% a core,
+    resident memory), the busiest 15 and the largest 15, sorted by either,
+    with user, container (by the cgroup's id, as the disk activity) and
+    command line. Read like the disk activity: two reads of every
+    process's stat two seconds apart, on demand only while the view is
+    open, no agent. Not as root: /proc/<pid>/stat, cmdline and cgroup are
+    readable by every user (only hidepid hides them). Admins only: a
+    command line can hold a password. Not taken over: a tree view, kill and
+    renice (Burrow's terminal is there for that), per-thread rows.
+
 - Disk activity per disk, and who reads and writes (report d4a9c0: "my
   hard disk spins all the time; which processes are writing?"):
   - **iostat** (sysstat) is the reference for a disk's numbers: from

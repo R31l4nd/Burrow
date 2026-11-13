@@ -6,9 +6,23 @@ says how it was verified.
 
 ## [Unreleased]
 
+## [2.26.0] - 2026-11-13
+
+### Added
+
+- A host's *Processes*, htop-like (report 387b0e): for admins the CPU and Memory tiles on a host's statistics open the busiest and the largest processes now, with their user, container and command line, ordered by CPU or by memory, measured only while open.
+
 ### Fixed
 
+- Two sign-ins at the same moment from one address (two people behind one router, two browsers) both get in: the second waits its turn instead of being refused, which the sign-in page called "Too many failed attempts". Failed attempts are still checked one at a time.
 - The tabs atop a terminal on a phone no longer move up and get cut off at the top while swiping between them: every row that scrolls sideways (tabs, chips, keys, paths) now scrolls sideways only (report e020bc). A new layout check finds any row laid out side by side that scrolls up and down too.
+
+### Verified
+
+- The processes: the parser with a sample answer (unit), against the test host's real /proc as the SSH user with a process burning a core on top, root's processes seen too (integration), opened from both tiles on the statistics page, sorted by CPU and by memory, measured again while open and no more once closed (e2e), and in the tour on every size and theme, by CPU, by memory and failed.
+- Two sign-ins at the same moment: a unit test failing on 2.25.0 (200 and 429) and passing now; the test that sends 30 wrong attempts together still lets no more through than the block allows. An e2e sign-in in the gate had hit it (a NOTE on its retry).
+- The tabs: an e2e test on a phone failing on 2.25.0 (the row scrolled 3 px) and passing now; the new layout check found exactly that row on 2.25.0, and the whole tour and the sizes pass it.
+- The gate, the Android app's test on an emulator, and a fresh install.
 
 ## [2.25.0] - 2026-11-12
 

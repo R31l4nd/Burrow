@@ -133,6 +133,39 @@ export interface DiskActivity {
   containers?: ContainerIo[];
 }
 
+/** A process in a host's process overview (report 387b0e). */
+export interface ProcessNow {
+  pid: number;
+  name: string;
+  /** Its command line, cut short; '' for a kernel thread. */
+  command: string;
+  /** The user it runs as. */
+  user: string;
+  /** The container it runs in, by its cgroup: the name Burrow knows it by, else the short id. */
+  container: string | null;
+  /** CPU over the sample, as top counts it: 100 is one core in full. */
+  cpu: number;
+  /** Its memory in RAM (resident). */
+  memBytes: number;
+}
+
+/**
+ * The processes now, sampled on demand while someone looks: every process's
+ * CPU time twice, a couple of seconds apart, and its memory.
+ */
+export interface ProcessList {
+  hostId: number;
+  at: string;
+  /** The length of the sample. */
+  seconds: number;
+  cores: number;
+  memTotal: number;
+  /** Processes on the host (those the SSH user may see). */
+  total: number;
+  /** The busiest on CPU and the largest in memory, up to 15 of each. */
+  top: ProcessNow[];
+}
+
 export interface ContainerIo {
   container: string;
   readBps: number;

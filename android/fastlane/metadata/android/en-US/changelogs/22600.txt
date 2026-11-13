@@ -1,0 +1,1 @@
+A host's statistics show its processes: tap CPU or Memory for the busiest and the largest now, with user, container and command line. The tabs atop a terminal no longer move up and get cut off while you swipe between them. Two sign-ins at the same moment from one network both get in.

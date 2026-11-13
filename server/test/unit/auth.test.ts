@@ -109,6 +109,15 @@ describe('login', () => {
     expect(codes.every((c) => c === 401 || c === 429)).toBe(true);
   });
 
+  it('two right sign-ins at the same moment from one address both get in: the second waits its turn, not "too many failed attempts" (2026-11-13)', async () => {
+    // Two people behind one router, or two browsers (the e2e workers): the one-at-a-time check
+    // refused the second at once, and the sign-in page called that a block.
+    await setupAdmin(t);
+    t.cookie = null;
+    const both = await Promise.all([0, 1].map(() => t.request('POST', '/api/auth/password', { username: 'admin', password: PASSWORD }, { cookie: null })));
+    expect(both.map((r) => r.statusCode)).toEqual([200, 200]);
+  });
+
   it('a recovery code signs in exactly once', async () => {
     const { recoveryCodes } = await setupAdmin(t);
     t.cookie = null;

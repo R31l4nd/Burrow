@@ -764,6 +764,12 @@ updates raise a *Host health* alert once, and each report names the hosts
 with updates waiting. Burrow never installs them: the command to update is
 there to copy into a terminal.
 
+For admins the *CPU* and *Memory* tiles open *Processes*: the busiest and
+the largest processes now, htop-like, with their user, container and
+command line, ordered by CPU (100% is one core in full, as `top` counts) or
+by memory (resident). It is measured over two seconds every few seconds
+while it is open, and only then; nothing runs on the host otherwise.
+
 *Disk activity* shows per disk how much is read and written, how busy it is
 and whether it spins or is spun down, now and over the chosen period; for
 admins *Who reads and writes* lists the processes doing it. A container's

@@ -1,5 +1,5 @@
 import { expect, type Page } from './fixtures.js';
-import type { DiskActivity, DiskHistory, DiskIo, HostStats } from '@burrow/shared';
+import type { DiskActivity, DiskHistory, DiskIo, HostStats, ProcessList } from '@burrow/shared';
 import type { MessageKey } from '../../web/src/lib/i18n/en.js';
 
 // The tour's screens of a disk's activity (report d4a9c0), with numbers
@@ -12,6 +12,7 @@ type Tr = (key: MessageKey, params?: Record<string, string | number>) => string;
 const STATS = /\/api\/hosts\/\d+\/stats$/;
 const HISTORY = /\/api\/hosts\/\d+\/stats\/disks\?/;
 const ACTIVITY = /\/api\/hosts\/\d+\/disks\/activity$/;
+const PROCS = /\/api\/hosts\/\d+\/processes$/;
 
 const disk = (d: Partial<DiskIo> & Pick<DiskIo, 'name' | 'kind'>): DiskIo => ({ model: null, sizeBytes: 0, readBps: 0, writeBps: 0, readIops: 0, writeIops: 0, util: 0, power: null, powerFrom: null, ...d });
 const DISKS: DiskIo[] = [
@@ -95,6 +96,24 @@ const USER: Omit<DiskActivity, 'hostId' | 'at'> = {
   top: [ROOT.top[3]!],
 };
 
+
+// The processes now (report 387b0e): a busy one in a container, a large database, a kernel thread, long command lines.
+const proc = (pid: number, name: string, user: string, cpu: number, memBytes: number, command: string, container: string | null = null) => ({ pid, name, user, cpu, memBytes, command, container });
+const PROCESSES: Omit<ProcessList, 'hostId' | 'at'> = {
+  seconds: 2.01,
+  cores: 8,
+  memTotal: 33_554_432_000,
+  total: 486,
+  top: [
+    proc(2210, 'qbittorrent-nox', 'abc', 187.5, 1_288_490_188, '/usr/bin/qbittorrent-nox --webui-port=8080 --profile=/config --relative-fastresume --confirm-legal-notice', 'qbittorrent'),
+    proc(88424, 'postgres', '999', 12.4, 4_617_089_843, 'postgres: immich immich 172.18.0.5(51234) idle', 'immich-database-with-a-rather-long-name'),
+    proc(1187, 'dockerd', 'root', 3.5, 172_490_752, '/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock'),
+    proc(3301, 'smbd', 'root', 1, 61_865_984, '/usr/sbin/smbd --foreground --no-process-group'),
+    proc(41, 'kswapd0', 'root', 0.5, 0, ''),
+    proc(1, 'systemd', 'root', 0, 13_107_200, '/sbin/init'),
+  ],
+};
+
 async function mock(p: Page, hostId: number, activity: ((p: Page) => Promise<unknown>) | null) {
   await p.route(STATS, (r) => r.fulfill({ json: stats(hostId, DISKS) }));
   await p.route(HISTORY, (r) => r.fulfill({ json: history }));
@@ -153,6 +172,41 @@ export function diskScreens(hostId: number) {
         await expect(p.locator('dialog[open]').getByTestId('load-failed')).toContainText(T('disk.failed', { error: T('error.host_unreachable', { detail: T('error.net.refused', { host: '192.168.1.20', port: '22' }) }) }));
       },
     },
+    // The processes behind the CPU and memory tiles (report 387b0e), sampled while open; by CPU, by memory, and failed.
+    {
+      name: 'processes',
+      url,
+      ready: (p: Page) => mock(p, hostId, (q) => q.route(PROCS, (r) => r.fulfill({ json: { ...PROCESSES, hostId, at: new Date().toISOString() } }))),
+      open: async (p: Page, T: Tr) => {
+        await p.getByTestId('tile-cpu').click();
+        const d = p.locator('dialog[open][data-tour=processes]');
+        await expect(d.getByTestId('proc')).toHaveCount(6);
+        await expect(d.getByTestId('proc').first()).toContainText('qbittorrent-nox');
+        // How many processes and cores, in the app's words.
+        await expect(d.getByTestId('procs-sampled')).toContainText(`486 ${T('procs.title').toLowerCase()}`);
+      },
+    },
+    {
+      name: 'processes-mem',
+      url,
+      ready: (p: Page) => mock(p, hostId, (q) => q.route(PROCS, (r) => r.fulfill({ json: { ...PROCESSES, hostId, at: new Date().toISOString() } }))),
+      open: async (p: Page) => {
+        await p.getByTestId('tile-mem').click();
+        const d = p.locator('dialog[open][data-tour=processes]');
+        await expect(d.getByTestId('procs-by-mem')).toHaveAttribute('aria-checked', 'true');
+        await expect(d.getByTestId('proc').first()).toContainText('postgres');
+      },
+    },
+    {
+      name: 'processes-failed',
+      url,
+      ready: (p: Page) => mock(p, hostId, (q) => q.route(PROCS, (r) => r.fulfill({ status: 502, json: { error: 'processes_unreadable', message: 'the answer was cut short' } }))),
+      open: async (p: Page) => {
+        await p.getByTestId('tile-cpu').click();
+        await expect(p.locator('dialog[open][data-tour=processes]').getByTestId('load-failed')).toBeVisible();
+        await expect(p.locator('dialog[open][data-tour=processes]').getByTestId('proc')).toHaveCount(0);
+      },
+    },
   ];
 }
 
@@ -161,4 +215,5 @@ export async function unrouteDisk(p: Page): Promise<void> {
   await p.unroute(STATS);
   await p.unroute(HISTORY);
   await p.unroute(ACTIVITY);
+  await p.unroute(PROCS);
 }

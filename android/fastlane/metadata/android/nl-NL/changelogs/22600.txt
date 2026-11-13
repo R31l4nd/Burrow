@@ -1,0 +1,1 @@
+De statistieken van een host tonen de processen: tik op CPU of Geheugen voor de drukste en de grootste van nu, met gebruiker, container en commandoregel. De tabs boven een terminal schuiven niet meer omhoog en vallen niet meer af als je ertussen veegt. Twee keer tegelijk inloggen vanaf één netwerk lukt allebei.
