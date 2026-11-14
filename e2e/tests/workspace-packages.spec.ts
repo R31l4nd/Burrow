@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures.js';
+import { expect, test, type Page } from './fixtures.js';
 import { lookAt } from './checks.js';
 import { en, type MessageKey } from '../../web/src/lib/i18n/en.js';
 import { hostNamed, signIn } from './passkey.js';
@@ -15,9 +15,29 @@ const T = (key: MessageKey, params: Record<string, string | number> = {}) =>
 
 const ONE = /\/api\/hosts\/\d+\/packages$/;
 
+/** A command on the test host as root (the test user's sudo with its password); its exit code. */
+const asRoot = (page: Page, hostId: number, command: string) =>
+  page.evaluate(
+    async ([h, c]) => ((await (await fetch('/api/snippets/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ hostIds: [h], command: c }) })).json()) as { exitCode: number | null }[])[0]!.exitCode,
+    [hostId, `printf '%s\\n' burrow-test-password | sudo -S -p '' sh -c '${command}'`] as const,
+  );
+const REPO = '/etc/apt/sources.list.d/burrow-test.list';
+
 test("package updates: Check now lists them, security first; the host list marks the host; a Host health alert; the command to copy, never run", async ({ page }) => {
   await signIn(page);
   const sshd = await hostNamed(page, 'test-sshd');
+  // Burrow checks by itself too (every six hours, the first a few minutes after the host came), and
+  // an earlier spec clears the alerts: told then, cleared, and this check found nothing new to tell
+  // (CI 2026-11-14). So a check first with the test repository away, nothing waiting: the updates
+  // are new to the check below, whatever ran before.
+  await page.goto('/#/hosts');
+  expect(await asRoot(page, sshd, `mv ${REPO} ${REPO}.off`)).toBe(0);
+  try {
+    const none = await page.evaluate(async (h) => (await (await fetch(`/api/hosts/${h}/packages`, { method: 'POST' })).json()) as { state: string; updates: unknown[] }, sshd);
+    expect(none).toMatchObject({ state: 'ok', updates: [] });
+  } finally {
+    expect(await asRoot(page, sshd, `mv ${REPO}.off ${REPO}`)).toBe(0);
+  }
   await page.goto(`/#/hosts/${sshd}/stats`);
   const box = page.getByTestId('packages');
   await expect(box).toBeVisible({ timeout: 20_000 });
@@ -47,7 +67,7 @@ test("package updates: Check now lists them, security first; the host list marks
   await expect(row.getByTestId('host-updates')).toHaveAttribute('aria-label', '3 updates | 2 security', { timeout: 20_000 });
   await expect(row.getByTestId('host-updates')).toHaveText('3');
 
-  // Told once as a Host health alert (by this check, or the one Burrow made by itself before it).
+  // Told as a Host health alert by this check: bash and tar are new to it (the check above found none).
   await expect
     .poll(async () => (await page.evaluate(async () => (await (await fetch('/api/alerts')).json()) as { container: string; title: string }[])).filter((a) => a.container === '@packages').map((a) => a.title), { timeout: 20_000 })
     .toContain('2 security updates waiting: bash, tar');
