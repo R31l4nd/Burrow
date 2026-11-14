@@ -892,6 +892,16 @@ test('two files side by side on a wide screen: moved with their unsaved text, ke
   await expect(page.getByTestId('dirty')).toHaveCount(0);
   await page.reload();
   await expect(page.getByTestId('ws-tabbar')).toHaveCount(2);
+  // From the tab's own menu too (a right click), where Compare with... is (report b015a9: not found).
+  const tabMenu = async (name: string) => {
+    await page.getByTestId('ws-tab').filter({ hasText: name }).click({ button: 'right' });
+    await page.locator('dialog[open]').getByTestId('ws-other-side').click();
+  };
+  await tabMenu('b.txt');
+  await expect(page.getByTestId('ws-tabbar')).toHaveCount(1);
+  await tabMenu('b.txt');
+  await expect(page.getByTestId('ws-tabbar')).toHaveCount(2);
+  await expect(page.getByTestId('ws-tabbar').nth(1).getByTestId('ws-tab').filter({ hasText: 'b.txt' })).toBeVisible();
   // Renamed from the tree: its tab follows the new name on the same side (audit 2026-11-05: it went back to the left).
   await page.locator('[data-testid=tree-node][data-path="b.txt"]').click({ button: 'right' });
   await page.getByRole('dialog', { name: 'b.txt' }).getByRole('button', { name: 'Rename', exact: true }).click();

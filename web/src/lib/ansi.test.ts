@@ -38,4 +38,12 @@ describe('ansi', () => {
     expect(ansiLines('\x1b[4;9mx')).toEqual(['<span style="text-decoration:underline line-through">x</span>']);
     expect(ansiLines('a\n\nb')).toEqual(['a', '', 'b']);
   });
+
+  it('keeps the indentation of a history without tmux: the empty cells of the server copy, written as "cursor forward", are spaces (report 24cacf)', () => {
+    // What the serializer made of "\tchain DOCKER {" and "\t\tiifname x" (nft's tabs), and of one empty cell.
+    expect(ansiLines('table ip nat {\r\n\x1b[8Cchain DOCKER {\r\n\x1b[16Ciifname x\r\na\x1b[Cb')).toEqual(['table ip nat {\r', '        chain DOCKER {\r', '                iifname x\r', 'a b']);
+    // Inside a colour too, and never more than a line's worth.
+    expect(ansiLines('\x1b[32m\x1b[4Cok')).toEqual(['<span style="color:var(--ansi-2)">    ok</span>']);
+    expect(ansiLines('\x1b[99999Cx')[0]).toHaveLength(1001);
+  });
 });

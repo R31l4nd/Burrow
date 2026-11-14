@@ -81,6 +81,7 @@
     onstate = () => {},
     ongone = () => {},
     oncompare,
+    onotherside = null,
     gitBase,
   }: {
     hostId: number;
@@ -94,6 +95,8 @@
     ongone?: () => void;
     /** In a workspace: "Compare with..." another file (report 9d710d). */
     oncompare?: () => void;
+    /** In a workspace on a wide screen with another tab: "Move to the other side" (report b015a9: two files side by side, not found). */
+    onotherside?: (() => void) | null;
     /** In a repository (a workspace): the file as last committed ('' new), else null; the change marks are against it, as VS Code's. */
     gitBase?: () => Promise<string | null>;
   } = $props();
@@ -766,6 +769,9 @@
     <button class="btn" onclick={() => ((toolsOpen = false), view && openSearchPanel(view))}><Icon name="search" size={18} /> {t('editor.find')}</button>
     {#if oncompare}
       <button class="btn" onclick={() => ((toolsOpen = false), oncompare())} data-testid="ws-compare-open"><Icon name="swap" size={18} /> {t('files.compareWith')}</button>
+    {/if}
+    {#if onotherside}
+      <button class="btn" onclick={() => ((toolsOpen = false), onotherside?.())} data-testid="ws-other-side"><Icon name="columns" size={18} /> {t('ws.otherSide')}</button>
     {/if}
     {#if dirty}
       <button class="btn" onclick={() => ((toolsOpen = false), (versus = view ? { saved: held, now: view.state.doc.toString() } : null))} data-testid="compare-saved"

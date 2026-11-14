@@ -52,7 +52,11 @@ const plain = (): Sgr => ({ fg: null, bg: null, bold: false, dim: false, italic:
 
 function convert(raw: string, st: Sgr): string {
   let out = '';
-  const text = raw.replace(OTHER, '');
+  // "Cursor forward" over empty cells is spaces: the server's copy of a screen without tmux writes
+  // a tab's or an indent's empty cells so, and dropped with the other codes the history layer lost
+  // every indentation (report 24cacf). At most a line's worth.
+  // eslint-disable-next-line no-control-regex
+  const text = raw.replace(OTHER, '').replace(/\x1b\[(\d*)C/g, (_, n: string) => ' '.repeat(Math.min(Number(n) || 1, 1000)));
   const re = new RegExp(CSI.source, 'g');
   let last = 0;
   const emit = (chunk: string) => {

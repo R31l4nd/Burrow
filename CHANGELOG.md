@@ -6,6 +6,13 @@ says how it was verified.
 
 ## [Unreleased]
 
+### Fixed
+
+- A long paste arrives (report 940168): text over 65,536 characters, from the phone keyboard's clipboard or Ctrl+V, went out as one message the server refused, and nothing of it arrived; it goes in parts now.
+- The terminals in a workspace's or a stack's panel are named on their buttons, as on the terminal page, not "1" and "2" (report 6cbc81).
+- The history layer of a terminal without tmux keeps the indentation (report 24cacf): output indented with tabs (nft, Makefiles, code) or spaces showed at the left edge when scrolled back.
+- Two files side by side is easier to find (report b015a9): a right click on an editor tab offers *Move to the other side* on a wide screen, beside *Compare with...*; it was a command and a drag only.
+
 ## [2.26.0] - 2026-11-13
 
 ### Added

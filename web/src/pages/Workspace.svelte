@@ -632,6 +632,7 @@
                 ongone={() => close(tab.path)}
                 gitBase={() => headOf(fullPath(tab.path))}
                 oncompare={() => startCompare(fullPath(tab.path))}
+                onotherside={!narrow.on && tabs.length > 1 ? () => moveToOtherSide(tab.path) : null}
               />
             </div>
           {/each}

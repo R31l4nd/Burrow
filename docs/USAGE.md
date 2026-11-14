@@ -321,9 +321,9 @@ page.
   finds every command of the workspace and of the file in front by a few
   letters of its name, with its keys; the ones used last come first.
 - On a wide screen two files can be side by side: *Move to the other side*
-  (a command) or drag a tab onto the other side's bar. Each side shows one
-  of its tabs; a click in an editor puts it in front. On a phone all tabs
-  are in one bar again.
+  (a right click on its tab, or a command) or drag a tab onto the other
+  side's bar. Each side shows one of its tabs; a click in an editor puts
+  it in front. On a phone all tabs are in one bar again.
 - *Outline* (beside Git) lists the headings, keys, sections, blocks or
   functions of the file in front; a tap goes there. The badge at the top
   counts the problems of every open file; a tap lists them by file.

@@ -1195,9 +1195,49 @@ test("a finger in a tmux of the person's own attached in a session without Burro
     await page.getByTestId('term-history-live').click();
     await expect(layer).toHaveCount(0);
     await typeLine(`tmux kill-session -t mem-${mouse}-e2e`);
+    // The shell's prompt back after tmux's "[exited]" before typing on: keys typed while tmux was going
+    // reached it or were redrawn over, and the line arrived broken (CI release run of 2.26.0).
+    await expect(rows).toContainText(/\[exited\][^[]*\$\s*$/, { timeout: 10_000 });
     await typeLine(`echo back-${mouse}-$((40+2))`);
     await expect(rows).toContainText(`back-${mouse}-42`);
   }
+  await page.evaluate((id) => fetch(`/api/terminal/sessions/${id}`, { method: 'DELETE' }), s.id);
+});
+
+test('the history layer of a session without tmux keeps the indentation: tabs and leading spaces as on the screen (report 24cacf)', async ({ page }) => {
+  await page.setViewportSize({ width: 343, height: 711 });
+  await signIn(page);
+  const hostId = await page.evaluate(async () => ((await (await fetch('/api/hosts')).json()) as { id: number; name: string }[]).find((h) => h.name === 'test-sshd')!.id);
+  const s = await page.evaluate((id) => fetch('/api/terminal/sessions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ hostId: id, tmux: 'never' }) }).then((r) => r.json() as Promise<{ id: string }>), hostId);
+  await page.goto(`/#/term/${s.id}`);
+  const rows = page.locator('[data-testid=terminal] .xterm-rows');
+  await expect(rows).toContainText('$', { timeout: 20_000 });
+  // nft's way: a tab for each level; then a line indented with spaces; then enough to scroll it away.
+  await page.locator('[data-testid=terminal] textarea').focus();
+  await page.keyboard.type('w=e2e; printf "table-$w {\\n\\tchain-$w {\\n\\t\\trule-$w\\n    spaced-$w\\n"; seq 1 80\n');
+  await expect(rows).toContainText('7980');
+  await page.locator('.term-wrap').evaluate(async (w) => {
+    const r = w.getBoundingClientRect();
+    const el = w.querySelector<HTMLElement>('[data-testid=terminal]')!;
+    const touch = (y: number) => new Touch({ identifier: 9, target: el, clientX: r.left + r.width / 2, clientY: y });
+    const top = r.top + 40;
+    el.dispatchEvent(new TouchEvent('touchstart', { touches: [touch(top)], changedTouches: [touch(top)], bubbles: true, cancelable: true }));
+    for (let y = top; y <= top + 160; y += 4) {
+      el.dispatchEvent(new TouchEvent('touchmove', { touches: [touch(y)], changedTouches: [touch(y)], bubbles: true, cancelable: true }));
+      await new Promise((d) => setTimeout(d, 30));
+    }
+    el.dispatchEvent(new TouchEvent('touchend', { touches: [], changedTouches: [touch(top + 160)], bubbles: true, cancelable: true }));
+  });
+  const layer = page.getByTestId('term-history');
+  await expect(layer).toBeVisible();
+  const line = (word: string) => layer.locator('.line').filter({ hasText: word }).first();
+  await expect(line('rule-e2e')).toBeVisible({ timeout: 10_000 });
+  expect(await line('table-e2e').textContent()).toMatch(/^table-e2e \{\s*$/);
+  expect(await line('chain-e2e').textContent()).toMatch(/^ {8}chain-e2e \{\s*$/);
+  expect(await line('rule-e2e').textContent()).toMatch(/^ {16}rule-e2e\s*$/);
+  expect(await line('spaced-e2e').textContent()).toMatch(/^ {4}spaced-e2e\s*$/);
+  await page.getByTestId('term-history-live').click();
+  await expect(layer).toHaveCount(0);
   await page.evaluate((id) => fetch(`/api/terminal/sessions/${id}`, { method: 'DELETE' }), s.id);
 });
 

@@ -306,7 +306,7 @@
         {#if tab === 'term'}
           {#if sessions.length > 1}
             {#each sessions as id, i (id)}
-              <button class="chip" class:on={id === active} aria-pressed={id === active} title={labelOf(id)} onclick={() => (active = id)} data-testid="panel-session">{i + 1}</button>
+              <button class="chip" class:on={id === active} aria-pressed={id === active} title={labelOf(id)} onclick={() => (active = id)} data-testid="panel-session"><span class="sname">{labelOf(id) || i + 1}</span></button>
             {/each}
           {/if}
           <button
@@ -555,6 +555,14 @@
     min-width: 30px;
     min-height: 28px;
     cursor: pointer;
+  }
+  /* Named as on the terminal page, not "1" and "2" (report 6cbc81); a long name cut, whole in its title. */
+  .sessions .chip .sname {
+    display: block;
+    max-width: 16ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .sessions .chip.on {
     border-color: var(--accent);

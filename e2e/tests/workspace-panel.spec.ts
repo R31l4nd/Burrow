@@ -85,12 +85,18 @@ test('workspace panel: a terminal in the folder, its stack logs picked by itself
   await expect(screen(page)).toContainText('panel-42');
   await lookAt(page, 'desktop-workspace-panel');
 
-  // A second one; the numbers switch between them; the one in front closes.
+  // A second one; the buttons switch between them; the one in front closes.
   await page.getByTestId('panel-term-add').click();
   // Others' sessions on this host are offered first: a new one asked for.
   const ways = page.locator('dialog[open][data-tour=panel-new]');
   if (await ways.waitFor({ timeout: 1500 }).then(() => true, () => false)) await ways.getByTestId('panel-new-ways').getByRole('button', { name: 'New session' }).click();
   await expect(page.getByTestId('panel-session')).toHaveCount(2);
+  // Named as on the terminal page, not numbered (report 6cbc81): each says which session it is.
+  for (const chip of await page.getByTestId('panel-session').all()) {
+    const name = (await chip.textContent())!.trim();
+    expect(name).not.toMatch(/^\d+$/);
+    expect(name).toBe(await chip.getAttribute('title'));
+  }
   await expect(page.getByTestId('panel-session').nth(1)).toHaveAttribute('aria-pressed', 'true');
   await expect(screen(page)).not.toContainText('panel-42');
   await page.getByTestId('panel-session').first().click();

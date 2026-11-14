@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TerminalConnection, type TerminalEvents } from './terminal.js';
+import { clientMessage } from '@burrow/shared';
 import { onSessionDoubt } from './dial.js';
 
 // A WebSocket that does what the test says: opens, answers, or stays silent
@@ -216,5 +217,21 @@ describe('a recording that stops by itself (2026-11-07)', () => {
     FakeSocket.all[0]!.onmessage?.({ data: JSON.stringify({ t: 'recording', on: false }) });
     expect(seen).toEqual([false]);
     c.close();
+  });
+});
+
+describe('a long paste (report 940168)', () => {
+  it('goes out in parts the server takes, in order and whole: one message over its limit was refused, and nothing arrived', () => {
+    const c = new TerminalConnection('s8', events());
+    const ws = FakeSocket.all[0]!;
+    ws.open();
+    // 72,000 characters as the keyboard's clipboard gave them, a bracketed paste, an emoji across a cut.
+    const text = `\x1b[200~${'x'.repeat(65_535)}\u{1F600}${'line of a long note\r'.repeat(350)}\x1b[201~`;
+    c.input(text);
+    const parts = ws.sent.map((d) => JSON.parse(d) as { t: string; d: string }).filter((m) => m.t === 'input');
+    expect(parts.length).toBeGreaterThan(1);
+    for (const p of parts) expect(clientMessage.safeParse(p).success, `a part of ${p.d.length}`).toBe(true);
+    expect(parts.map((p) => p.d).join('')).toBe(text);
+    expect(parts.every((p) => !/[\uD800-\uDBFF]$/.test(p.d))).toBe(true);
   });
 });

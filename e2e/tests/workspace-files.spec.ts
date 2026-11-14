@@ -689,10 +689,12 @@ test('a paste where the name is taken asks: both kept with a number, skipped, or
   await ask.getByTestId('clash-rename').click();
   await expect(rows.filter({ hasText: 'a (1).txt' })).toBeVisible({ timeout: 30_000 });
   expect([await cat('/tmp/e2e-clash/a.txt'), await cat('/tmp/e2e-clash/a (1).txt')]).toEqual(['old\n', 'new\n']);
+  // Its own line in the list, done. Counted from the lines there now: the list clears itself 4 s after all is done,
+  // and on a busy machine the steps above can take longer than that.
+  const lines = await status.count();
   await page.getByTestId('paste').click();
   await ask.getByTestId('clash-replace').click();
-  // Its own line in the list (the fourth), done.
-  await expect(status).toHaveCount(4);
+  await expect(status).toHaveCount(lines + 1);
   await expect(status.last()).toHaveText('done', { timeout: 30_000 });
   expect(await cat('/tmp/e2e-clash/a.txt')).toBe('new\n');
   // The busy list closed and opened again from its pill, then cleared.

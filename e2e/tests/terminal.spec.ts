@@ -770,3 +770,25 @@ test("back to the page's own session after its pane was closed: the tab opens it
   await expect(pane(0)).toHaveAttribute('aria-label', nameA);
   for (const s of [a, b]) await page.evaluate((id) => fetch(`/api/terminal/sessions/${id}`, { method: 'DELETE' }), s.id);
 });
+
+test('a paste longer than one message arrives whole: 70,000 characters in parts, not refused (report 940168)', async ({ page }) => {
+  await signIn(page);
+  const hostId = await page.evaluate(async () => ((await (await fetch('/api/hosts')).json()) as { id: number; name: string }[]).find((h) => h.name === 'test-sshd')!.id);
+  const id = await page.evaluate(async (h) => ((await (await fetch('/api/terminal/sessions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ hostId: h, cols: 100, rows: 30, tmux: 'never' }) })).json()) as { id: string }).id, hostId);
+  await page.goto(`/#/term/${id}`);
+  await expect(screen(page)).toContainText('$', { timeout: 20_000 });
+  await type(page, 'cat > /tmp/paste-e2e.txt');
+  await page.waitForTimeout(500);
+  // As the browser pastes (Ctrl+V, the keyboard's clipboard): 700 lines of 100.
+  await page.locator('[data-testid=terminal] textarea').evaluate((ta, text) => {
+    const dt = new DataTransfer();
+    dt.setData('text/plain', text);
+    ta.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+  }, `${'p'.repeat(99)}\n`.repeat(700));
+  await page.waitForTimeout(3000);
+  await page.keyboard.press('Control+D');
+  // On the host, every character.
+  const size = () => page.evaluate(async (h) => ((await (await fetch('/api/snippets/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ hostIds: [h], command: 'wc -c < /tmp/paste-e2e.txt' }) })).json()) as { stdout: string }[])[0]!.stdout.trim(), hostId);
+  await expect.poll(size, { timeout: 15_000 }).toBe('70000');
+  await page.evaluate((s) => fetch(`/api/terminal/sessions/${s}`, { method: 'DELETE' }), id);
+});

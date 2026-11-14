@@ -1,5 +1,5 @@
 import { DIAL_MS, failedDials } from './dial.js';
-import type { ClientMessage, ServerMessage, ShellState, TerminalMode, TerminalViewer } from '@burrow/shared';
+import { INPUT_MAX, type ClientMessage, type ServerMessage, type ShellState, type TerminalMode, type TerminalViewer } from '@burrow/shared';
 
 // One WebSocket to one server-side session. Survives network drops: it
 // reconnects with backoff and the server answers every (re)connect with a
@@ -165,6 +165,17 @@ export class TerminalConnection {
   }
 
   input(data: string): void {
+    // A long paste in parts the server takes: one message over its limit was refused whole, and
+    // nothing of it arrived (report 940168). Never between the halves of a character.
+    if (data.length > INPUT_MAX) {
+      for (let at = 0; at < data.length; ) {
+        let end = Math.min(at + INPUT_MAX, data.length);
+        if (end < data.length && /[\uD800-\uDBFF]/.test(data[end - 1]!)) end--;
+        this.input(data.slice(at, end));
+        at = end;
+      }
+      return;
+    }
     if (this.#ws?.readyState === WebSocket.OPEN || this.#stopped || this.#failed) return this.send({ t: 'input', d: data });
     // A few keys, not a paste of a whole file into a connection that may never come.
     if (this.#pendingSize + data.length > PENDING_MAX) return;

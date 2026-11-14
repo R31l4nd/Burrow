@@ -154,8 +154,11 @@ export type ServerMessage =
   | { t: 'history'; data: string; alt?: boolean; failed?: boolean }
   | { t: 'pong' };
 
+/** The most one input message may carry; a longer paste goes in parts (report 940168). */
+export const INPUT_MAX = 65536;
+
 export const clientMessage: z.ZodType<ClientMessage> = z.discriminatedUnion('t', [
-  z.object({ t: z.literal('input'), d: z.string().max(65536) }),
+  z.object({ t: z.literal('input'), d: z.string().max(INPUT_MAX) }),
   z.object({
     t: z.literal('resize'),
     cols: z.number().int().min(10).max(500),
