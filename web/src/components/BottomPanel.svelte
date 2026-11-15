@@ -138,6 +138,18 @@
   // another device): offered before a new one is started (report eca78a:
   // every + and every opening made one more, and asked for a step-up).
   let term = $state<TermSession | null>(null);
+  // The chosen session's name in sight in its row, which scrolls when the names do not fit (a phone).
+  let chipsEl = $state<HTMLElement | null>(null);
+  $effect(() => {
+    const row = chipsEl;
+    if (!row || !active) return;
+    const c = row.querySelector<HTMLElement>('.chip.on');
+    if (!c) return;
+    const a = row.getBoundingClientRect();
+    const r = c.getBoundingClientRect();
+    if (r.left < a.left) row.scrollLeft -= a.left - r.left;
+    else if (r.right > a.right) row.scrollLeft += r.right - a.right;
+  });
   const hasPassword = $derived(!!data.hosts.find((h) => h.id === hostId)?.hasPassword);
   // A host added since the hosts were read (in another tab): read again once, for its stored password.
   let reread = false;
@@ -302,13 +314,17 @@
         {#if admin}<button role="tab" aria-selected={tab === 'term'} class:on={tab === 'term'} onclick={() => (tab = 'term')} data-testid="panel-tab-term"><Icon name="terminal" size={16} /><span class="tlabel">{t('panel.terminal')}</span></button>{/if}
         <button role="tab" aria-selected={tab === 'logs'} class:on={tab === 'logs'} onclick={() => (tab = 'logs')} data-testid="panel-tab-logs"><Icon name="layers" size={16} /><span class="tlabel">{t('panel.logs')}</span></button>
       </div>
+      <!-- The names scroll in their own row, on a phone below the buttons: beside them they took the buttons off a
+           phone's edge, or had no room left themselves (report 6cbc81). -->
+      {#if tab === 'term' && sessions.length > 1}
+        <div use:scrollCue class="chips" bind:this={chipsEl}>
+          {#each sessions as id, i (id)}
+            <button class="chip" class:on={id === active} aria-pressed={id === active} title={labelOf(id)} onclick={() => (active = id)} data-testid="panel-session"><span class="sname">{labelOf(id) || i + 1}</span></button>
+          {/each}
+        </div>
+      {/if}
       <div use:scrollCue class="sessions">
         {#if tab === 'term'}
-          {#if sessions.length > 1}
-            {#each sessions as id, i (id)}
-              <button class="chip" class:on={id === active} aria-pressed={id === active} title={labelOf(id)} onclick={() => (active = id)} data-testid="panel-session"><span class="sname">{labelOf(id) || i + 1}</span></button>
-            {/each}
-          {/if}
           <button
             class="icon-btn"
             aria-label={t('panel.newTerminal')}
@@ -550,28 +566,47 @@
     overflow-x: auto;
     scrollbar-width: none;
   }
-  .sessions .chip {
+  .chips {
+    flex: 0 1 auto;
+    min-width: 64px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  @media (max-width: 599px) {
+    .pbar {
+      flex-wrap: wrap;
+    }
+    .chips {
+      order: 9;
+      flex-basis: 100%;
+      padding-bottom: 2px;
+    }
+  }
+  .chips .chip {
     flex: none;
     min-width: 30px;
     min-height: 28px;
     cursor: pointer;
   }
   /* Named as on the terminal page, not "1" and "2" (report 6cbc81); a long name cut, whole in its title. */
-  .sessions .chip .sname {
+  .chips .chip .sname {
     display: block;
     max-width: 16ch;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .sessions .chip.on {
+  .chips .chip.on {
     border-color: var(--accent);
     color: var(--text);
   }
   /* A finger's room on a touch screen (AUDIT2 UX-04). */
   @media (pointer: coarse) {
     .seg button,
-    .sessions .chip {
+    .chips .chip {
       min-height: 36px;
     }
   }

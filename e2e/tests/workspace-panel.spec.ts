@@ -97,6 +97,7 @@ test('workspace panel: a terminal in the folder, its stack logs picked by itself
     expect(name).not.toMatch(/^\d+$/);
     expect(name).toBe(await chip.getAttribute('title'));
   }
+  await lookAt(page, 'desktop-panel-named');
   await expect(page.getByTestId('panel-session').nth(1)).toHaveAttribute('aria-pressed', 'true');
   await expect(screen(page)).not.toContainText('panel-42');
   await page.getByTestId('panel-session').first().click();

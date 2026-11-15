@@ -93,8 +93,9 @@ for (const [vp, size] of VARIANTS) {
 
 async function tour(page: Page, vp: (typeof VARIANTS)[number][0], size: { width: number; height: number }) {
   const first = vp === 'phone';
-  // Over 120 screens a pass: up to 8 minutes on a quiet machine, 13 on a busy one (passes ran out at 10 in a gate).
-  test.setTimeout(1_200_000);
+  // Over 120 screens a pass: up to 8 minutes on a quiet machine (10 in CI), 20 on a busy one (passes ran out at 20 in
+  // gates beside a media stack transcoding, 2026-11-14).
+  test.setTimeout(1_800_000);
   // "Leave this page?" (something pressed left unsaved work) is answered yes: dismissed, a reload waited for ever (15 minutes in a gate).
   page.on('dialog', (d) => void (d.type() === 'beforeunload' ? d.accept() : d.dismiss()));
   // Signed out: the sign-in page, and an invite link (made below).

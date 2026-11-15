@@ -347,6 +347,20 @@ export async function buttonsInSight(page: Page, where: string) {
       .map((e) => `${e.tagName.toLowerCase()}.${[...e.classList].join('.')} (${e.scrollHeight - e.clientHeight} px)`),
   );
   expect.soft(sliver, `rows that scroll sideways and up and down too (${where})`).toEqual([]);
+  // A row of buttons that scrolls sideways, squeezed by its neighbours to less than one of them:
+  // the sessions' names in a workspace's panel went to 0 px on a 343 px phone (report 6cbc81).
+  const squeezed = await page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>('body *')]
+      .filter((e) => {
+        const s = getComputedStyle(e);
+        const sideways = s.overflowX === 'auto' || s.overflowX === 'scroll';
+        const buttons = [...e.querySelectorAll<HTMLElement>('button, a[href]')].filter((b) => b.getClientRects().length);
+        if (!sideways || !buttons.length || !e.getClientRects().length || e.closest('dialog:not([open]), [aria-hidden=true], .xterm, .cm-editor')) return false;
+        return e.scrollWidth > e.clientWidth + 1 && e.clientWidth < Math.min(40, ...buttons.map((b) => b.offsetWidth));
+      })
+      .map((e) => `${e.tagName.toLowerCase()}.${[...e.classList].join('.')} (${e.clientWidth} px)`),
+  );
+  expect.soft(squeezed, `rows of buttons squeezed to less than one button (${where})`).toEqual([]);
 }
 
 /**

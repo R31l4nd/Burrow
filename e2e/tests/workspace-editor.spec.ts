@@ -893,11 +893,12 @@ test('two files side by side on a wide screen: moved with their unsaved text, ke
   await page.reload();
   await expect(page.getByTestId('ws-tabbar')).toHaveCount(2);
   // From the tab's own menu too (a right click), where Compare with... is (report b015a9: not found).
-  const tabMenu = async (name: string) => {
+  const tabMenu = async (name: string, shot?: string) => {
     await page.getByTestId('ws-tab').filter({ hasText: name }).click({ button: 'right' });
+    if (shot) await lookAt(page, shot);
     await page.locator('dialog[open]').getByTestId('ws-other-side').click();
   };
-  await tabMenu('b.txt');
+  await tabMenu('b.txt', 'workspace-tab-menu');
   await expect(page.getByTestId('ws-tabbar')).toHaveCount(1);
   await tabMenu('b.txt');
   await expect(page.getByTestId('ws-tabbar')).toHaveCount(2);

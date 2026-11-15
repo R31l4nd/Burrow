@@ -1,0 +1,1 @@
+A long paste arrives whole, also from the keyboard's clipboard. A terminal's history keeps its indentation. The terminals in a workspace's panel are named on their buttons. A right click on an editor tab moves it to the other side.

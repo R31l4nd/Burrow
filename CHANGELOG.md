@@ -6,12 +6,21 @@ says how it was verified.
 
 ## [Unreleased]
 
+## [2.26.1] - 2026-11-15
+
 ### Fixed
 
 - A long paste arrives (report 940168): text over 65,536 characters, from the phone keyboard's clipboard or Ctrl+V, went out as one message the server refused, and nothing of it arrived; it goes in parts now.
 - The terminals in a workspace's or a stack's panel are named on their buttons, as on the terminal page, not "1" and "2" (report 6cbc81).
 - The history layer of a terminal without tmux keeps the indentation (report 24cacf): output indented with tabs (nft, Makefiles, code) or spaces showed at the left edge when scrolled back.
 - Two files side by side is easier to find (report b015a9): a right click on an editor tab offers *Move to the other side* on a wide screen, beside *Compare with...*; it was a command and a drag only.
+
+### Verified
+
+- The long paste: a unit test of the parts (each one the server takes, in order, a character of two halves never split) and an e2e paste of 70,000 characters into a file on the test host, 0 arrived on 2.26.0 and all of them now.
+- The indentation: a unit test of the history's text (the server's copy writes empty cells as "cursor forward") and an e2e swipe into the history of a session without tmux on a phone, tabs and spaces kept; both failing on 2.26.0.
+- The panel's names and *Move to the other side*: e2e tests failing on 2.26.0 (numbers on the buttons; no such item in the tab's menu), the file moved there and back with its unsaved text. On a phone the names have a row of their own: beside the buttons they had no room at 343 px, a new check of the tour (a row of buttons squeezed to less than one) failing on the first try.
+- The gate, the Android app's test on an emulator, and a fresh install.
 
 ## [2.26.0] - 2026-11-13
 
