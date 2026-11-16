@@ -1,6 +1,6 @@
 {
   "name": "burrow",
-  "version": "2.26.2",
+  "version": "2.27.0",
   "private": true,
   "description": "Homelab management from your phone: persistent SSH terminals, files, container logs and AI analysis.",
   "license": "AGPL-3.0-only",

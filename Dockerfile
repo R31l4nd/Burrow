@@ -4,7 +4,7 @@
 # Node 24 on Debian 13 slim, pinned on digest (Debian 12 carried 52 HIGH or
 # CRITICAL advisories without a fix there, A3-OPS-10). The same image runs the dev
 # commands (scripts/node.sh); scripts/gate.sh checks that both agree.
-FROM node:24-trixie-slim@sha256:54f84b4cf8432b21aaffd5d3ce8d41e12cea0d10d33c09d2f3c9879d49d6b446 AS deps
+FROM node:24-trixie-slim@sha256:af02d57b57719b9657a45199a79264a9437940cd55b3c7b3fc99615654f124a0 AS deps
 WORKDIR /app
 COPY package.json package-lock.json .npmrc ./
 COPY shared/package.json shared/
@@ -39,7 +39,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH="${TARGETARCH:-amd64}" GOTOOLCHAIN=local GOF
 # Downloaded at a fixed version and checked against a pinned SHA-256 per
 # architecture; a changed file fails the build instead of shipping. Named
 # with their licences in README.md (Third-party data and programs).
-FROM debian:trixie-slim@sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4 AS tools
+FROM debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2 AS tools
 # Set by BuildKit for the platform being built (no default here: a default made arm64
 # builds fetch amd64 tools, AUDIT2 OPS-01); amd64 only for the old builder.
 ARG TARGETARCH
@@ -95,7 +95,7 @@ RUN set -eu; \
 
 # Production dependencies only, installed apart so the runtime image carries
 # no compilers, test tools or bundlers.
-FROM node:24-trixie-slim@sha256:54f84b4cf8432b21aaffd5d3ce8d41e12cea0d10d33c09d2f3c9879d49d6b446 AS prod-deps
+FROM node:24-trixie-slim@sha256:af02d57b57719b9657a45199a79264a9437940cd55b3c7b3fc99615654f124a0 AS prod-deps
 WORKDIR /app
 COPY package.json package-lock.json .npmrc ./
 COPY shared/package.json shared/
@@ -104,7 +104,7 @@ COPY web/package.json web/
 COPY e2e/package.json e2e/
 RUN npm ci --omit=dev --no-audit --no-fund -w @burrow/server -w @burrow/shared
 
-FROM node:24-trixie-slim@sha256:54f84b4cf8432b21aaffd5d3ce8d41e12cea0d10d33c09d2f3c9879d49d6b446
+FROM node:24-trixie-slim@sha256:af02d57b57719b9657a45199a79264a9437940cd55b3c7b3fc99615654f124a0
 # Which of Burrow's images this is: an untagged one left behind by a build is found by it (scripts/gate.sh, leftovers).
 LABEL burrow.image="app"
 ENV NODE_ENV=production \

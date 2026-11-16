@@ -5,13 +5,13 @@
   import { t } from '../../lib/i18n/index.svelte.js';
   import type { FileLabel } from '../../lib/tablabels.js';
   import Dialog from '../Dialog.svelte';
-  import DiffView from '../DiffView.svelte';
 
   // A workspace's file against another (report 9d710d): an open file, or any
   // file of the workspace's folders found by name. Read only, the two paths
   // named. An open file is compared as it is in its tab (what is typed
   // too, and a file opened through sudo without reading it again); a file
-  // only root may read says so, with the way to open it through sudo.
+  // only root may read says so, with the way to open it through sudo. Two that differ are shown in
+  // a tab of their own, with the whole editor's room (report a43cd5).
 
   let {
     open = $bindable(false),
@@ -22,6 +22,7 @@
     label,
     textOf,
     onopentab,
+    oncompared,
   }: {
     open?: boolean;
     hostId: number;
@@ -36,6 +37,8 @@
     textOf: (path: string) => string | null;
     /** Open a file in a tab (to read it through sudo there). */
     onopentab: (path: string) => void;
+    /** Two that differ: shown in a tab, the other file's text the older one. */
+    oncompared: (other: string, path: string, otherText: string, text: string) => void;
   } = $props();
 
   let other = $state<string | null>(null);
@@ -104,6 +107,10 @@
       }
     }
     reading = false;
+    if (result && result.a !== result.b) {
+      oncompared(p, path, result.b, result.a);
+      open = false;
+    }
   }
 
   function back() {
@@ -137,8 +144,7 @@
         {/if}
       </div>
     {:else if result && !reading}
-      {#if result.a === result.b}<p class="small" data-testid="compare-same">{t('files.compareSame')}</p>
-      {:else}<p class="dim small">{t('ws.compareHelp')}</p><DiffView original={result.b} modified={result.a} label={t('files.compareLabel', { a: path, b: other })} names={[other ?? '', path ?? '']} />{/if}
+      {#if result.a === result.b}<p class="small" data-testid="compare-same">{t('files.compareSame')}</p>{/if}
     {/if}
   {:else if path}
     {#if others.length}

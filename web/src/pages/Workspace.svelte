@@ -20,6 +20,7 @@
   import { shortcuts } from '../lib/shortcuts.svelte.js';
   import SearchPanel from '../components/workspace/SearchPanel.svelte';
   import CompareDialog from '../components/workspace/CompareDialog.svelte';
+  import DiffView from '../components/DiffView.svelte';
   import { fileLabels, type FileLabel } from '../lib/tablabels.js';
   import { moveTab } from '../lib/termsplit.js';
   import { renamedTab } from '../lib/wstabs.js';
@@ -50,6 +51,8 @@
     /** Opened with one click in the tree: the next one so opened takes its place, until it is kept
      *  (a double click on it or its tab, or a change in it), as in VS Code and code-server (report 96a655). */
     preview?: boolean;
+    /** Two files compared (report a43cd5): their texts as read then, the other one the older; no pane. */
+    compare?: { other: string; path: string; otherText: string; text: string };
   }
 
   let ws = $state<Workspace | null>(null);
@@ -115,16 +118,18 @@
   // relative to the root when it is below it, else absolute.
   const pathKey = (p: string) => (ws && p.startsWith(`${rootBase()}/`) ? p.slice(rootBase().length + 1) : p);
   // Open files by name, and those of the same name with the part of their folder that tells them apart (report 9d710d).
-  const labels = $derived(ws ? fileLabels(tabs.map((x) => fullPath(x.path)), roots) : new Map<string, FileLabel>());
+  const labels = $derived(ws ? fileLabels([...new Set(tabs.flatMap((x) => (x.compare ? [x.compare.other, x.compare.path] : [fullPath(x.path)])))], roots) : new Map<string, FileLabel>());
   const labelOf = (full: string): FileLabel => labels.get(full) ?? fileLabels([full], roots).get(full)!;
   const named = (full: string) => {
     const l = labelOf(full);
     return l.dir ? `${l.name} (${l.dir})` : l.name;
   };
+  // A tab by its file's name, a comparison by both (the older first, as they stand in it).
+  const tabName = (tab: Tab) => (tab.compare ? t('ws.compareTab', { other: named(tab.compare.other), this: named(tab.compare.path) }) : named(fullPath(tab.path)));
   // The window's title says the open file too, as VS Code's does.
   $effect(() => {
     if (!ws) return;
-    document.title = `${active ? `${named(fullPath(active.path))} - ` : ''}${ws.name} - Burrow`;
+    document.title = `${active ? `${tabName(active)} - ` : ''}${ws.name} - Burrow`;
   });
   $effect(() => () => (document.title = 'Burrow'));
 
@@ -137,6 +142,16 @@
     compareOpen = true;
   }
   const textOf = (full: string) => tabs.find((x) => fullPath(x.path) === full)?.pane?.text() ?? null;
+  // Two that differ: a tab of their own, as VS Code's diff editor, beside the file in its side; the same
+  // pair compared again takes the texts of now.
+  function showCompared(other: string, path: string, otherText: string, text: string) {
+    const key = `compare:${other} <-> ${path}`;
+    const compare = { other, path, otherText, text };
+    const there = tabs.find((x) => x.path === key);
+    if (there) there.compare = compare;
+    else tabs.push({ path: key, group: split ? (active?.group ?? 0) : 0, compare, state: { dirty: false, lang: '', lsp: false, sudo: false, errors: 0, warnings: 0, notes: 0, rev: 0 } });
+    current = key;
+  }
 
   // Right click (or a long press) on the tree: the file's menu from Files
   // (report 80a8ce); "Edit" opens it in a tab here.
@@ -222,9 +237,11 @@
   // Open tabs are remembered on this device.
   $effect(() => {
     if (!restored) return;
-    const list = tabs.map((x) => x.path);
+    // A comparison is not: its texts are as they were then.
+    const kept = tabs.filter((x) => !x.compare);
+    const list = kept.map((x) => x.path);
     try {
-      localStorage.setItem(TABS_KEY, JSON.stringify({ tabs: list, current, right: tabs.filter((x) => x.group === 1).map((x) => x.path) }));
+      localStorage.setItem(TABS_KEY, JSON.stringify({ tabs: list, current: list.includes(current ?? '') ? current : (list[0] ?? null), right: kept.filter((x) => x.group === 1).map((x) => x.path) }));
     } catch {
       // Not remembered.
     }
@@ -285,7 +302,7 @@
   function moved(from: string, to: string | null) {
     for (const tab of [...tabs]) {
       const full = fullPath(tab.path);
-      if (full !== from && !full.startsWith(`${from}/`)) continue;
+      if (tab.compare || (full !== from && !full.startsWith(`${from}/`))) continue;
       if (tab.pane?.isDirty() ?? tab.state.dirty) continue;
       const i = tabs.indexOf(tab);
       if (to === null) {
@@ -328,7 +345,7 @@
     // The pane knows best: typed while a save was on its way.
     if ((tab?.pane?.isDirty() ?? tab?.state.dirty) && !(await ask({ text: t('ws.closeUnsaved', { name: path.split('/').pop() ?? path }), confirm: t('common.closeUnsaved'), danger: true }))) return;
     const i = tabs.findIndex((x) => x.path === path);
-    closedTabs = [path, ...closedTabs.filter((x) => x !== path)].slice(0, 20);
+    if (!tab?.compare) closedTabs = [path, ...closedTabs.filter((x) => x !== path)].slice(0, 20);
     tabs.splice(i, 1);
     if (current === path) current = tabs[Math.min(i, tabs.length - 1)]?.path ?? null;
   }
@@ -612,10 +629,10 @@
                   ondblclick={() => (tab.preview = false)}
                   onkeydown={(e) => tabKey(e, tab.path)}
                   oncontextmenu={(e) => (e.preventDefault(), (current = tab.path), tab.pane?.openTools())}
-                  title="{ws.hostName}:{fullPath(tab.path)}{tab.preview ? `\n${t('ws.previewTab')}` : ''}"
-                  >{#if tab.state.dirty}<span class="dirty-dot" role="img" aria-label={t('common.unsaved')} data-testid="dirty"></span>{/if}{label.name}{#if label.dir}<span class="tdir" data-testid="ws-tab-dir">{label.dir}</span>{/if}</button
+                  title={tab.compare ? `${ws.hostName}:${tab.compare.other}\n${ws.hostName}:${tab.compare.path}` : `${ws.hostName}:${fullPath(tab.path)}${tab.preview ? `\n${t('ws.previewTab')}` : ''}`}
+                  >{#if tab.compare}{tabName(tab)}{:else}{#if tab.state.dirty}<span class="dirty-dot" role="img" aria-label={t('common.unsaved')} data-testid="dirty"></span>{/if}{label.name}{#if label.dir}<span class="tdir" data-testid="ws-tab-dir">{label.dir}</span>{/if}{/if}</button
                 >
-                <button class="tclose" data-testid="ws-tab-close" aria-label={t('ws.closeTab', { name: named(fullPath(tab.path)) })} onclick={() => close(tab.path)}><Icon name="close" size={14} /></button>
+                <button class="tclose" data-testid="ws-tab-close" aria-label={t('ws.closeTab', { name: tabName(tab) })} onclick={() => close(tab.path)}><Icon name="close" size={14} /></button>
               </div>
             {/each}
           </div>
@@ -623,6 +640,13 @@
           {#each tabs as tab (tab.path)}
             <!-- Its side by its place in the grid: moved, the same editor (its unsaved text kept). -->
             <div class="slot" class:gone={!visible(tab)} class:right={split && tab.group === 1} style:grid-column={split ? (tab.group ?? 0) + 1 : 1} onfocusin={() => tab.path !== current && (current = tab.path)} data-testid="ws-slot">
+              {#if tab.compare}
+              <div class="compared" data-content>
+                {#key tab.compare}
+                  <DiffView fill original={tab.compare.otherText} modified={tab.compare.text} label={tabName(tab)} names={[named(tab.compare.other), named(tab.compare.path)]} help={t('ws.compareHelp')} />
+                {/key}
+              </div>
+              {:else}
               <EditorPane
                 bind:this={tab.pane}
                 hostId={ws.hostId}
@@ -634,6 +658,7 @@
                 oncompare={() => startCompare(fullPath(tab.path))}
                 onotherside={!narrow.on && tabs.length > 1 ? () => moveToOtherSide(tab.path) : null}
               />
+              {/if}
             </div>
           {/each}
           </div>
@@ -650,7 +675,7 @@
   </div>
 
   <FileSheet bind:open={menuOpen} item={menuItem} hostId={ws.hostId} dir={null} prefs={menuPrefs} onchanged={refreshTrees} onmoved={moved} onnewIn={newIn} onedit={openInTab} oncompare={startCompare} />
-  <CompareDialog bind:open={compareOpen} hostId={ws.hostId} {roots} path={comparing} openFiles={tabs.map((x) => fullPath(x.path))} label={labelOf} {textOf} onopentab={openInTab} />
+  <CompareDialog bind:open={compareOpen} hostId={ws.hostId} {roots} path={comparing} openFiles={tabs.filter((x) => !x.compare).map((x) => fullPath(x.path))} label={labelOf} {textOf} onopentab={openInTab} oncompared={showCompared} />
   <Viewer hostId={ws.hostId} items={media ? [media] : []} index={media ? 0 : null} onclose={() => (media = null)} />
   <CommandPalette bind:open={palette} {commands} />
   <Dialog tour="ws-problems" bind:open={problemsOpen} title={t('ws.problemsAll')}>
@@ -779,6 +804,13 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
+  }
+  .compared {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 6px 8px;
   }
   .slot.gone {
     display: none;

@@ -6,6 +6,18 @@ says how it was verified.
 
 ## [Unreleased]
 
+## [2.27.0] - 2026-11-16
+
+### Changed
+
+- Comparing two files of a workspace opens them in a tab of their own, with the whole editor's room, as VS Code does: side by side from 600 px wide (a phone held sideways too), the two scrolling together with the lines level and a gap where a line is in one only; a button switches between side by side and one column, in every comparison (report a43cd5).
+- Pinned images moved to their new upstream digests (alpine, debian, node, temurin, docker cli, mailpit, ntfy, registry); the F-Droid draft builds with Node 24.22.3.
+
+### Verified
+
+- The comparison: a new e2e test (red on 2.26.2: the dialog stayed) of a tab of its own on a phone held sideways (698 x 394), both sides of a difference and the lines after a line gone on one height, the layout button and a phone upright; green 1 + 5 runs. The two earlier comparison tests moved to the tab, green. Screenshots looked at: sideways, upright and a computer.
+- The gate (with the images repinned), the Android app's test on an emulator, and a fresh install.
+
 ## [2.26.2] - 2026-11-16
 
 ### Fixed

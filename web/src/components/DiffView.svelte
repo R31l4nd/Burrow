@@ -5,6 +5,7 @@
   import { Chunk, getChunks, MergeView, unifiedMergeView } from '@codemirror/merge';
   import { burrowEditorTheme, editorLabel } from '../lib/editor/theme.js';
   import { chunkAt, diffSummary, markPlaces } from '../lib/editor/diffinfo.js';
+  import { untrack } from 'svelte';
   import { t } from '../lib/i18n/index.svelte.js';
   import Icon from './Icon.svelte';
 
@@ -12,13 +13,38 @@
   // the reference): side by side where there is room (the older left), one column with the older
   // lines above the newer ones on a phone; how much differs and where, the previous and next
   // difference (F7, Shift+F7) with the first one in view at the start, a mark along the edge for each,
-  // and the unchanged stretches folded until asked for.
-  let { original, modified, label, names = null }: { original: string; modified: string; label: string; names?: [string, string] | null } = $props();
+  // and the unchanged stretches folded until asked for. Side by side the two scroll as one, the lines
+  // level, a gap where a line is only in one of them (report a43cd5: VS Code on a computer as the
+  // reference): from 600 px, a phone held sideways too; one column or two when asked.
+  let {
+    original,
+    modified,
+    label,
+    names = null,
+    fill = false,
+    help = null,
+  }: {
+    original: string;
+    modified: string;
+    label: string;
+    names?: [string, string] | null;
+    /** All the height its parent gives (a tab of its own), not a part of a dialog's. */
+    fill?: boolean;
+    /** What red and green mean, in one column (side by side the names above each say it). */
+    help?: string | null;
+  } = $props();
 
   let wrap = $state<HTMLDivElement | null>(null);
   let el = $state<HTMLDivElement | null>(null);
   let width = $state(0);
-  const side = $derived(width >= 760);
+  let asked = $state<'side' | 'one' | null>(null);
+  const roomy = $derived(width >= 600);
+  const side = $derived(asked ? asked === 'side' : roomy);
+  // A choice holds until the room changes across that line (a phone turned): then the room decides again.
+  $effect(() => {
+    void roomy;
+    untrack(() => (asked = null));
+  });
   let showAll = $state(false);
   let index = $state(-1);
   let target: EditorView | null = null;
@@ -95,7 +121,7 @@
   }
 </script>
 
-<div class="diffwrap" bind:this={wrap}>
+<div class="diffwrap" class:fill bind:this={wrap}>
   <div class="diffbar">
     {#if summary.places}
       <span class="small" data-testid="diff-summary"><b class="add">+{summary.added}</b> <b class="del">-{summary.removed}</b> {t('diff.places', { n: summary.places })}{#if index >= 0}{` | ${t('diff.at', { i: index + 1, n: chunks.length })}`}{/if}</span>
@@ -105,10 +131,12 @@
     <span class="spacer"></span>
     {#if summary.places}
       <label class="check small"><input type="checkbox" bind:checked={showAll} data-testid="diff-all" />{t('diff.showAll')}</label>
+      <button class="icon-btn" aria-pressed={side} aria-label={t('diff.sideBySide')} title={t('diff.sideBySide')} onclick={() => (asked = side ? 'one' : 'side')} data-testid="diff-layout"><Icon name="columns" size={18} /></button>
       <button class="icon-btn" aria-label={t('diff.prev')} title={t('diff.prev')} disabled={index <= 0} onclick={() => step(-1)} data-testid="diff-prev"><Icon name="chevron-up" size={18} /></button>
       <button class="icon-btn" aria-label={t('diff.next')} title={t('diff.next')} disabled={index >= chunks.length - 1} onclick={() => step(1)} data-testid="diff-next"><Icon name="chevron-down" size={18} /></button>
     {/if}
   </div>
+  {#if help && !side}<p class="dim small help">{help}</p>{/if}
   {#if side}<div class="names small dim"><span>{names?.[0] ?? t('diff.before')}</span><span>{names?.[1] ?? t('diff.after')}</span></div>{/if}
   <div class="diffbody">
     <!-- Scrolled by keyboard too (focusable), F7 and Shift+F7 inside it as in VS Code. -->
@@ -130,6 +158,23 @@
     flex-direction: column;
     gap: 6px;
     min-width: 0;
+  }
+  .diffwrap.fill {
+    height: 100%;
+    min-height: 0;
+  }
+  .fill .diffbody {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .fill .diff {
+    flex: 1;
+    max-height: none;
+  }
+  .help {
+    margin: 0;
   }
   .diffbar {
     display: flex;

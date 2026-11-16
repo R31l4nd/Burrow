@@ -37,7 +37,7 @@ read -r -p "Type 'burrow' to continue: " answer
 
 docker compose --profile backup down
 if [ "$kind" = bind ]; then
-  docker run --rm --label burrow.ignore=true -v "$where":/d alpine:3.22@sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f \
+  docker run --rm --label burrow.ignore=true -v "$where":/d alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f \
     sh -c 'rm -rf /d/* /d/.[!.]* /d/..?* 2>/dev/null || true'
 else
   docker volume rm "$where"

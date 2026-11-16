@@ -7,7 +7,7 @@ import { signIn } from './passkey.js';
 // could not be chosen there, and an empty view did not say why).
 
 const DOCKER_HOST = process.env.DOCKER_HOST_SSHD ?? 'burrow-e2e-docker';
-const ALPINE = 'alpine:3.22@sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f';
+const ALPINE = 'alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f';
 const NAMES = Array.from({ length: 14 }, (_, k) => `burrowtest-many-${String(k + 1).padStart(2, '0')}`);
 const RESTARTED = NAMES.slice(0, 4);
 // One that said 6000 lines, one 3000, and one that says nothing.

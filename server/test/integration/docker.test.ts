@@ -203,7 +203,7 @@ describe('logs', () => {
     expect(lines(inside).map((l) => l.text)).toEqual(['inside the container']);
     // A stopped container with a bind mount: docker exec cannot reach it, the host's side can.
     const [made] = await sh(
-      "mkdir -p /tmp/burrowtest-mnt && echo '2026-10-04T11:30:00Z on the host side' > /tmp/burrowtest-mnt/app.log && docker rm -fv burrowtest-mnt >/dev/null 2>&1; docker create --label burrow.ignore=true --name burrowtest-mnt -v /tmp/burrowtest-mnt:/data alpine:3.22@sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f true",
+      "mkdir -p /tmp/burrowtest-mnt && echo '2026-10-04T11:30:00Z on the host side' > /tmp/burrowtest-mnt/app.log && docker rm -fv burrowtest-mnt >/dev/null 2>&1; docker create --label burrow.ignore=true --name burrowtest-mnt -v /tmp/burrowtest-mnt:/data alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f true",
     );
     expect(made!.exitCode, made!.stderr).toBe(0);
     const mounted = await collect(`/api/docker/logs/ws?t=${encodeURIComponent(`${h.id}:burrowtest-mnt:${encodeURIComponent('/data/app.log')}`)}&tail=10&follow=0`, (m) => m.some((x) => x.t === 'end' || x.t === 'error'));
@@ -214,7 +214,7 @@ describe('logs', () => {
   it('log files kept with a container: added once, listed, suggested from its mounts and /var/log, removed', async () => {
     const sh = (command: string) => t.json<{ exitCode: number; stdout: string; stderr: string }[]>('POST', '/api/snippets/run', { hostIds: [h.id], command });
     await sh(
-      "mkdir -p /tmp/burrowtest-sug/sub && touch /tmp/burrowtest-sug/a.log /tmp/burrowtest-sug/sub/b.log /tmp/burrowtest-sug/c.txt && docker rm -fv burrowtest-sug >/dev/null 2>&1; docker run -d --label burrow.ignore=true --name burrowtest-sug -v /tmp/burrowtest-sug:/data alpine:3.22@sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f sh -c 'mkdir -p /var/log/app && touch /var/log/app/x.log && sleep 600' >/dev/null",
+      "mkdir -p /tmp/burrowtest-sug/sub && touch /tmp/burrowtest-sug/a.log /tmp/burrowtest-sug/sub/b.log /tmp/burrowtest-sug/c.txt && docker rm -fv burrowtest-sug >/dev/null 2>&1; docker run -d --label burrow.ignore=true --name burrowtest-sug -v /tmp/burrowtest-sug:/data alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f sh -c 'mkdir -p /var/log/app && touch /var/log/app/x.log && sleep 600' >/dev/null",
     );
     await new Promise((r) => setTimeout(r, 1500));
     const suggested = await t.json<string[]>('GET', `/api/docker/${h.id}/containers/burrowtest-sug/logfile-suggestions`);

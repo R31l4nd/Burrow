@@ -20,16 +20,16 @@ RepoType: git
 Repo: https://github.com/R31l4nd/Burrow.git
 
 Builds:
-  - versionName: 2.26.2
-    versionCode: 22602
-    commit: v2.26.2
+  - versionName: 2.27.0
+    versionCode: 22700
+    commit: v2.27.0
     subdir: android/app
     sudo:
       # Node for the direct route's page, which the app carries as assets.
-      - curl -fsSLo /tmp/node.tar.xz https://nodejs.org/dist/v24.22.2/node-v24.22.2-linux-x64.tar.xz
-      - echo "48cc0e21e048790e54c0cf5749c2725005313d652651c40b7a21feb9697aaf75  /tmp/node.tar.xz" | sha256sum -c -
+      - curl -fsSLo /tmp/node.tar.xz https://nodejs.org/dist/v24.22.3/node-v24.22.3-linux-x64.tar.xz
+      - echo "4f2b175a6d53a5c617a80dba2676238a0688cef28c6da4eba35c7d844e66fcfb  /tmp/node.tar.xz" | sha256sum -c -
       - tar -xJf /tmp/node.tar.xz -C /opt
-      - ln -s /opt/node-v24.22.2-linux-x64/bin/node /opt/node-v24.22.2-linux-x64/bin/npm /usr/local/bin/
+      - ln -s /opt/node-v24.22.3-linux-x64/bin/node /opt/node-v24.22.3-linux-x64/bin/npm /usr/local/bin/
       # Go for the app's own WireGuard (android/wg), bound with gomobile.
       - curl -fsSLo /tmp/go.tgz https://go.dev/dl/go1.27.4.linux-amd64.tar.gz
       - echo "7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840  /tmp/go.tgz" | sha256sum -c -
@@ -51,5 +51,5 @@ UpdateCheckMode: Tags ^v[0-9.]+$
 # The version code is major*10000 + minor*100 + patch (android/app/build.gradle.kts),
 # not the version itself: the checker reads it from the tag's own build file.
 UpdateCheckData: android/version-code.txt|(\d+)|package.json|"version":\s*"(\d+\.\d+\.\d+)"
-CurrentVersion: 2.26.2
-CurrentVersionCode: 22602
+CurrentVersion: 2.27.0
+CurrentVersionCode: 22700

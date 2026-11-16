@@ -11,7 +11,7 @@
 # NODE_IMAGE must match the FROM line in the Dockerfile; scripts/gate.sh checks it.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-NODE_IMAGE="node:24-trixie-slim@sha256:54f84b4cf8432b21aaffd5d3ce8d41e12cea0d10d33c09d2f3c9879d49d6b446"
+NODE_IMAGE="node:24-trixie-slim@sha256:af02d57b57719b9657a45199a79264a9437940cd55b3c7b3fc99615654f124a0"
 
 TTY=()
 [ -t 0 ] && [ -t 1 ] && TTY=(-it)

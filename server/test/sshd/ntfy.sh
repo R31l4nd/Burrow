@@ -4,7 +4,7 @@
 set -euo pipefail
 PORT="${NTFY_PORT:-5002}"
 NAME="${NTFY_CONTAINER:-burrowtest-ntfy}"
-NTFY="binwiederhier/ntfy:latest@sha256:fb48c413eb11d50339962b5d62cddce0f800e7f77c626d638a7c20cb7e9c4465"
+NTFY="binwiederhier/ntfy:latest@sha256:038da2be5e668fee6d36a62884eea48975e1b71c29a56964e5298c1b9165a573"
 case "${1:-}" in
   up)
     docker rm -fv "$NAME" >/dev/null 2>&1 || true

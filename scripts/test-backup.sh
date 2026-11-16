@@ -200,11 +200,11 @@ for _ in $(seq 1 50); do [ "$(docker inspect -f '{{.State.Health.Status}}' "$APP
 # it guessed "burrow_<name>", which could be another installation's).
 BURROW_RESET_LIB=1 . "$ROOT/scripts/reset.sh"
 docker rm -fv "$APP-reset" >/dev/null 2>&1 || true
-docker run -d --label burrow.ignore=true --name "$APP-reset" -v "$VOL":/data alpine:3.22@sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f sleep 60 >/dev/null
+docker run -d --label burrow.ignore=true --name "$APP-reset" -v "$VOL":/data alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f sleep 60 >/dev/null
 [ "$(data_target "$APP-reset")" = "volume $VOL" ] || { echo "reset would delete '$(data_target "$APP-reset")', not the volume $VOL"; exit 1; }
 docker rm -fv "$APP-reset" >/dev/null
 mkdir -p "$WORK/binddata"
-docker run -d --label burrow.ignore=true --name "$APP-reset" -v "$WORK/binddata":/data alpine:3.22@sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f sleep 60 >/dev/null
+docker run -d --label burrow.ignore=true --name "$APP-reset" -v "$WORK/binddata":/data alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f sleep 60 >/dev/null
 [ "$(data_target "$APP-reset")" = "bind $WORK/binddata" ] || { echo "reset would delete '$(data_target "$APP-reset")', not the folder $WORK/binddata"; exit 1; }
 docker rm -fv "$APP-reset" >/dev/null
 

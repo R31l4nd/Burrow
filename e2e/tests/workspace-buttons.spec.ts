@@ -390,7 +390,7 @@ test('several containers at once: stopped, started, restarted; Burrow itself nev
     expect(res!.exitCode, `${command}: ${res!.stderr}`).toBe(0);
     return res!.stdout.trim();
   };
-  const ALPINE = 'alpine:3.22@sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f';
+  const ALPINE = 'alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f';
   const names = ['burrowtest-bulk-a', 'burrowtest-bulk-b', 'burrowtest-bulk-c'];
   await sh(`docker rm -fv ${names.join(' ')} >/dev/null 2>&1; docker run -d --label burrow.ignore=true --name ${names[0]} ${ALPINE} sleep 3600 >/dev/null && docker run -d --label burrow.ignore=true --name ${names[1]} ${ALPINE} sleep 3600 >/dev/null && docker create --label burrow.ignore=true --name ${names[2]} ${ALPINE} sleep 3600 >/dev/null`);
   const state = async (n: string) => sh(`docker inspect --format '{{.State.Status}}' ${n}`);

@@ -1,0 +1,1 @@
+Comparing two files in a workspace opens them in a tab of their own: side by side when the screen is 600 px wide or more, a phone held sideways too, scrolling together with the lines level. A button switches to one column.

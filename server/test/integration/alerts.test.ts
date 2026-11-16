@@ -85,7 +85,7 @@ afterAll(async () => {
 describe('alerts', () => {
   it('a crash arrives as an alert and a push with a link to the logs', async () => {
     const got = nextAlert((a) => a.container === 'burrowtest-crash');
-    await sh(`docker rm -fv burrowtest-crash >/dev/null 2>&1; docker run -d --label burrow.ignore=true --name burrowtest-crash alpine:3.22@sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f sh -c 'echo "ERROR could not connect: password=hunter2"; sleep 1; exit 3' >/dev/null`);
+    await sh(`docker rm -fv burrowtest-crash >/dev/null 2>&1; docker run -d --label burrow.ignore=true --name burrowtest-crash alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f sh -c 'echo "ERROR could not connect: password=hunter2"; sleep 1; exit 3' >/dev/null`);
     const a = await got;
     expect(a).toMatchObject({ ruleName: 'Crashes', title: 'exited with code 3', hostName: 'docker-real', pushed: 'yes', count: 1 });
     // Its last lines go along, masked.
@@ -110,7 +110,7 @@ describe('alerts', () => {
 
   it('a crash in a stack Burrow is working on (an update, a deploy) is no alert; once it is done, it counts again', async () => {
     const run = (name: string) =>
-      sh(`docker rm -fv ${name} >/dev/null 2>&1; docker run -d --label burrow.ignore=true --label com.docker.compose.project=burrowtest-quiet --label com.docker.compose.service=${name} --name ${name} alpine:3.22@sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f sh -c 'sleep 1; exit 4' >/dev/null`);
+      sh(`docker rm -fv ${name} >/dev/null 2>&1; docker run -d --label burrow.ignore=true --label com.docker.compose.project=burrowtest-quiet --label com.docker.compose.service=${name} --name ${name} alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f sh -c 'sleep 1; exit 4' >/dev/null`);
     const seen: string[] = [];
     t.alerts.onAlert = (a) => void seen.push(a.container);
     let finish!: (code: number) => void;
@@ -132,13 +132,13 @@ describe('alerts', () => {
   it('an unhealthy container', async () => {
     const got = nextAlert((a) => a.container === 'burrowtest-sick');
     await sh(
-      `docker rm -fv burrowtest-sick >/dev/null 2>&1; docker run -d --label burrow.ignore=true --name burrowtest-sick --health-cmd false --health-interval 1s --health-retries 1 alpine:3.22@sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f sleep 300 >/dev/null`,
+      `docker rm -fv burrowtest-sick >/dev/null 2>&1; docker run -d --label burrow.ignore=true --name burrowtest-sick --health-cmd false --health-interval 1s --health-retries 1 alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f sleep 300 >/dev/null`,
     );
     expect(await got).toMatchObject({ title: 'turned unhealthy', ruleName: 'Crashes' });
   }, 30_000);
 
   it('a container someone stops is no crash', async () => {
-    await sh(`docker rm -fv burrowtest-stopme >/dev/null 2>&1; docker run -d --label burrow.ignore=true --name burrowtest-stopme alpine:3.22@sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f sleep 300 >/dev/null`);
+    await sh(`docker rm -fv burrowtest-stopme >/dev/null 2>&1; docker run -d --label burrow.ignore=true --name burrowtest-stopme alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f sleep 300 >/dev/null`);
     let fired = false;
     t.alerts.onAlert = (a) => (fired ||= a.container === 'burrowtest-stopme');
     await sh('docker stop -t 1 burrowtest-stopme >/dev/null');
@@ -222,7 +222,7 @@ describe('alerts', () => {
   }, 60_000);
 
   it('a container made anew under its name is followed again (AUDIT2 MON-13: its log was never read again)', async () => {
-    const ALPINE = 'alpine:3.22@sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f';
+    const ALPINE = 'alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f';
     const start = (word: string) => sh(`docker rm -fv burrowtest-again >/dev/null 2>&1; docker run -d --label burrow.ignore=true --name burrowtest-again ${ALPINE} sh -c 'while true; do echo "ERROR ${word} again"; sleep 1; done' >/dev/null`);
     await start('first');
     // Another container followed on the same host keeps the host's log stream open: only this

@@ -7,8 +7,8 @@
 set -euo pipefail
 PORT="${REGISTRY_PORT:-5001}"
 NAME="${REGISTRY_CONTAINER:-burrowtest-registry}"
-REGISTRY="registry:3@sha256:d4032d4cc323c1731c707931ecada07a53076eac38e3b61ae57533f170f2c6c3"
-ALPINE="alpine:3.22@sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f"
+REGISTRY="registry:3@sha256:82f6ff4a7f982960c8aa51617fea3aabc485df6e55cce80d22deb1de36f1bc3c"
+ALPINE="alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f"
 case "${1:-}" in
   up)
     docker rm -fv "$NAME" >/dev/null 2>&1 || true

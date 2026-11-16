@@ -12,7 +12,7 @@ const DOCKER_HOST = process.env.DOCKER_HOST_SSHD ?? 'burrow-e2e-docker';
 const LLM_URL = process.env.LLM_URL ?? 'http://burrow-e2e-llm:8000/v1';
 const NTFY_READ = 'http://127.0.0.1:5002';
 const TOPIC = `burrow-e2e-${Date.now().toString(36)}`;
-const ALPINE = 'alpine:3.22@sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f';
+const ALPINE = 'alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f';
 
 async function api<T>(page: Page, method: string, url: string, body?: unknown): Promise<T> {
   return page.evaluate(

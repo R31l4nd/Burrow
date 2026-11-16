@@ -1,6 +1,6 @@
 # Backup container: separate from the application image on purpose - a
 # restore must still work when the application no longer builds.
-FROM alpine:3.22@sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f
+FROM alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f
 # Which of Burrow's images this is: an untagged one left behind by a build is found by it (scripts/gate.sh, leftovers).
 LABEL burrow.image="backup"
 # cryptography from apk, not pip: Alpine is musl and pip's wheels expect glibc.

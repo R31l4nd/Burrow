@@ -4,7 +4,7 @@
 # logs JSON (pino-style levels) on stdout and errors on stderr, and a worker
 # that exits. Labelled as compose project "burrowtest".
 set -euo pipefail
-ALPINE="alpine:3.22@sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f"
+ALPINE="alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f"
 label() { printf -- '--label com.docker.compose.project=burrowtest --label com.docker.compose.service=%s --label com.docker.compose.project.config_files=/srv/burrowtest/compose.yaml' "$1"; }
 case "${1:-}" in
   up)

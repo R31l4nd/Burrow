@@ -153,7 +153,12 @@ Checked 2026-10-06.
     unchanged regions". Taken over (user, 2026-10-23): all of it in every
     comparison (Compare with..., compare with saved, a save conflict, a
     stack's review), with a count of the places and the lines added and
-    removed above it; side by side from 760 px of room.
+    removed above it; side by side from 600 px of room (a phone held
+    sideways too: report a43cd5, where VS Code keeps inline up to 900),
+    one column or two when asked, as its "Toggle Inline View". A
+    workspace's comparison opens as a tab of its own, as VS Code's does
+    (report a43cd5), named "other <-> this"; it is not kept with the open
+    tabs, its texts being as they were then.
   - VS Code's explorer and Filebrowser take files dropped from the
     computer on a folder, and VS Code follows the disk with a file
     watcher. Taken over (reports 6d86aa, 905455): a drop on a folder of a

@@ -1,0 +1,1 @@
+Twee bestanden vergelijken in een werkruimte opent ze in een eigen tabblad: naast elkaar vanaf 600 px breed, ook op een liggende telefoon, samen scrollend met de regels op gelijke hoogte. Een knop zet ze onder elkaar.

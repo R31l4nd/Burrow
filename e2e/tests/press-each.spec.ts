@@ -4,7 +4,7 @@ import { sayYes } from './confirm.js';
 import { signIn } from './passkey.js';
 import { lookAt, SOME_PASSES } from './checks.js';
 
-const ALPINE = 'alpine:3.22@sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f';
+const ALPINE = 'alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f';
 
 // The controls no other test pressed (e2e/controls-todo.json), each pressed
 // on purpose and what it does checked: after all the other tests, so what
