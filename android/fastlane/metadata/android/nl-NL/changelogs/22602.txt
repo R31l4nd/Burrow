@@ -1,0 +1,1 @@
+Een terminal in het paneel op een laag telefoonscherm toont weer zijn prompt: die bleef leeg als het paneel maar een paar regels hoog was.

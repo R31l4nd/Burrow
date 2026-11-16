@@ -92,7 +92,7 @@ class DirectRouteTest : WebTestBase() {
             // comes back with it on screen; typing still reaches the host (A3-AND-02).
             val before = web()
             killRenderer(before)
-            waitUntil("a new WebView for the direct route", 15_000) {
+            waitUntil("a new WebView for the direct route", 30_000) {
                 var now: WebView? = null
                 instr.runOnMainSync { now = a.webView }
                 now !== before

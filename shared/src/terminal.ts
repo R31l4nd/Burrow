@@ -161,8 +161,10 @@ export const clientMessage: z.ZodType<ClientMessage> = z.discriminatedUnion('t',
   z.object({ t: z.literal('input'), d: z.string().max(INPUT_MAX) }),
   z.object({
     t: z.literal('resize'),
-    cols: z.number().int().min(10).max(500),
-    rows: z.number().int().min(4).max(200),
+    // Whatever a terminal on screen fits, down to xterm's own least: a panel on a low phone fits 2 rows, and a
+    // size refused left the session at its old one, drawing rows out of sight (report ffef5f's test).
+    cols: z.number().int().min(2).max(500),
+    rows: z.number().int().min(1).max(200),
     active: z.boolean().optional(),
   }),
   z.object({ t: z.literal('ping') }),

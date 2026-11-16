@@ -92,7 +92,7 @@ class DeviceTest : WebTestBase() {
     fun t0_asksForTheServerFirst() {
         app.unlocked = false
         ActivityScenario.launch(MainActivity::class.java).use {
-            val input = device.wait(Until.findObject(By.res(ctx.packageName, "server_input")), 15_000)
+            val input = device.wait(Until.findObject(By.res(ctx.packageName, "server_input")), 30_000)
             assertNotNull("the setup screen asks for the server", input)
             screenshot("01-setup")
             // Only https: a plain address is refused with a message.
@@ -221,10 +221,10 @@ class DeviceTest : WebTestBase() {
             waitServerFile(web, sharedName, sharedSize)
             // The folder on screen shows it without a manual refresh.
             val q = org.json.JSONObject.quote(sharedName)
-            waitJs(web, "[...document.querySelectorAll('[data-testid=file-row]')].some(r => r.textContent.includes($q))", 15_000)
+            waitJs(web, "[...document.querySelectorAll('[data-testid=file-row]')].some(r => r.textContent.includes($q))", 30_000)
             screenshot("05b-uploaded")
             // Done without errors: the transfers list goes away by itself.
-            waitJs(web, "!document.querySelector('[data-testid=transfers], [data-testid=transfers-pill]')", 15_000)
+            waitJs(web, "!document.querySelector('[data-testid=transfers], [data-testid=transfers-pill]')", 30_000)
         }
         ctx.contentResolver.delete(uri, null, null)
     }
@@ -445,7 +445,7 @@ class DeviceTest : WebTestBase() {
             instr.runOnMainSync { before = a.currentWebView() }
             waitJs({ before!! }, "document.getElementById('state')")
             killRenderer(before!!)
-            waitUntil("a new WebView for the tab", 15_000) {
+            waitUntil("a new WebView for the tab", 30_000) {
                 var now: WebView? = null
                 instr.runOnMainSync { now = a.currentWebView() }
                 now != null && now !== before
@@ -616,14 +616,14 @@ class DeviceTest : WebTestBase() {
                 // Allowed only in the app's own question (audit 2026-11-05): No leaves it off.
                 val box = "document.querySelector('[data-testid=allow-screenshots]')"
                 js(web, "$box.click()")
-                val no = device.wait(Until.findObject(By.res(ctx.packageName, "ask_cancel")), 15_000)
+                val no = device.wait(Until.findObject(By.res(ctx.packageName, "ask_cancel")), 30_000)
                 assertNotNull("the app asks before screenshots are allowed", no)
                 no.click()
                 Thread.sleep(800)
                 assertTrue("said no: still secure", secure())
                 assertEquals("and the box not ticked", false, js(web, "$box.checked"))
                 js(web, "$box.click()")
-                assertNotNull(device.wait(Until.findObject(By.res(ctx.packageName, "ask_ok")), 15_000))
+                assertNotNull(device.wait(Until.findObject(By.res(ctx.packageName, "ask_ok")), 30_000))
                 // A tap at once is not taken (tapjacking): the OK waits a moment after it shows.
                 Thread.sleep(Style.GUARD_MS + 300)
                 screenshot("08c-screenshots-ask", mayBeBlack = true)
@@ -839,7 +839,7 @@ class DeviceTest : WebTestBase() {
             screenshot("11-tmux-text-box")
             assertEquals("typed into the text box, not the terminal (in front: ${inFront()})", "echo tmux-\$((6*7))", js(web, "document.querySelector('[data-testid=compose]').value"))
             tap("[data-testid=compose-send]")
-            waitUntil("tmux-42 run in the person's own tmux", 15_000, detail = { "screen: ${js(web, "$rows.slice(-400)")}" }) {
+            waitUntil("tmux-42 run in the person's own tmux", 30_000, detail = { "screen: ${js(web, "$rows.slice(-400)")}" }) {
                 js(web, "$rows.includes('tmux-42')") == true
             }
             screenshot("12-tmux-ran")
@@ -855,7 +855,7 @@ class DeviceTest : WebTestBase() {
             // A shake (what the accelerometer's two jolts end in; ShakeTest has
             // which jolts count): the report form, with the screen as it was.
             scenario.onActivity { it.shaken() }
-            waitJs(web, "document.querySelector('dialog[data-tour=bug-report][open] img')", 15_000)
+            waitJs(web, "document.querySelector('dialog[data-tour=bug-report][open] img')", 30_000)
             // Send on the screen as it opens, with the screen's picture in it: the shake is the
             // app's quickest way to report, and its Send was below the screen (UIA-02).
             val send = "(() => { const d = document.querySelector('dialog[data-tour=bug-report][open]'); const b = d && [...d.querySelectorAll('button')].find((x) => x.classList.contains('primary')); if (!b) return 'no primary button'; const r = b.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight ? true : 'Send at ' + Math.round(r.top) + '-' + Math.round(r.bottom) + ' of ' + innerHeight; })()"
@@ -1030,7 +1030,7 @@ class DeviceTest : WebTestBase() {
             // A plain shell (no program taking the mouse): one finger scrolls back, as ever.
             shell("input text seq%s1%s300")
             device.pressEnter()
-            waitJs(web, "document.querySelector('.xterm-rows').innerText.includes('299')", 15_000)
+            waitJs(web, "document.querySelector('.xterm-rows').innerText.includes('299')", 30_000)
             // The first number on the screen: smaller once scrolled back.
             val top = "Math.min(...[...document.querySelectorAll('.xterm-rows > div')].map(d => /^\\d+$/.test(d.textContent.trim()) ? Number(d.textContent) : 9999))"
             val before = (js(web, top) as Number).toDouble()
@@ -1098,7 +1098,7 @@ class DeviceTest : WebTestBase() {
                     for (attempt in 1..3) {
                         try {
                             Thread.sleep(800)
-                            waitUntil("the terminal has the focus with FUTO's keyboard, asked for plain characters", 15_000, detail = {
+                            waitUntil("the terminal has the focus with FUTO's keyboard, asked for plain characters", 30_000, detail = {
                                 shell("dumpsys input_method").lines().filter { it.contains("inputType") || it.contains("mCurMethodId") }.joinToString(" | ")
                             }) {
                                 tapTerminal()
@@ -1201,7 +1201,7 @@ class DeviceTest : WebTestBase() {
             assertEquals(9, WidgetNumbers.stored(prefs.widgetLast)!!.total)
             // Away from home: chosen in Settings -> Android app, kept by the app.
             js(web, "location.hash = '#/settings/android'")
-            waitJs(web, "document.querySelector('[data-testid=widget-away]')", 15_000)
+            waitJs(web, "document.querySelector('[data-testid=widget-away]')", 30_000)
             js(web, "(s => { s.value = 'last'; s.dispatchEvent(new Event('change', { bubbles: true })); })(document.querySelector('[data-testid=widget-away]'))")
             waitUntil("the choice kept by the app", 10_000) { prefs.widgetAway == "last" }
             screenshot("16-widget-setting")
@@ -1218,11 +1218,11 @@ class DeviceTest : WebTestBase() {
             val web = main(scenario)
             opened(web)
             js(web, "location.hash = '#/settings?s=notify'")
-            waitJs(web, "document.querySelector('[data-testid=push-toggle]')", 15_000)
+            waitJs(web, "document.querySelector('[data-testid=push-toggle]')", 30_000)
             assertEquals("off at first", tr("push.off"), js(web, "document.querySelector('[data-testid=push-state]').textContent.trim()"))
             js(web, "document.querySelector('[data-testid=push-toggle]').click()")
             val install = org.json.JSONObject.quote(ctx.getString(R.string.no_distributor).take(30))
-            waitJs(web, "[...document.querySelectorAll('[role=alert], [role=status]')].some(e => e.textContent.includes($install))", 15_000)
+            waitJs(web, "[...document.querySelectorAll('[role=alert], [role=status]')].some(e => e.textContent.includes($install))", 30_000)
         }
         // A message as the connector gives it: shown as Burrow's, a tap opens its page.
         Push.show(ctx, org.json.JSONObject(mapOf("title" to "Disk almost full", "body" to "/data on nas is 95% full", "page" to "/alerts", "priority" to 4, "topic" to "alerts")))

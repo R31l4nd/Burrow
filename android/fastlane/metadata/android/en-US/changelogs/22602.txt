@@ -1,0 +1,1 @@
+A terminal in the panel on a low phone screen shows its prompt again: it stayed empty when the panel was only a couple of rows high.

@@ -939,22 +939,35 @@ test('the keyboard coming up and going down in steps, as Android animates it: no
   await page.waitForTimeout(500);
   const size = sizes.at(-1)!;
   sizes.length = 0;
-  // The page's clock in the test's hands: the steps 30 ms apart on it, however long a resize takes on a
-  // busy machine (in the gate one took over the 200 ms the terminal waits, and its size went out).
-  await page.clock.install();
-  // Up in steps of 40 px, a frame or two apart, then down again the same way.
-  for (let h = 676; h >= 356; h -= 40) {
+  // Each step laid out by the page before its clock goes on, a box as high as the window watched as the terminal
+  // watches its own.
+  await page.evaluate(() => {
+    const probe = document.body.appendChild(document.createElement('div'));
+    probe.style.cssText = 'position: fixed; top: 0; left: 0; width: 1px; height: 100vh; pointer-events: none';
+    const w = window as unknown as { __laidOut: number };
+    w.__laidOut = 0;
+    new ResizeObserver(() => w.__laidOut++).observe(probe);
+  });
+  const laidOut = () => page.evaluate(() => (window as unknown as { __laidOut: number }).__laidOut);
+  const step = async (h: number) => {
+    const was = await laidOut();
     await page.setViewportSize({ width: 343, height: h });
+    await expect.poll(laidOut).toBeGreaterThan(was);
     await page.clock.runFor(30);
-  }
+  };
+  // The page's clock in the test's hands: the steps 30 ms apart on it, however long a resize takes on a
+  // busy machine (in the gate one took over the 200 ms the terminal waits, and its size went out). Paused: an
+  // installed clock still runs with real time, and on a busy machine the slow steps ran it past those 200 ms
+  // all the same (gates of 2026-11-11 and -14; 6 in 6 with the CPU 20 times slower).
+  await page.clock.install();
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 2000));
+  // Up in steps of 40 px, a frame or two apart, then down again the same way.
+  for (let h = 676; h >= 356; h -= 40) await step(h);
   await page.setViewportSize({ width: 343, height: 356 });
   await page.clock.runFor(800);
   await page.waitForTimeout(300);
   expect(sizes.filter((x) => x !== size), 'sizes sent while the keyboard came up').toEqual([]);
-  for (let h = 396; h <= 711; h += 40) {
-    await page.setViewportSize({ width: 343, height: h });
-    await page.clock.runFor(30);
-  }
+  for (let h = 396; h <= 711; h += 40) await step(h);
   await page.setViewportSize({ width: 343, height: 711 });
   await page.clock.runFor(800);
   await page.waitForTimeout(300);

@@ -191,7 +191,7 @@ abstract class WebTestBase {
      * showed the pairing form, and that was the picture (UIA-16); back from
      * Android's folder picker the same with the folder just added.
      */
-    protected fun drawn(web: () -> WebView, selector: String? = null, timeoutMs: Long = 15_000) {
+    protected fun drawn(web: () -> WebView, selector: String? = null, timeoutMs: Long = 30_000) {
         js(web, "window.__drawn = false; requestAnimationFrame(() => requestAnimationFrame(() => { window.__drawn = true }))")
         waitJs(web, "window.__drawn", timeoutMs)
         val q = selector?.let { org.json.JSONObject.quote(it) }
@@ -269,7 +269,7 @@ abstract class WebTestBase {
     protected val device: androidx.test.uiautomator.UiDevice get() = androidx.test.uiautomator.UiDevice.getInstance(instr)
 
     /** The activity on screen now (one we did not launch ourselves, such as after a tap). */
-    protected fun <T : android.app.Activity> resumed(cls: Class<T>, timeoutMs: Long = 15_000): T {
+    protected fun <T : android.app.Activity> resumed(cls: Class<T>, timeoutMs: Long = 30_000): T {
         var found: T? = null
         waitUntil("${cls.simpleName} on screen", timeoutMs) {
             instr.runOnMainSync {

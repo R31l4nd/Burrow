@@ -6,6 +6,19 @@ says how it was verified.
 
 ## [Unreleased]
 
+## [2.26.2] - 2026-11-16
+
+### Fixed
+
+- A terminal in the panel on a low phone screen, a couple of rows high, showed nothing: the server refused sizes under 4 rows, so the session kept its old size and drew its prompt out of sight.
+- Tests: the keyboard test on a phone kept the page's clock running with real time, so on a busy machine a size went out half-way (now paused); the Android app's test waits up to 30 s for a screen or a question.
+
+### Verified
+
+- The panel: a unit test of the sizes the server takes (2 rows refused on 2.26.1) and the e2e test of a low phone screen asserting the session's size is the one shown (24 rows against 2 shown on 2.26.1, empty 1 in 10 before); 11 runs in a row green.
+- The keyboard test: with the browser's CPU 20 times slower it failed 6 in 6 as it was and passed 6 in 6 now.
+- The gate, the Android app's test on an emulator, and a fresh install.
+
 ## [2.26.1] - 2026-11-15
 
 ### Fixed

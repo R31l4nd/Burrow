@@ -36,10 +36,13 @@ class PhoneFilesTest : WebTestBase() {
         return { a.webView }
     }
 
-    /** Found and pressed, found again when Android drew the screen anew in between (StaleObjectException). */
+    /**
+     * Found and pressed, found again when Android drew the screen anew in between (StaleObjectException).
+     * Up to 30 s: 15 ran out for a native question on an emulator beside a busy machine (2026-11-15).
+     */
     private fun press(what: String, selector: androidx.test.uiautomator.BySelector) {
         repeat(3) { n ->
-            val o = device.wait(Until.findObject(selector), 15_000)
+            val o = device.wait(Until.findObject(selector), 30_000)
             assertNotNull(what, o)
             try {
                 return o.click()

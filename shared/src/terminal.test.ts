@@ -36,6 +36,15 @@ describe('client messages', () => {
     expect(clientMessage.safeParse({ t: 'input', d: 'ls\r' }).success).toBe(true);
     expect(clientMessage.safeParse({ t: 'resize', cols: 80, rows: 24, active: true }).success).toBe(true);
     expect(clientMessage.safeParse({ t: 'resize', cols: 5000, rows: 24 }).success).toBe(false);
+  });
+
+  // A panel on a low phone screen fits 2 rows: refused, the session stayed at 80x24 and its 24 rows drawn into
+  // the 2 shown pushed the prompt out of sight (report ffef5f's test, empty 1 in 10). What xterm fits, down to its own least.
+  it('takes every size a terminal on screen fits', () => {
+    expect(clientMessage.safeParse({ t: 'resize', cols: 40, rows: 2, active: true }).success).toBe(true);
+    expect(clientMessage.safeParse({ t: 'resize', cols: 2, rows: 1 }).success).toBe(true);
+    expect(clientMessage.safeParse({ t: 'resize', cols: 1, rows: 1 }).success).toBe(false);
+    expect(clientMessage.safeParse({ t: 'resize', cols: 40, rows: 0 }).success).toBe(false);
     expect(clientMessage.safeParse({ t: 'exec', d: 'x' }).success).toBe(false);
   });
 });

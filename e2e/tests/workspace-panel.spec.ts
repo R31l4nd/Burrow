@@ -326,6 +326,13 @@ test('stack panel on a low phone screen: the sessions already running scroll in 
   const row = (await last.boundingBox())!;
   expect(row.y + row.height).toBeLessThanOrEqual(body.y + body.height + 1);
   await last.click();
+  await expect(screen(phone)).toBeVisible({ timeout: 20_000 });
+  // The session at the size shown: 2 rows here were refused, it stayed at 80x24 and drew its 24 rows into the 2
+  // shown, the prompt out of sight (empty 1 in 10).
+  const rowsShown = () => screen(phone).evaluate((r) => r.children.length);
+  await expect.poll(rowsShown, { timeout: 10_000 }).toBeLessThan(6);
+  const shown = await rowsShown();
+  await expect.poll(async () => (await api<{ id: string; rows: number }[]>(page, 'GET', '/api/terminal/sessions')).find((s) => s.id === made[made.length - 1])?.rows, { timeout: 10_000 }).toBe(shown);
   await expect(screen(phone)).toContainText('$', { timeout: 20_000 });
   await phoneCtx.close();
   for (const s of await api<{ id: string }[]>(page, 'GET', '/api/terminal/sessions')) if (!had.includes(s.id)) await api(page, 'DELETE', `/api/terminal/sessions/${s.id}`);
