@@ -456,9 +456,8 @@ test("a container's details on a phone: CPU and memory now in words, drawn once,
   await lookAt(page, 'container-info-phone');
 });
 
-test("the columns of every stack's table in one line: a long state or an update flag in one stack moves no other's (report 94465b)", async ({ page }) => {
-  await signIn(page);
-  // Two stacks on the first host's snapshot: one with short states, one with a long one and an image with an update.
+/** Two stacks on the first host's snapshot: one with short states, one with a long one and an image with an update (report 94465b). */
+async function alignStacks(page: Page) {
   const at = new Date(Date.now() - 3_600_000).toISOString();
   const c = (name: string, project: string, image: string, restarts: number, health: string | null) => ({ id: name, name, image, imageId: `sha256:${name}`, state: 'running', health, restarts, startedAt: at, finishedAt: null, exitCode: 0, oomKilled: false, createdAt: at, project, service: name, configFiles: null, workingDir: null });
   let into: number | null = null;
@@ -484,6 +483,11 @@ test("the columns of every stack's table in one line: a long state or an update 
     for (const hostId of hostIds) o.checks.push({ hostId, image: 'nginx:2-align', status: 'update', localDigest: null, remoteDigest: null, error: null, source: null, version: null, newerTag: null, checkedAt: at });
     await r.fulfill({ json: o });
   });
+}
+
+test("the columns of every stack's table in one line: a long state or an update flag in one stack moves no other's (report 94465b)", async ({ page }) => {
+  await signIn(page);
+  await alignStacks(page);
   await page.goto('/#/containers');
   await page.reload();
   const long = page.getByTestId('stack').filter({ hasText: 'alignlong' });
@@ -494,6 +498,33 @@ test("the columns of every stack's table in one line: a long state or an update 
   expect(edges.length).toBeGreaterThan(1);
   for (const e of edges) expect(e, 'the columns as in the first stack').toEqual(edges[0]);
   await lookAt(page, 'containers-aligned');
+});
+
+test("on a screen just wide enough for two columns, each stack's table fits its column: an update flag in sight, not cut off at its edge (report 5a729b)", async ({ page }) => {
+  await signIn(page);
+  // The report's words, in Dutch, on the narrowest screen with the stacks in two columns (reported at 1710 px).
+  await page.evaluate(() => localStorage.setItem('burrow.locale', 'nl'));
+  await alignStacks(page);
+  await page.setViewportSize({ width: 1700, height: 1000 });
+  await page.goto('/#/containers');
+  await page.reload();
+  const long = page.getByTestId('stack').filter({ hasText: 'alignlong' });
+  await expect(long.getByTestId('row-update')).toBeVisible();
+  // Two columns: some stack beside another.
+  const xs = new Set(await page.getByTestId('stack').evaluateAll((ss) => ss.map((s) => Math.round(s.getBoundingClientRect().left))));
+  expect(xs.size).toBeGreaterThan(1);
+  // Every column of every row, the flag's too, inside its stack's border.
+  const out = await page.getByTestId('stack').evaluateAll((ss) =>
+    ss.flatMap((s) => {
+      const box = s.getBoundingClientRect();
+      const right = box.right - parseFloat(getComputedStyle(s).borderRightWidth);
+      return [...s.querySelectorAll('.chead > *, .crow > *')].filter((c) => c.getBoundingClientRect().width > 0 && c.getBoundingClientRect().right > right + 0.5).map((c) => `${c.className.split(' ')[0]} "${c.textContent!.trim().slice(0, 20)}": ${Math.round(c.getBoundingClientRect().right - right)} px past the edge`);
+    }),
+  );
+  expect(out).toEqual([]);
+  await lookAt(page, 'containers-two-columns-narrow');
+  await page.evaluate(() => localStorage.setItem('burrow.locale', 'en'));
+  await page.setViewportSize({ width: 1280, height: 720 });
 });
 
 test("a part that could not be read says so with Try again: the stacks brought down, a host's alert limits (audit 2026-11-09)", async ({ page }) => {

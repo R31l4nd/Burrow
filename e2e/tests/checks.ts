@@ -938,6 +938,38 @@ export async function nothingOutOfReach(page: Page, where: string) {
 }
 
 /**
+ * The same sideways: a flag, pill or control cut off at the right (or left) of
+ * a box that hides what does not fit, with nothing in between that scrolls.
+ * A stack's table on a screen just wide enough for two columns ran past its
+ * border, its update flags cut to "updat" (report 5a729b).
+ */
+async function nothingCutSideways(page: Page, where: string) {
+  const out = await page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>('.flag, .pill, .badge, .chip, button, a[href]')]
+      .filter((e) => e.getClientRects().length && e.checkVisibility({ visibilityProperty: true, opacityProperty: true }) && !e.closest('dialog:not([open]), [aria-hidden=true], [inert], .cm-editor, .xterm, details:not([open])'))
+      .flatMap((e) => {
+        const r = e.getBoundingClientRect();
+        if (r.width < 4) return [];
+        for (let a = e.parentElement; a && a !== document.body; a = a.parentElement) {
+          const ox = getComputedStyle(a).overflowX;
+          // A box that scrolls on the way: reachable by scrolling it.
+          if ((ox === 'auto' || ox === 'scroll') && a.scrollWidth > a.clientWidth + 1) return [];
+          if (ox !== 'hidden' && ox !== 'clip') continue;
+          const box = a.getBoundingClientRect();
+          // Entirely out of it (a sliding strip, a folded part), or a box of a pixel (read aloud only): not meant to be seen.
+          if (r.left >= box.right || r.right <= box.left || box.width < 3) return [];
+          const cut = Math.max(r.right - box.right, box.left - r.left);
+          if (cut <= 2) continue;
+          const label = (e.getAttribute('aria-label') ?? e.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, 40);
+          return [`${e.dataset.testid ?? e.tagName.toLowerCase()} "${label}": ${Math.round(cut)} px cut off by ${a.tagName.toLowerCase()}.${[...a.classList].filter((c) => !c.startsWith('svelte-')).join('.')}`];
+        }
+        return [];
+      }),
+  );
+  expect.soft(out, `flags or controls cut off at the side with nothing that scrolls to them (${where})`).toEqual([]);
+}
+
+/**
  * A segmented choice's options stay inside it, each on one line: "Zwart
  * (OLED)" broke over two lines past the edge on a 343 px wide phone, and
  * later hung below its box over the colours.
@@ -2598,6 +2630,7 @@ async function lookOnce(page: Page, name: string, opts: { tips?: boolean; axe?: 
   await clampedTextInside(page, name);
   await contentUnderBar(page, name);
   await nothingOutOfReach(page, name);
+  await nothingCutSideways(page, name);
   await wordsWhole(page, name);
   await rowsReachable(page, name);
   await separatorsSpaced(page, name);

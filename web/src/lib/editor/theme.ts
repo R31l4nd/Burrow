@@ -37,6 +37,8 @@ export const burrowEditorTheme = [
     '.cm-searchMatch': { backgroundColor: 'color-mix(in srgb, var(--warn) 14%, transparent)', outline: '1px solid color-mix(in srgb, var(--warn) 55%, transparent)', borderRadius: '2px' },
     '.cm-searchMatch-selected': { backgroundColor: 'color-mix(in srgb, var(--accent) 18%, transparent)', outline: '2px solid var(--accent)' },
     '.cm-tooltip': { backgroundColor: 'var(--bg-raised)', color: 'var(--text)', border: '1px solid var(--border)' },
+    // One column of a comparison: the lines gone numbered as in the older file, in the colour of a removal.
+    '.cm-deletedNumbersGutter': { color: 'var(--danger)', backgroundColor: 'color-mix(in srgb, var(--danger) 8%, transparent)' },
   }),
   syntaxHighlighting(highlight),
 ];

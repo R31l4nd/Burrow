@@ -6,6 +6,31 @@ says how it was verified.
 
 ## [Unreleased]
 
+## [2.28.0] - 2026-11-17
+
+### Added
+
+- A workspace on a computer: a file of the tree hovered half a second shows its size, when it changed, owner and group, rights (as `ls` shows them, and in octal), path and a link's target; the file list, two editors side by side and a file beside its Markdown preview are resized by dragging the edge between them (or with the arrow keys on it), a double click puts it back, and the sizes are kept on the device (report 780048).
+
+### Changed
+
+- compose.yaml writes `no-new-privileges=true`, the form in Docker's documentation; the gate's compose check takes either form, and still fails without it.
+
+### Fixed
+
+- A comparison in one column numbers the lines gone with their numbers in the older file, beside them, in the colour of a removal (asked after report a43cd5).
+- An image's release notes and the editor's Markdown preview show the HTML in them as GitHub does (links, bold, italic, line breaks, code, pictures; layout tags and comments left out) instead of the tags as text (report aae3cd).
+- On a screen just wide enough for the stacks in two columns (1700 px and a little more), each stack's table fits its column, with the closer columns of a tablet, instead of running past its edge with the update flags cut off (report 5a729b).
+
+### Verified
+
+- A workspace's tooltip and edges: a new e2e test (red on 2.27.0: no tooltip) of a file's, a folder's and a link's tooltip, the three edges dragged, moved with an arrow key, double-clicked back, held between their limits, kept after a reload, and gone on a phone; green 1 + 5 runs. Unit tests of the rights as `ls` shows them and of the sizes kept (red with the bug the e2e test found: a share read before it was defined, so a kept split came back as half). Screenshots looked at: the tooltip and the edges.
+- Release notes: a unit test (red on 2.27.0) of the HTML GitHub shows, with a link only to http(s), no attribute but the ones Burrow writes, and a model's answer left as text; the stack test's notes carry an HTML block, green; the editor's Markdown preview test green.
+- One column of a comparison: a unit test (red before) of the older file's numbers of the lines gone; the comparison test checks the number beside its line on a phone upright, screenshot looked at.
+- Containers in two columns: a new e2e test at 1700 px in Dutch (red on 2.27.0: the update flag past its stack's edge) of every column inside its stack; a new check of every screenshot, a flag, pill or control cut off at the side with nothing that scrolls to it. Screenshot looked at.
+- The compose check fails with `no-new-privileges=false` and passes with `=true`.
+- The gate, the Android app's test on an emulator, and a fresh install.
+
 ## [2.27.0] - 2026-11-16
 
 ### Changed

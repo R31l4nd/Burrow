@@ -159,6 +159,19 @@ Checked 2026-10-06.
     workspace's comparison opens as a tab of its own, as VS Code's does
     (report a43cd5), named "other <-> this"; it is not kept with the open
     tabs, its texts being as they were then.
+  - VS Code resizes its side bar, its editor groups and an editor beside
+    its Markdown preview by a sash between them (drag; a double click on
+    the sash between groups makes them even again), and keeps the sizes;
+    its explorer shows only the path on hover. **Windows Explorer** shows
+    a file's type, size and date in a tooltip after a moment's hover.
+    Taken over (report 780048): the same three edges in a workspace on a
+    wide screen, dragged, moved with the arrow keys, double-clicked back
+    to the start, kept on the device (`burrow.wsLayout`), the editor
+    never squeezed under 480 px; a tooltip after half a second on a file
+    of the tree, as Explorer's but with what Files' columns show (size,
+    changed, owner:group, rights as rwx and octal, path, a link's target).
+    On a phone there is no hover: its Properties stay in the long-press
+    menu.
   - VS Code's explorer and Filebrowser take files dropped from the
     computer on a folder, and VS Code follows the disk with a file
     watcher. Taken over (reports 6d86aa, 905455): a drop on a folder of a
@@ -505,6 +518,14 @@ Checked 2026-10-06.
   in the stack's update and, since report ac3a68, from a container's own
   "Update now" question, and says so when the image does not tell where its
   notes are.
+  - **GitHub** renders the HTML in release notes and READMEs through a
+    sanitizer (an allowlist of tags and attributes). Taken over (report
+    aae3cd: the tags showed as text): the notes and the editor's Markdown
+    preview show `<a>`, `<b>`, `<i>`, `<code>`, `<br>` and `<img>` as
+    GitHub does, written again by Burrow without other attributes (a link
+    only to http(s), a picture only from GitHub through Burrow), layout
+    tags (`<p align>`, `<div>`, `<details>`, ...) left out with their text,
+    comments hidden; a model's answer keeps every tag as text.
 
 - **What's Up Docker** and **Diun** read an image's version from its tag or
   its OCI labels; **Renovate** knows the official images' versions from

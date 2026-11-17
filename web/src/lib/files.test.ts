@@ -5,7 +5,7 @@ vi.hoisted(() => {
   Object.assign(globalThis, { document: { documentElement: {}, hidden: false, addEventListener() {}, removeEventListener() {} } });
 });
 
-const { cancelUpload, clearClipboard, clearFinished, clipboard, followJob, formatBytes, openKind, rawUrl, setClipboard, transfers, upload } = await import('./files.svelte.js');
+const { cancelUpload, clearClipboard, clearFinished, clipboard, followJob, formatBytes, modeText, openKind, rawUrl, setClipboard, transfers, upload } = await import('./files.svelte.js');
 const { setLocale } = await import('./i18n/index.svelte.js');
 const { setSession } = await import('./session.svelte.js');
 
@@ -257,6 +257,9 @@ describe('the clipboard and another account', () => {
 });
 
 describe('files by name', () => {
+  it("rights as ls shows them, with the octal number: a file's tooltip in a workspace (report 780048)", () => {
+    expect([0o640, 0o755, 0o4755, 0o1777, 0o2750, 0o4644, 0].map(modeText)).toEqual(['rw-r----- (0640)', 'rwxr-xr-x (0755)', 'rwsr-xr-x (4755)', 'rwxrwxrwt (1777)', 'rwxr-s--- (2750)', 'rwSr--r-- (4644)', '--------- (0000)']);
+  });
   it('sizes read easily; the raw address; what opening a file does', () => {
     expect([0, 1023, 1024, 1536, 15 * 1024, 5 * 1024 ** 3, 3 * 1024 ** 5].map(formatBytes)).toEqual(['0 B', '1023 B', '1.0 KB', '1.5 KB', '15 KB', '5.0 GB', '3072 TB']);
     expect(rawUrl(2, '/etc/a b.txt')).toBe('/api/files/2/raw?path=%2Fetc%2Fa%20b.txt');

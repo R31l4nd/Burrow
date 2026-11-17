@@ -32,3 +32,12 @@ export function chunkAt(chunks: readonly Chunk[], pos: number): number {
   for (const [i, c] of chunks.entries()) if (c.fromB <= pos) at = i;
   return at;
 }
+
+/**
+ * One column: the older file's numbers of the lines gone at a position of the newer one (where the
+ * comparison shows them), so they are numbered as the lines around them are (asked 2026-11-17).
+ */
+export function deletedLines(chunks: readonly Chunk[], a: Text, pos: number): { first: number; count: number } | null {
+  const c = chunks.find((x) => x.fromB === pos && x.toA > x.fromA);
+  return c ? { first: a.lineAt(c.fromA).number, count: linesIn(a, c.fromA, c.toA) } : null;
+}

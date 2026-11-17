@@ -1,7 +1,7 @@
 import { Chunk } from '@codemirror/merge';
 import { Text } from '@codemirror/state';
 import { describe, expect, it } from 'vitest';
-import { chunkAt, diffSummary, markPlaces } from './diffinfo.js';
+import { chunkAt, deletedLines, diffSummary, markPlaces } from './diffinfo.js';
 
 // Comparing two files said at once where they differ and how much (user, 2026-10-23, as VS Code):
 // the places, the lines added and removed, and marks along the scrollbar.
@@ -28,5 +28,17 @@ describe('diff information', () => {
     expect(chunkAt(chunks, b.line(2).from)).toBe(0);
     expect(chunkAt(chunks, b.line(5).from)).toBe(0);
     expect(chunkAt(chunks, b.line(11).from)).toBe(1);
+  });
+
+  it("one column: the older file's numbers of the lines gone, beside them (asked 2026-11-17)", () => {
+    const old = Text.of(['one', 'two', 'three', 'four', 'five', '']);
+    const now = Text.of(['one', 'four', 'FIVE', '']);
+    const c = Chunk.build(old, now);
+    // two and three gone: shown above "four", numbered 2 and 3; five changed: its old line numbered 5.
+    expect(deletedLines(c, old, now.line(2).from)).toEqual({ first: 2, count: 2 });
+    expect(deletedLines(c, old, now.line(3).from)).toEqual({ first: 5, count: 1 });
+    // Nothing gone there, or only lines added: no numbers.
+    expect(deletedLines(c, old, 0)).toBeNull();
+    expect(deletedLines(chunks, a, b.line(11).from)).toBeNull();
   });
 });

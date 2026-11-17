@@ -21,6 +21,8 @@
   import SearchPanel from '../components/workspace/SearchPanel.svelte';
   import CompareDialog from '../components/workspace/CompareDialog.svelte';
   import DiffView from '../components/DiffView.svelte';
+  import Sash from '../components/Sash.svelte';
+  import { EDITOR_MIN, SIDE_MIN, WS_LAYOUT, keepWsLayout, share, wsLayout } from '../lib/wslayout.svelte.js';
   import { fileLabels, type FileLabel } from '../lib/tablabels.js';
   import { moveTab } from '../lib/termsplit.js';
   import { renamedTab } from '../lib/wstabs.js';
@@ -360,6 +362,25 @@
     narrowQuery?.addEventListener('change', on);
     return () => narrowQuery?.removeEventListener('change', on);
   });
+  // The file list's width and the two editors' shares, changed by the edges between them and kept
+  // on this device (report 780048). The list is a drawer under 900 px: no edge then.
+  const wideQuery = typeof window !== 'undefined' ? matchMedia('(min-width: 900px)') : null;
+  let wide = $state(wideQuery?.matches ?? true);
+  $effect(() => {
+    const on = () => (wide = wideQuery?.matches ?? true);
+    wideQuery?.addEventListener('change', on);
+    return () => wideQuery?.removeEventListener('change', on);
+  });
+  let bodyEl = $state<HTMLElement>();
+  let bodyW = $state(0);
+  const sideFits = (w: number) => Math.round(Math.max(SIDE_MIN, bodyW ? Math.min(w, bodyW - EDITOR_MIN) : w));
+  const sideW = $derived(sideFits(wsLayout.side));
+  let editorsEl = $state<HTMLElement>();
+  const sideTo = (x: number) => (wsLayout.side = sideFits(x - (bodyEl?.getBoundingClientRect().left ?? 0)));
+  function splitTo(x: number) {
+    const r = editorsEl?.getBoundingClientRect();
+    if (r?.width) wsLayout.split = share((x - r.left) / r.width);
+  }
   let dragging: string | null = null;
   function reorder(order: string[]) {
     tabs.sort((a, b) => order.indexOf(a.path) - order.indexOf(b.path));
@@ -529,10 +550,10 @@
       {#if active}<button class="icon-btn" aria-label={t('editor.tools')} title={t('editor.tools')} onclick={() => active?.pane?.openTools()} data-testid="editor-menu"><Icon name="more" /></button>{/if}
     </header>
 
-    <div class="body">
+    <div class="body" bind:this={bodyEl} bind:clientWidth={bodyW}>
       <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
       {#if drawer}<div class="scrim narrow-only" onclick={() => (drawer = false)}></div>{/if}
-      <aside class="side" class:open={drawer}>
+      <aside class="side" class:open={drawer} style:width={wide ? `${sideW}px` : undefined} data-testid="ws-side">
         <div class="seg" role="tablist" use:roving>
           {#each [['files', t('ws.files')], ['search', t('ws.search')], ['git', 'Git'], ['outline', t('ws.outline')]] as const as [k, label] (k)}
             <button role="tab" aria-selected={side === k} class:on={side === k} onclick={() => (side = k)} data-testid="ws-tab-{k}">
@@ -585,13 +606,17 @@
           {/if}
         </div>
       </aside>
+      {#if wide}
+        <Sash label={t('ws.sashSide')} value={bodyW ? (sideW / bodyW) * 100 : 0} left="{sideW}px" onmove={sideTo} onstep={(by) => (wsLayout.side = sideFits(sideW + by * 16))} onreset={() => (wsLayout.side = WS_LAYOUT.side)} ondone={keepWsLayout} testid="ws-side-sash" />
+      {/if}
 
       <!-- With the panel open, the editor and the panel share the room (e2e checks: data-split). -->
       <div class="main" data-split={panel ? '' : undefined}>
         {#if tabs.length}
           <!-- Open files: a name to switch to, a x to close. Not ARIA tabs: a
                tab may not hold a second button. Split: a bar on each side. -->
-          <div class="editors" class:split data-testid="ws-editors">
+          <div class="editors" class:split bind:this={editorsEl} style:grid-template-columns={split ? `minmax(0, ${wsLayout.split}fr) minmax(0, ${1 - wsLayout.split}fr)` : undefined} data-testid="ws-editors">
+          {#if split}<Sash label={t('ws.sashSplit')} value={wsLayout.split * 100} left="{wsLayout.split * 100}%" onmove={splitTo} onstep={(by) => (wsLayout.split = share(wsLayout.split + by * 0.05))} onreset={() => (wsLayout.split = WS_LAYOUT.split)} ondone={keepWsLayout} testid="ws-split-sash" />{/if}
           {#each sides as g (g)}
           <div
             use:scrollCue
@@ -789,6 +814,7 @@
     flex-direction: column;
   }
   .editors {
+    position: relative;
     flex: 1;
     min-height: 0;
     display: grid;

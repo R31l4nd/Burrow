@@ -1,0 +1,1 @@
+In een werkruimte op de computer toont een bestand onder de muis zijn grootte, datum, eigenaar en rechten; de bestandenlijst en de editors naast elkaar zijn breder of smaller te slepen. Release notes tonen hun links en opmaak. Containers op een breed scherm houden hun updatelabel in beeld.

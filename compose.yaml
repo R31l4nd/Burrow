@@ -58,7 +58,7 @@ services:
     cap_drop:
       - ALL
     security_opt:
-      - "no-new-privileges:true"
+      - "no-new-privileges=true"
     read_only: true
     tmpfs:
       - /tmp:size=${BURROW_TMP_SIZE:-256m}
@@ -98,7 +98,7 @@ services:
     cap_drop:
       - ALL
     security_opt:
-      - "no-new-privileges:true"
+      - "no-new-privileges=true"
     read_only: true
     # A round works in /tmp (memory): about three times the database.
     tmpfs:

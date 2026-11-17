@@ -5,6 +5,7 @@
   import { Chunk, getChunks, MergeView, unifiedMergeView } from '@codemirror/merge';
   import { burrowEditorTheme, editorLabel } from '../lib/editor/theme.js';
   import { chunkAt, diffSummary, markPlaces } from '../lib/editor/diffinfo.js';
+  import { deletedNumbers } from '../lib/editor/deletednumbers.js';
   import { untrack } from 'svelte';
   import { t } from '../lib/i18n/index.svelte.js';
   import Icon from './Icon.svelte';
@@ -85,7 +86,7 @@
     } else {
       const v = new EditorView({
         parent: el,
-        state: EditorState.create({ doc: modified, extensions: [...base, editorLabel(label), unifiedMergeView({ original, mergeControls: false, ...(collapse ? { collapseUnchanged: collapse } : {}) })] }),
+        state: EditorState.create({ doc: modified, extensions: [...base, editorLabel(label), deletedNumbers, unifiedMergeView({ original, mergeControls: false, ...(collapse ? { collapseUnchanged: collapse } : {}) })] }),
       });
       target = v;
       found = getChunks(v.state)?.chunks ?? [];

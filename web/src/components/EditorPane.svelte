@@ -63,6 +63,8 @@
   import { brokenPictures } from '../lib/brokenpictures.js';
   import { keepPictures } from '../lib/keeppictures.js';
   import type { TextSource } from '../lib/phonefiles.js';
+  import Sash from './Sash.svelte';
+  import { WS_LAYOUT, keepWsLayout, share, wsLayout } from '../lib/wslayout.svelte.js';
 
   // One file on one host, with its language server, problems, the mobile key
   // bar and safe saving: a temporary file renamed over the original; if the
@@ -153,6 +155,12 @@
   let sideHtml = $state('');
   let sideTimer: ReturnType<typeof setTimeout> | undefined;
   const sideShown = $derived(side && paneW >= SIDE_MIN);
+  // The text's share beside its preview, by the edge between them (report 780048), kept with the workspace's sizes.
+  let splitEl = $state<HTMLElement>();
+  function mdTo(x: number) {
+    const r = splitEl?.getBoundingClientRect();
+    if (r?.width) wsLayout.md = share((x - r.left) / r.width);
+  }
   function readSide() {
     try {
       return localStorage.getItem(SIDE_KEY) === '1';
@@ -725,9 +733,10 @@
     {#if rootOnly}
       <div class="sudo-bar small root-only" data-testid="root-only-bar"><span>{t('editor.rootOnly')}</span><button class="btn small" onclick={editWithSudo} data-testid="edit-sudo">{t('editor.editSudo')}</button></div>
     {:else if readOnly}<div class="sudo-bar small" data-testid="readonly-bar">{t(source ? 'phone.readOnly' : 'editor.readOnly')}</div>{/if}
-    <div class="split">
-      <div class="cm" bind:this={el} data-testid="editor" data-main data-private></div>
+    <div class="split" bind:this={splitEl}>
+      <div class="cm" bind:this={el} style:flex={sideShown && lang.name === 'Markdown' ? `0 0 ${wsLayout.md * 100}%` : undefined} data-testid="editor" data-main data-private></div>
       {#if sideShown && lang.name === 'Markdown'}
+        <Sash label={t('editor.sashPreview')} value={wsLayout.md * 100} left="{wsLayout.md * 100}%" onmove={mdTo} onstep={(by) => (wsLayout.md = share(wsLayout.md + by * 0.05))} onreset={() => (wsLayout.md = WS_LAYOUT.md)} ondone={keepWsLayout} testid="md-sash" />
         <!-- svelte-ignore a11y_no_noninteractive_tabindex (a scrolling box: keyboard users scroll it once it has focus) -->
         <aside class="md-side" tabindex="0" aria-label={t('editor.preview')} data-testid="markdown-side"><div class="md-preview" use:brokenPictures use:keepPictures={sideHtml} data-testid="markdown-rendered" data-private></div></aside>
       {/if}
@@ -902,6 +911,7 @@
     gap: 4px 12px;
   }
   .split {
+    position: relative;
     flex: 1;
     min-height: 0;
     display: flex;

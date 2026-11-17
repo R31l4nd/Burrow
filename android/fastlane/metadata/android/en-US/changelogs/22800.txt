@@ -1,0 +1,1 @@
+In a workspace on a computer, a file hovered a moment shows its size, date, owner and rights; the file list and the editors side by side are resized by dragging their edge. Release notes show their links and formatting. Containers on a wide screen keep their update flags in sight.

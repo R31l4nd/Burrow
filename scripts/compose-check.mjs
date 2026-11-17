@@ -19,7 +19,8 @@ for (const name of ['burrow', 'backup']) {
   want(s.read_only === true, `${name}: read_only`);
   want((s.cap_drop ?? []).includes('ALL'), `${name}: cap_drop ALL`);
   want((s.cap_add ?? []).length === 0, `${name}: no cap_add`);
-  want((s.security_opt ?? []).includes('no-new-privileges:true'), `${name}: no-new-privileges`);
+  // Docker takes it as written either way: no-new-privileges, :true or =true (=true since 2026-11-17).
+  want((s.security_opt ?? []).some((o) => /^no-new-privileges([:=]true)?$/.test(o)), `${name}: no-new-privileges`);
   want(!s.privileged, `${name}: not privileged`);
   want((s.tmpfs ?? []).some((t) => t.split(':')[0] === '/tmp'), `${name}: /tmp on a tmpfs`);
   want(!s.ports?.length, `${name}: no published port`);

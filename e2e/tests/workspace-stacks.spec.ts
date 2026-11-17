@@ -197,7 +197,7 @@ test('edit a compose file, review the diff, deploy; an outdated image updated au
             tag: 'v2.1',
             name: 'v2.1',
             publishedAt: '2026-09-29T00:00:00Z',
-            body: '### Fixes\n- Logs keep their colours\n- Security fix for the `/api` token (see [the advisory](https://github.com/burrow-test/app/security))\n\nThe new menu:\n![](https://github.com/user-attachments/assets/b011c1a2-b81c-47a8-b3d8-159d829fcf82 "=428x659")',
+            body: '<p align="center">\n<a href="https://chat.example/invite/x">\n<img src="https://icons.example/api?i=chat" />\n</a>\n<br />\n<i>Join us</i>\n</p>\n\n### Fixes\n- Logs keep their colours\n- Security fix for the `/api` token (see [the advisory](https://github.com/burrow-test/app/security))\n\nThe new menu:\n![](https://github.com/user-attachments/assets/b011c1a2-b81c-47a8-b3d8-159d829fcf82 "=428x659")',
             url: 'https://github.com/burrow-test/app/releases/tag/v2.1',
             flags: { breaking: [], important: ['Security fix for the /api token'], major: false },
           },
@@ -205,7 +205,7 @@ test('edit a compose file, review the diff, deploy; an outdated image updated au
             tag: 'v2',
             name: 'v2',
             publishedAt: '2026-09-27T00:00:00Z',
-            body: '## Breaking changes\n- PORT is now HTTP_PORT\n\n## Changes\n- Faster start\n- <b>not bold</b>',
+            body: '## Breaking changes\n- PORT is now HTTP_PORT\n\n## Changes\n- Faster start\n- <b>bold</b> too',
             url: 'https://github.com/burrow-test/app/releases/tag/v2',
             flags: { breaking: ['PORT is now HTTP_PORT'], important: [], major: false },
           },
@@ -227,12 +227,16 @@ test('edit a compose file, review the diff, deploy; an outdated image updated au
   await page.getByTestId('whats-new').click();
   const notes = page.getByTestId('changelog');
   await expect(notes).toContainText('3 newer versions: v1.9 to v2.1');
-  // Formatted: headings and lists as such, a link to its site; HTML in the notes stays text.
+  // Formatted: headings and lists as such, a link to its site; the HTML of the notes shown as
+  // GitHub shows it, never its tags as text (report aae3cd), a picture from elsewhere not loaded.
   const v2 = notes.getByTestId('release').filter({ has: page.getByTestId('release-breaking') });
   await expect(v2.locator('h3', { hasText: /^Changes$/ })).toBeVisible();
   await expect(v2.locator('li', { hasText: 'Faster start' })).toBeVisible();
-  await expect(notes).toContainText('<b>not bold</b>');
-  await expect(notes.locator('b')).toHaveCount(0);
+  await expect(v2.locator('li strong', { hasText: /^bold$/ })).toBeVisible();
+  await expect(notes.getByRole('link', { name: 'https://icons.example/api?i=chat' })).toHaveAttribute('href', 'https://chat.example/invite/x');
+  await expect(notes.locator('em', { hasText: 'Join us' })).toBeVisible();
+  await expect(notes).not.toContainText('<');
+  await expect(notes.locator('b, img[src*="icons.example"]')).toHaveCount(0);
   await expect(notes.getByRole('link', { name: 'the advisory' })).toHaveAttribute('href', 'https://github.com/burrow-test/app/security');
   const shot = notes.getByTestId('changelog-body').locator('img').first();
   await expect(shot).toHaveAttribute('src', `/api/changelog/image?url=${encodeURIComponent('https://github.com/user-attachments/assets/b011c1a2-b81c-47a8-b3d8-159d829fcf82')}`);

@@ -232,6 +232,12 @@ test('a comparison opens in a tab of its own, the two files side by side scrolli
   await page.setViewportSize({ width: 412, height: 839 });
   await expect(diff.locator('.cm-editor')).toHaveCount(1);
   await expect(diff.locator('.cm-deletedChunk').first()).toContainText('line 5');
+  // The lines gone numbered as in the older file, each beside its line (asked 2026-11-17).
+  const gone = diff.locator('.cm-deletedNumbers').first();
+  await expect(gone).toHaveText('5');
+  const [num, old] = [(await gone.boundingBox())!, (await diff.locator('.cm-deletedLine').first().boundingBox())!];
+  expect(Math.abs(num.y - old.y), 'the number on the line it numbers').toBeLessThan(2);
+  await lookAt(page, 'compare-tab-upright');
 
   // Closed as any tab: the file's tab stays, and a comparison is not opened again with the page.
   await page.setViewportSize({ width: 1440, height: 900 });

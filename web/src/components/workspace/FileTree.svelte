@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { DirListing, FileEntry } from '@burrow/shared';
   import { errorMessage, get } from '../../lib/api.js';
-  import { t } from '../../lib/i18n/index.svelte.js';
+  import { dateTime, relativeTime, t } from '../../lib/i18n/index.svelte.js';
+  import { formatBytes, modeText } from '../../lib/files.svelte.js';
   import { keepFresh } from '../../lib/keepfresh.js';
   import { toast } from '../../lib/ui.svelte.js';
   import { dragsFiles, droppedFiles, uploadInto } from '../../lib/uploadinto.js';
@@ -113,6 +114,43 @@
   }
 
   const dirty = (r: string) => Object.keys(changes).some((p) => p.startsWith(`${r}/`));
+
+  // A file hovered a moment (half a second, as Windows Explorer): its properties beside the list, what
+  // Files' columns show (report 780048). Only with a mouse: a phone has them in the long-press menu.
+  let tip = $state<{ e: FileEntry; x: number; y: number } | null>(null);
+  let tipTimer: ReturnType<typeof setTimeout> | undefined;
+  function tipIn(ev: PointerEvent, e: FileEntry) {
+    clearTimeout(tipTimer);
+    if (ev.pointerType !== 'mouse') return;
+    const row = ev.currentTarget as HTMLElement;
+    tipTimer = setTimeout(() => {
+      const r = row.getBoundingClientRect();
+      tip = { e, x: r.right + 6, y: r.top };
+    }, 500);
+  }
+  function tipOut() {
+    clearTimeout(tipTimer);
+    tip = null;
+  }
+  // Gone on a scroll, a key or leaving the window; never left behind.
+  $effect(() => {
+    if (!tip) return;
+    window.addEventListener('scroll', tipOut, true);
+    window.addEventListener('keydown', tipOut);
+    window.addEventListener('blur', tipOut);
+    return () => {
+      window.removeEventListener('scroll', tipOut, true);
+      window.removeEventListener('keydown', tipOut);
+      window.removeEventListener('blur', tipOut);
+    };
+  });
+  $effect(() => () => clearTimeout(tipTimer));
+  /** Kept on the screen: up from the bottom, in from the right. */
+  function fit(node: HTMLElement) {
+    const r = node.getBoundingClientRect();
+    node.style.top = `${Math.max(8, Math.min(r.top, innerHeight - r.height - 8))}px`;
+    node.style.left = `${Math.max(8, Math.min(r.left, innerWidth - r.width - 8))}px`;
+  }
 </script>
 
 {#snippet level(dir: string, depth: number)}
@@ -129,7 +167,11 @@
       aria-expanded={isDir(e) ? open.has(r) : undefined}
       onclick={() => toggle(e)}
       ondblclick={() => !isDir(e) && onopen(r, true)}
-      oncontextmenu={(ev) => onmenu && (ev.preventDefault(), onmenu(e))}
+      oncontextmenu={(ev) => (tipOut(), onmenu && (ev.preventDefault(), onmenu(e)))}
+      onpointerenter={(ev) => tipIn(ev, e)}
+      onpointerleave={tipOut}
+      onpointerdown={tipOut}
+      aria-describedby={tip?.e.path === e.path ? 'file-tip' : undefined}
       class:droptarget={dropAt !== null && dropAt !== '' && dropAt === r}
       data-testid="tree-node"
       data-path={r}
@@ -154,6 +196,22 @@
   {#if loading.has('') && !children['']}<p role="none" class="dim small pad">{t('common.loading')}</p>{/if}
   {#if failed['']}<p role="none" class="small bad pad" data-testid="tree-error">{failed['']}</p>{/if}
 </div>
+
+{#if tip}
+  {@const e = tip.e}
+  <div class="tip" id="file-tip" role="tooltip" style:left="{tip.x}px" style:top="{tip.y}px" use:fit data-testid="file-tip">
+    <strong class="tname">{e.name}</strong>
+    {#if isDir(e)}<span class="dim">{t('files.folder')}</span>{/if}
+    {#if e.type === 'link'}<span class="dim mono">-> {e.target ?? '?'}</span>{/if}
+    <dl>
+      {#if !isDir(e)}<dt>{t('files.colSize')}</dt><dd>{formatBytes(e.size)}</dd>{/if}
+      <dt>{t('files.colModified')}</dt><dd>{e.mtime ? `${dateTime(e.mtime)} (${relativeTime(e.mtime)})` : '-'}</dd>
+      <dt>{t('files.colOwner')}</dt><dd>{e.owner}:{e.group}</dd>
+      <dt>{t('files.colRights')}</dt><dd class="mono">{modeText(e.mode)}</dd>
+      <dt>{t('files.path')}</dt><dd class="mono path">{e.path}</dd>
+    </dl>
+  </div>
+{/if}
 
 <style>
   .tree {
@@ -236,6 +294,40 @@
   .tree.dropping {
     outline: 2px dashed var(--accent);
     outline-offset: -2px;
+  }
+  .tip {
+    position: fixed;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-width: min(420px, calc(100vw - 16px));
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-raised);
+    box-shadow: var(--shadow);
+    color: var(--text);
+    font-size: 0.85rem;
+    pointer-events: none;
+  }
+  .tname {
+    overflow-wrap: anywhere;
+  }
+  .tip dl {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 2px 12px;
+    margin: 4px 0 0;
+  }
+  .tip dt {
+    color: var(--text-dim);
+  }
+  .tip dd {
+    margin: 0;
+  }
+  .tip .path {
+    overflow-wrap: anywhere;
   }
   .node.droptarget {
     background: color-mix(in srgb, var(--accent) 14%, var(--bg-raised));

@@ -340,6 +340,13 @@ export function formatBytes(n: number): string {
   return `${v < 10 ? v.toFixed(1) : Math.round(v)} ${units[i]}`;
 }
 
+/** Rights as `ls -l` shows them (setuid, setgid and sticky as s/S and t/T), with the octal number after. */
+export function modeText(mode: number): string {
+  const x = (bit: number, special: boolean, on: string) => (mode & bit ? (special ? on : 'x') : special ? on.toUpperCase() : '-');
+  const who = (shift: number, special: number, on: string) => `${mode & (4 << shift) ? 'r' : '-'}${mode & (2 << shift) ? 'w' : '-'}${x(1 << shift, !!(mode & special), on)}`;
+  return `${who(6, 0o4000, 's')}${who(3, 0o2000, 's')}${who(0, 0o1000, 't')} (${(mode & 0o7777).toString(8).padStart(4, '0')})`;
+}
+
 export const rawUrl = (hostId: number, path: string, download = false) =>
   `/api/files/${hostId}/raw?path=${encodeURIComponent(path)}${download ? '&download=1' : ''}`;
 

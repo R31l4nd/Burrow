@@ -575,8 +575,10 @@
     max-width: 45%;
     flex: 0 1 auto;
   }
+  /* A stack sized by its own width, not the screen's: in one of two columns it is as narrow as on a tablet (below). */
   .group {
     margin-bottom: 16px;
+    container: stack / inline-size;
   }
   .pickbox {
     flex: none;
@@ -824,6 +826,16 @@
     .ctable:not(.hidden) {
       --cols: minmax(12ch, 1fr) minmax(10ch, 20ch) 52px 64px 76px 76px auto;
       column-gap: 10px;
+    }
+  }
+  /* A stack in one of two columns on a screen just wide enough for them (1700 px and a little more):
+     the computer's columns ran past its edge, the update flags cut off (report 5a729b). */
+  @media (min-width: 900px) {
+    @container stack (max-width: 800px) {
+      .ctable:not(.hidden) {
+        --cols: minmax(12ch, 1fr) minmax(10ch, 20ch) 52px 64px 76px 76px auto;
+        column-gap: 10px;
+      }
     }
   }
   .crow.picked {

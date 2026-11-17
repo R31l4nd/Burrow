@@ -70,6 +70,34 @@ describe('markdownToHtml', () => {
     expect(markdownToHtml('| just | pipes |')).toBe('<p>| just | pipes |</p>');
   });
 
+  it('release notes and a preview: the HTML GitHub shows is shown, never as tags; only Burrow-made tags, no attributes but a checked link (report aae3cd)', () => {
+    const notes = '<p align="center">\n<a href="https://chat.example/invite/x">\n<img src="https://icons.example/api?i=chat" />\n</a>\n<br />\n<i>Join us</i>\n<br />\n</p>\n\n## Changelog\n- **bold** and <b>bold too</b>, <code>a &lt; b</code><br>next line <!-- a note to self -->\n- <a href="javascript:alert(1)">bad</a> <span onclick="x()">kept text</span> <details><summary>More</summary>inside</details>';
+    const html = markdownToHtml(notes, { links: true, image: () => null, pictureLabel: 'Picture' });
+    // No tag of the notes is shown as text.
+    expect(html).not.toMatch(/&lt;\/?(p|a|img|br|i|b|code|span|details|summary)\b/);
+    expect(html).not.toContain('&lt;!--');
+    expect(html).not.toContain('a note to self');
+    // A link around a picture that is not shown: one link, named by its address, no link in a link.
+    expect(html).toContain('<a href="https://chat.example/invite/x" target="_blank" rel="noopener noreferrer">https://icons.example/api?i=chat</a>');
+    expect(html.match(/<a /g)).toHaveLength(1);
+    expect(html).toContain('<br><em>Join us</em><br>');
+    expect(html).toContain('<strong>bold too</strong>');
+    expect(html).toContain('<code>a &amp;lt; b</code><br>next line');
+    expect(html).toContain('<h3>Changelog</h3>');
+    expect(html).toContain('bad');
+    expect(html).toContain('kept text');
+    expect(html).toContain('More inside');
+    // Only tags Burrow writes, and no attribute it did not write.
+    for (const tag of html.match(/<[a-z][^>]*>/g) ?? []) expect(tag).toMatch(/^<(p|ul|li|h3|strong|em|code|br)>$|^<a href="https:\/\/[^"]+" target="_blank" rel="noopener noreferrer">$/);
+    // A picture that is shown keeps its link around it.
+    const shown = markdownToHtml('<a href="https://example.com/"><img alt="Logo" src="https://github.com/a.png"></a>', { links: true, image: (s) => `/img?u=${s}` });
+    expect(shown).toBe('<p><a href="https://example.com/" target="_blank" rel="noopener noreferrer"><img src="/img?u=https://github.com/a.png" alt="Logo" loading="lazy"></a></p>');
+    // An address in angle brackets is no block of HTML: the list after it stays a list.
+    expect(markdownToHtml('<https://example.com>\n- one', { links: true })).toContain('<ul><li>one</li></ul>');
+    // A model's answer (no links asked): every tag stays text, as written.
+    expect(markdownToHtml('<b>x</b><br>')).toBe('<p>&lt;b&gt;x&lt;/b&gt;&lt;br&gt;</p>');
+  });
+
   it("the editor's preview: a picture next to the file shown from the host, no link around it; one it cannot place stays as written", () => {
     const local = (src: string) => {
       const p = localPicture('/srv/docs', src);

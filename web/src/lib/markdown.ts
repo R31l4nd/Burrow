@@ -4,7 +4,9 @@
 // Everything is escaped first; the only HTML is the tags made here. Links
 // stay text unless asked for (release notes), and then only http(s) ones,
 // opening elsewhere. A picture is a link, unless the caller gives an address
-// to show it from (release notes: GitHub's pictures through Burrow).
+// to show it from (release notes: GitHub's pictures through Burrow). With
+// links, the HTML in the text is read as GitHub shows it: a few tags written
+// again by Burrow, layout tags left out with their text kept.
 
 import { escapeHtml as esc } from './escape.js';
 
@@ -63,14 +65,40 @@ function inline(s: string, o: MarkdownOptions): string {
       // link that would open a host's file as a page; else left as written.
       return img ? keep(img) : whole;
     };
-    // <img ... src="..." alt="..."> as GitHub's release notes write it (escaped by now).
-    out = out.replace(/&lt;img\s((?:(?!&gt;).)*)&gt;/g, (whole, attrs: string) => {
-      const src = /\bsrc=(?:&quot;(.*?)&quot;|'([^']*)')/.exec(attrs);
-      const href = src ? (src[1] ?? src[2] ?? '') : '';
-      if (!href) return whole;
-      const alt = /\balt=(?:&quot;(.*?)&quot;|'([^']*)')/.exec(attrs);
-      return picture(href, alt ? (alt[1] ?? alt[2] ?? '') : '', whole);
+    // The HTML GitHub shows in release notes and READMEs, as it shows it (report aae3cd: the tags
+    // were text). Escaped by now: the few tags that mark text are written again by Burrow, without
+    // their attributes; a link only to http(s); comments left out; the tags that only lay out
+    // (p, div, span, details, ...) left out with their text kept. Any other tag stays as written.
+    const attr = (attrs: string, name: string) => {
+      const m = new RegExp(`\\b${name}=(?:&quot;(.*?)&quot;|'([^']*)')`).exec(attrs);
+      return m ? (m[1] ?? m[2] ?? '') : '';
+    };
+    out = out
+      .replace(/&lt;!--[\s\S]*?--&gt;/g, '')
+      .replace(/&lt;code&gt;([\s\S]*?)&lt;\/code&gt;/g, (_m, c: string) => `\uE000${codes.push(`<code>${c}</code>`) - 1}\uE000`)
+      .replace(/&lt;(b|strong)&gt;([\s\S]*?)&lt;\/\1&gt;/g, '<strong>$2</strong>')
+      .replace(/&lt;(i|em)&gt;([\s\S]*?)&lt;\/\1&gt;/g, '<em>$2</em>')
+      .replace(/\s*&lt;br\s*\/?&gt;\s*/g, '<br>');
+    // <a href="...">: a link (only http(s)) around its text; a picture in it is shown, or else named.
+    out = out.replace(/&lt;a\s((?:(?!&gt;)[\s\S])*)&gt;([\s\S]*?)&lt;\/a&gt;/g, (_m, attrs: string, inner: string) => {
+      const href = attr(attrs, 'href');
+      const text = inner
+        .replace(/&lt;img\s((?:(?!&gt;)[\s\S])*)&gt;/g, (whole, a: string) => {
+          const src = attr(a, 'src');
+          const shown = src ? (o.image?.(unesc(src)) ?? null) : null;
+          if (shown) return `<img src="${esc(shown)}" alt="${attr(a, 'alt') || esc(o.pictureLabel ?? 'Picture')}" loading="lazy">`;
+          return attr(a, 'alt') || src || whole;
+        })
+        .trim();
+      return /^https?:\/\//.test(href) ? keep(link(href, text || href)) : text;
     });
+    // <img ... src="..." alt="..."> as GitHub's release notes write it.
+    out = out.replace(/&lt;img\s((?:(?!&gt;).)*)&gt;/g, (whole, attrs: string) => {
+      const href = attr(attrs, 'src');
+      if (!href) return whole;
+      return picture(href, attr(attrs, 'alt'), whole);
+    });
+    out = out.replace(/&lt;\/?(p|div|span|center|details|summary|picture|source|h[1-6]|sub|sup|small|font|section|figure|figcaption)\b(?:(?!&gt;)[\s\S])*&gt;/g, ' ');
     // ![alt](url "title"): GitHub puts a size there ("=428x659"); a title is left out.
     const title = '(?:\\s+&quot;.*?&quot;)?';
     // Addresses never take in a kept-aside piece (\uE000/\uE001): glued to a link or code, the
@@ -116,8 +144,30 @@ export function markdownToHtml(md: string, o: MarkdownOptions = {}): string {
     } else for (const row of table) out.push(`<p>${inline(row, o)}</p>`);
     table = [];
   };
+  // With links (release notes, a preview): a line that starts with a tag starts a block of HTML,
+  // to the next empty line, as GitHub reads it; its tags often stand on lines of their own.
+  let html: string[] = [];
+  const closeHtml = () => {
+    const inner = html.length ? inline(html.join('\n'), o).trim() : '';
+    if (inner) out.push(`<p>${inner}</p>`);
+    html = [];
+  };
   for (const raw of md.split('\n')) {
     const line = raw.replace(/\r$/, '');
+    if (html.length) {
+      if (line.trim()) {
+        html.push(line);
+        continue;
+      }
+      closeHtml();
+    }
+    if (o.links && !code && /^\s*<(\/?[a-z][\w-]*(?=[\s/>]|$)|!--)/i.test(line)) {
+      closeTable();
+      closeList();
+      closeQuote();
+      html.push(line);
+      continue;
+    }
     if (!code && /^\s*\|/.test(line)) {
       closeList();
       closeQuote();
@@ -173,6 +223,7 @@ export function markdownToHtml(md: string, o: MarkdownOptions = {}): string {
     closeList();
     if (line.trim()) out.push(`<p>${inline(line, o)}</p>`);
   }
+  closeHtml();
   if (code) out.push(`<pre><code>${esc(code.join('\n'))}</code></pre>`);
   closeTable();
   closeList();
