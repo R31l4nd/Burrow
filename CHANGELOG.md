@@ -30,6 +30,7 @@ says how it was verified.
 - Containers in two columns: a new e2e test at 1700 px in Dutch (red on 2.27.0: the update flag past its stack's edge) of every column inside its stack; a new check of every screenshot, a flag, pill or control cut off at the side with nothing that scrolls to it. Screenshot looked at.
 - The compose check fails with `no-new-privileges=false` and passes with `=true`.
 - The gate, the Android app's test on an emulator, and a fresh install.
+- npm audit: an advisory published on release day, a ReDoS in picomatch through a crafted glob pattern (GHSA-fc5q-39xc-vjpf, no fixed version yet), allowed until 2026-12-31 with why: only the editor's language servers reach it, with Burrow's own patterns.
 
 ## [2.27.0] - 2026-11-16
 

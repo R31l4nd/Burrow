@@ -3,5 +3,10 @@
     "package": "braces",
     "reason": "Stack exhaustion on deeply nested glob patterns. Only reached through bash-language-server (the editor's shell support), which Burrow starts with backgroundAnalysisMaxFiles: 0 (server/src/lsp/servers.ts): it globs nothing. Its settings are Burrow's own: the bridge drops workspace/didChangeConfiguration from the browser (server/src/lsp/bridge.ts clientMessage, tested in server/test/unit/websocket.test.ts) and rebuilds the browser's initialize with the server's own initializationOptions (serverInitialize, tested in server/test/unit/lsp.test.ts), so no pattern comes from a person. No fixed braces exists yet.",
     "until": "2026-12-31"
+  },
+  "GHSA-fc5q-39xc-vjpf": {
+    "package": "picomatch",
+    "reason": "ReDoS through a glob pattern of repeated single-branch extglobs: the pattern is the attack. Only reached through the editor's language servers, whose patterns are Burrow's own: yaml-language-server matches the compose schema's patterns (no extglobs; schemaStore off, server/src/lsp/servers.ts), bash-language-server globs nothing (backgroundAnalysisMaxFiles: 0), and vscode-markdown-languageservice comes with vscode-langservers-extracted but Burrow never starts its Markdown server. The bridge answers workspace/configuration from the server's own settings and drops didChangeConfiguration from the browser (server/src/lsp/bridge.ts), so no pattern comes from a person. No fixed picomatch exists yet (4.0.7 is the newest, 2026-11-17).",
+    "until": "2026-12-31"
   }
 }
