@@ -1651,7 +1651,16 @@ for (const [how, tmuxMode] of [["Burrow's tmux", 'always'], ['a tmux of your own
     const own = 'tmux -L own-e2e -f /dev/null';
     const tmux = tmuxMode === 'always' ? ours : own;
     const target = tmuxMode === 'always' ? `burrow-${s.id.replace(/[^A-Za-z0-9]/g, 'x')}` : 'own';
-    const run = async (command: string) => ((await api('/api/snippets/run', { hostIds: [hostId], command })) as { stdout: string }[])[0]!.stdout;
+    // Each run its own SSH connection: on a busy run one fails now and then, and its empty stdout read
+    // as an empty screen (the 2.28.0 gate). Tried again; a command that ran and failed is not.
+    const run = async (command: string) => {
+      for (let i = 1; ; i++) {
+        const r = ((await api('/api/snippets/run', { hostIds: [hostId], command })) as { status: string; stdout: string; stderr: string }[])[0]!;
+        if (r.status !== 'error') return r.stdout;
+        if (i === 3) throw new Error(`no connection to test-sshd: ${r.stderr}`);
+        await page.waitForTimeout(500);
+      }
+    };
     await page.goto(`/#/term/${s.id}`);
     const rows = page.locator('[data-testid=terminal] .xterm-rows');
     await expect(rows).toContainText('$', { timeout: 20_000 });
@@ -1666,10 +1675,19 @@ for (const [how, tmuxMode] of [["Burrow's tmux", 'always'], ['a tmux of your own
     // going on after: the shell's lines of that come before the tab is left, as in the report's session).
     const same = async (what: string) => {
       await page.waitForTimeout(1500);
-      await run(`${tmux} send-keys -t ${target} C-z`);
-      await page.waitForTimeout(800);
-      const height = Number((await run(`${tmux} display-message -p -t ${target} '#{pane_height}'`)).trim());
-      const tm = (await run(`${tmux} capture-pane -p -t ${target}`)).split('\n').slice(0, height).map((l) => l.trimEnd());
+      // Stopped between its line of output and its three lines drawn again, the program has no Spin
+      // on the screen: going on and stopped again then, at most three times.
+      let height = 0;
+      let tm: string[] = [];
+      for (let i = 1; i <= 3; i++) {
+        await run(`${tmux} send-keys -t ${target} C-z`);
+        await page.waitForTimeout(800);
+        height = Number((await run(`${tmux} display-message -p -t ${target} '#{pane_height}'`)).trim());
+        tm = (await run(`${tmux} capture-pane -p -t ${target}`)).split('\n').slice(0, height).map((l) => l.trimEnd());
+        if (tm.some((l) => l.startsWith('Spin')) || i === 3) break;
+        await page.keyboard.type('fg\n');
+        await page.waitForTimeout(1000);
+      }
       const xt = (await rows.locator(':scope > div').allInnerTexts()).slice(0, height).map((l) => l.replace(/\u00a0/g, ' ').trimEnd());
       expect(tm.some((l) => l.startsWith('Spin')), `the program on the screen ${what}`).toBe(true);
       expect(xt, `the phone as tmux has it ${what}`).toEqual(tm);
