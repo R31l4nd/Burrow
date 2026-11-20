@@ -232,6 +232,38 @@ test('app tiles are all as high as each other when a name takes two lines', asyn
   await page.unroute('**/api/apps');
 });
 
+test('an app down on a narrow tile, in Dutch: "onbereikbaar" inside its tile, not run into its edges (report 95ce1f)', async ({ page }) => {
+  // Reported on a folded phone, turned (698x394): the dot and the word as wide as the tile, over its border.
+  await signIn(page);
+  await page.evaluate(() => localStorage.setItem('burrow.locale', 'nl'));
+  await page.setViewportSize({ width: 698, height: 394 });
+  const app = (id: number, name: string, up = true): AppTab => ({ id, name, url: `https://${id}.example.lan`, group: null, pinned: true, embeddable: 'no', hasIcon: false, hostId: null, container: null, monitor: true, newTab: false, up, checkedAt: null, latencyMs: 10, downSince: up ? null : new Date(Date.now() - 600_000).toISOString(), uptime: up ? 1 : 0.5, certExpiresAt: null });
+  const list = [app(9101, 'Bazarr'), app(9102, 'Bikkel'), app(9103, 'Dozzle'), app(9104, 'Jellyfin'), app(9105, 'Lidarr', false), app(9106, 'Metube'), app(9107, 'Mousehole')];
+  await page.route('**/api/apps', (r) => (r.request().method() === 'GET' ? r.fulfill({ json: list }) : r.fallback()));
+  await page.goto('/#/apps');
+  await page.reload();
+  const down = page.locator('.tile', { hasText: 'Lidarr' }).getByTestId('app-state');
+  await expect(down).toHaveText('onbereikbaar');
+  for (const size of [{ width: 698, height: 394 }, { width: 343, height: 711 }]) {
+    await page.setViewportSize(size);
+    const out = await down.evaluate((s) => {
+      const tile = s.closest('.tile')!;
+      const b = tile.getBoundingClientRect();
+      const st = getComputedStyle(tile);
+      const left = b.left + parseFloat(st.borderLeftWidth) + parseFloat(st.paddingLeft);
+      const right = b.right - parseFloat(st.borderRightWidth) - parseFloat(st.paddingRight);
+      const r = s.getBoundingClientRect();
+      return { left: Math.round(r.left - left), right: Math.round(right - r.right) };
+    });
+    expect(out.left, `${size.width} px: room on the left`).toBeGreaterThanOrEqual(0);
+    expect(out.right, `${size.width} px: room on the right`).toBeGreaterThanOrEqual(0);
+  }
+  await page.setViewportSize({ width: 698, height: 394 });
+  await lookAt(page, 'phone-apps-down-nl');
+  await page.evaluate(() => localStorage.setItem('burrow.locale', 'en'));
+  await page.unroute('**/api/apps');
+});
+
 test('several apps changed at once in Manage: picked, a group and "in a new tab" set for all, the rest kept; deleted together', async ({ page }) => {
   await signIn(page);
   const app = (o: Partial<AppTab> & { id: number; name: string; url: string }): AppTab => ({ group: null, pinned: true, embeddable: 'no', hasIcon: false, hostId: null, container: null, monitor: true, newTab: false, up: true, checkedAt: null, latencyMs: 10, downSince: null, uptime: 1, certExpiresAt: null, ...o });

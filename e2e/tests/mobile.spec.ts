@@ -1102,6 +1102,67 @@ test("the keyboard up, scrolled back: the history layer covers the part of the t
   await lookAt(page, 'phone-terminal-history-keyboard');
 });
 
+test("a fast finger back in Burrow's tmux: the history layer opens where the finger went, not further back (report 622704)", async ({ page }) => {
+  // Reported: scrolled back into the history layer, it lay well above where the scroll began. While the
+  // history was on its way the finger's lines were sped up, as for tmux's own history (lib/wheel.ts);
+  // the layer, open, then went one to one. And with the history come mid-swipe, the moves before the
+  // layer was placed were lost (found with this test).
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 343, height: 711 });
+  await signIn(page);
+  const hostId = await page.evaluate(async () => ((await (await fetch('/api/hosts')).json()) as { id: number; name: string }[]).find((h) => h.name === 'test-sshd')!.id);
+  const s = await page.evaluate((id) => fetch('/api/terminal/sessions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ hostId: id, tmux: 'always' }) }).then((r) => r.json() as Promise<{ id: string }>), hostId);
+  // The history held a moment, as from a host far off: the whole swipe made before it is there.
+  let hold = 0;
+  await page.routeWebSocket(new RegExp(`/api/terminal/sessions/${s.id}/ws`), (ws) => {
+    const server = ws.connectToServer();
+    server.onMessage((m) => {
+      if (String(m).startsWith('{"t":"history"')) setTimeout(() => ws.send(m), hold);
+      else ws.send(m);
+    });
+  });
+  await page.goto(`/#/term/${s.id}`);
+  // A new document: the socket routed (Playwright wraps WebSocket as a page starts).
+  await page.reload();
+  const rows = page.locator('[data-testid=terminal] .xterm-rows');
+  await expect(rows).toContainText('$', { timeout: 20_000 });
+  await page.locator('[data-testid=terminal] textarea').focus();
+  await page.keyboard.type('seq 1 400\n');
+  await expect(rows).toContainText('400');
+  const layer = page.getByTestId('term-history');
+  for (const [what, ms] of [['the history held', 1500], ['the history come mid-swipe', 0]] as const) {
+    hold = ms;
+    // A fast finger down, a frame at a time, held still at its end (no glide after it), then lifted.
+    const moved = await page.locator('.term-wrap').evaluate(async (w) => {
+      const r = w.getBoundingClientRect();
+      const el = w.querySelector<HTMLElement>('[data-testid=terminal]')!;
+      const touch = (y: number) => new Touch({ identifier: 11, target: el, clientX: r.left + r.width / 2, clientY: y });
+      const frame = () => new Promise((d) => requestAnimationFrame(d));
+      const top = r.top + 40;
+      let y = top;
+      el.dispatchEvent(new TouchEvent('touchstart', { touches: [touch(y)], changedTouches: [touch(y)], bubbles: true, cancelable: true }));
+      for (let i = 0; i < 8; i++) {
+        y += 36;
+        el.dispatchEvent(new TouchEvent('touchmove', { touches: [touch(y)], changedTouches: [touch(y)], bubbles: true, cancelable: true }));
+        await frame();
+      }
+      await new Promise((d) => setTimeout(d, 200));
+      el.dispatchEvent(new TouchEvent('touchmove', { touches: [touch(y)], changedTouches: [touch(y)], bubbles: true, cancelable: true }));
+      await frame();
+      el.dispatchEvent(new TouchEvent('touchend', { touches: [], changedTouches: [touch(y)], bubbles: true, cancelable: true }));
+      return y - top;
+    });
+    await expect(layer.locator('.line').filter({ hasText: /^1$/ })).toHaveCount(1, { timeout: 10_000 });
+    await page.waitForTimeout(300);
+    // Back from the live screen by as much as the finger went, within a line.
+    const back = await layer.evaluate((el) => ({ px: el.scrollHeight - el.clientHeight - el.scrollTop, line: parseFloat(getComputedStyle(el).lineHeight) }));
+    expect.soft(Math.abs(back.px - moved), `${what}: back ${Math.round(back.px)} px for a finger of ${moved} px`).toBeLessThanOrEqual(back.line);
+    await page.getByTestId('term-history-live').click();
+    await expect(layer).toHaveCount(0);
+  }
+  await page.evaluate((id) => fetch(`/api/terminal/sessions/${id}`, { method: 'DELETE' }), s.id);
+});
+
 test("a finger in a tmux of the person's own (Claude Code in it, the mouse on): its history in the layer; a program with the mouse in Burrow's pane keeps its wheel", async ({ page }) => {
   test.setTimeout(90_000);
   await page.setViewportSize({ width: 343, height: 711 });

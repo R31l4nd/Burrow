@@ -1,0 +1,1 @@
+Een terminal in tmux op de telefoon: snel terugvegen opent de geschiedenis waar je vinger heen ging, niet ver erboven. Apps: een app die onbereikbaar is houdt zijn status binnen de tegel op een smal scherm. Processen: CPU/Geheugen staat op de computer naast de tekst.

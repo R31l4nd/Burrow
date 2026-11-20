@@ -1140,9 +1140,12 @@
   let wheelCarry = 0;
   function turnWheel(y: number, speed: number) {
     if (!term?.element) return;
-    // The history layer open: moved by the pixel, as the finger went (lines are for the session).
-    if (layer?.lines) {
-      moveLayer(y - wheelY);
+    // The history layer, open or on its way: by the pixel, as the finger went (lines are for the session).
+    // Not sped up as tmux's own history is: opened that much further back, it lay well above where the
+    // finger began (report 622704).
+    if (layer) {
+      if (layerPlaced) moveLayer(y - wheelY);
+      else layerPx += y - wheelY;
       wheelY = y;
       return;
     }
@@ -1163,19 +1166,19 @@
     // Unless it is a tmux of the person's own (a `tmux attach` without Burrow's tmux, its mouse off): that
     // tmux's history in the layer. The session says which (alt: the keys, for a while after).
     if (term.modes.mouseTrackingMode === 'none' && arrowScroll) {
-      if (onhistory && performance.now() >= altUntil && (layer || steps > 0)) return scrollBack(steps, 'keys');
+      if (onhistory && performance.now() >= altUntil && (layer || steps > 0)) return scrollBack(steps, 'keys', moved);
       if (performance.now() < altUntil) altUntil = performance.now() + ALT_KEEP_MS;
       return arrows(steps);
     }
     // A plain shell: Burrow's own history, line by line (xterm reads a wheel
     // there only on an inner element, which an event sent here never reaches).
-    if (term.modes.mouseTrackingMode === 'none') return scrollBack(steps);
+    if (term.modes.mouseTrackingMode === 'none') return scrollBack(steps, null, moved);
     // A program that took the mouse: its wheel, unless it is a tmux of the person's own (Claude
     // Code in it): that tmux's history in the layer. The session says which (alt: the wheel, for
     // a while after; asked again on the next swipe).
     if (onhistory) {
       if (performance.now() < altUntil) altUntil = performance.now() + ALT_KEEP_MS;
-      else if (layer || steps > 0) return scrollBack(steps, 'mouse');
+      else if (layer || steps > 0) return scrollBack(steps, 'mouse', moved);
     }
     turnProgramWheel(steps);
   }
@@ -1204,11 +1207,12 @@
   // Back through the history: Burrow's own, or (a session in Burrow's tmux)
   // tmux's, gathered for a moment so a flick is one message, not dozens.
   let scrollPending = 0;
-  /** `over`: what the finger is over when it is not the session's own history: a program with the mouse, or one taking keys. */
-  function scrollBack(lines: number, over: Over = null) {
+  /** `over`: what the finger is over when it is not the session's own history: a program with the mouse, or one taking keys.
+   *  `layerLines`: how far back the history layer opens, the finger's own lines when `lines` were sped up for the host. */
+  function scrollBack(lines: number, over: Over = null, layerLines = lines) {
     // The history layer: asked for, or open (moved by the finger itself, in turnWheel).
     if (layer) {
-      if (!layer.lines) layerPx += lines * cellPx();
+      if (!layerPlaced) layerPx += lines * cellPx();
       else moveLayer(lines * cellPx());
       return;
     }
@@ -1216,7 +1220,7 @@
     const legacy = performance.now() < altUntil;
     if (legacy) altUntil = performance.now() + ALT_KEEP_MS;
     if (onhistory && !legacy) {
-      if (lines > 0) openLayer(lines, over);
+      if (layerLines > 0) openLayer(layerLines, over);
       // Forward from the live screen: nothing is below it.
       return;
     }
@@ -1242,7 +1246,10 @@
   let layer = $state<{ lines: string[] | null; newer: boolean; size: number; cell: number; over: Over } | null>(null);
   let layerEl: HTMLDivElement | undefined = $state();
   // Scrolled while the history was on its way: where to open it.
+  // Scrolled while the history was on its way, or arrived and not yet placed: where to open it.
   let layerPx = 0;
+  // Placed at layerPx: from then on the finger moves the box itself.
+  let layerPlaced = false;
   // Positioned and shown: from then on the bottom closes it.
   let layerSettled = false;
   let layerTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1259,6 +1266,7 @@
     layer = { lines: null, newer: false, size: term?.options.fontSize ?? prefs.fontSize, cell: cellPx(), over };
     layerPx = lines * cellPx();
     layerSettled = false;
+    layerPlaced = false;
     onhistory(over === 'mouse');
     layerTimer = setTimeout(() => {
       if (layer && !layer.lines) {
@@ -1275,6 +1283,7 @@
     layer = null;
     layerPx = 0;
     layerSettled = false;
+    layerPlaced = false;
     glide++;
   }
 
@@ -1308,7 +1317,9 @@
       const max = box.scrollHeight - box.clientHeight;
       // Nothing above the screen: nothing to scroll.
       if (max <= 1) return closeLayer();
-      box.scrollTop = Math.max(0, max - px);
+      // Where the finger is by now: it may have moved on since the history came (lost, it lay lower).
+      box.scrollTop = Math.max(0, max - layerPx);
+      layerPlaced = true;
       requestAnimationFrame(() => (layerSettled = true));
     });
   }

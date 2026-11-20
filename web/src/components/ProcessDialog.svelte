@@ -75,8 +75,10 @@
               <span class="pname"><b>{p.name}</b> <span class="dim small">{t('disk.pid', { pid: p.pid })}{p.user ? ` | ${p.user}` : ''}</span></span>
               {#if p.container}<span class="tag small mono" title={t('disk.container')}>{p.container}</span>{/if}
               <span class="nums small">
-                <span class:main={by === 'cpu'}><span class="dim">CPU</span> {p.cpu.toFixed(1)}%</span>
-                <span class:main={by === 'mem'}><span class="dim">{t('procs.mem')}</span> {formatBytes(p.memBytes)} <span class="dim">({memPct(p.memBytes)})</span></span>
+                {#snippet cpu()}<span class="dim">CPU</span> {p.cpu.toFixed(1)}%{/snippet}
+                {#snippet mem()}<span class="dim">{t('procs.mem')}</span> {formatBytes(p.memBytes)} <span class="dim">({memPct(p.memBytes)})</span>{/snippet}
+                <span class="num" class:main={by === 'cpu'}><span>{@render cpu()}</span><span class="room" aria-hidden="true">{@render cpu()}</span></span>
+                <span class="num" class:main={by === 'mem'}><span>{@render mem()}</span><span class="room" aria-hidden="true">{@render mem()}</span></span>
               </span>
             </div>
             {#if p.command}<p class="cmd small mono dim">{p.command}</p>{/if}
@@ -89,6 +91,15 @@
 </Dialog>
 
 <style>
+  /* A title row as on the statistics page: CPU/Memory beside its words on a computer, a line of its own
+     under them on a phone (app.css fills it). Without it the switch lay under the words at the left,
+     half as wide (report 3767a7). */
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
   .what {
     margin: 0;
   }
@@ -130,6 +141,19 @@
   }
   .nums .main {
     font-weight: 700;
+  }
+  /* Each figure as wide as in bold, bold or not: switched, the bold went from one to the other and
+     moved both a few px (report 3767a7). The bold copy under it, unseen, holds the room. */
+  .num {
+    display: inline-grid;
+  }
+  .num > * {
+    grid-area: 1 / 1;
+    justify-self: end;
+  }
+  .room {
+    font-weight: 700;
+    visibility: hidden;
   }
   .tag {
     padding: 0 6px;

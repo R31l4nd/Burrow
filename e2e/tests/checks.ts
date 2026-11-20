@@ -970,6 +970,64 @@ async function nothingCutSideways(page: Page, where: string) {
 }
 
 /**
+ * A spacer pushes what follows it to the right only in a flex row: in a row left without one (the
+ * processes dialog's title row, its own style missing), CPU/Memory fell under its words at the left,
+ * half as wide (report 3767a7).
+ */
+async function spacerInARow(page: Page, where: string) {
+  const out = await page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>('.spacer')]
+      .filter((s) => s.parentElement?.getClientRects().length && !s.closest('dialog:not([open]), [aria-hidden=true], [inert], details:not([open])'))
+      .filter((s) => !getComputedStyle(s.parentElement!).display.includes('flex'))
+      .map((s) => `${s.parentElement!.className || s.parentElement!.tagName}: ${(s.parentElement!.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, 40)}`),
+  );
+  expect.soft([...new Set(out)], `a spacer in a row that is not a flex row: what follows it not pushed aside (${where})`).toEqual([]);
+}
+
+/**
+ * The text of a bordered control stays inside its border: an app's tile on a phone turned had
+ * "onbereikbaar" with its dot as wide as the tile, over its edges (report 95ce1f). Text clipped on
+ * the way (an ellipsis) is the cut-off checks' to judge.
+ */
+async function textInsideItsBorder(page: Page, where: string) {
+  const out = await page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>('button, a[href], [role=button]')]
+      .filter((e) => e.getClientRects().length && e.checkVisibility({ visibilityProperty: true, opacityProperty: true }) && !e.closest('dialog:not([open]), [aria-hidden=true], [inert], .cm-editor, .xterm, details:not([open])'))
+      .flatMap((e) => {
+        const st = getComputedStyle(e);
+        const bl = parseFloat(st.borderLeftWidth);
+        const br = parseFloat(st.borderRightWidth);
+        if (!bl || !br || st.borderLeftStyle === 'none' || st.borderRightStyle === 'none') return [];
+        const box = e.getBoundingClientRect();
+        const walker = document.createTreeWalker(e, NodeFilter.SHOW_TEXT);
+        for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+          if (!n.textContent?.trim()) continue;
+          const holder = n.parentElement!;
+          if (!holder.checkVisibility({ visibilityProperty: true, opacityProperty: true }) || holder.closest('.sr-only')) continue;
+          // Clipped between the text and the control: not painted past it.
+          let clipped = false;
+          for (let a: HTMLElement | null = holder; a && a !== e.parentElement; a = a.parentElement) {
+            const ox = getComputedStyle(a).overflowX;
+            if (ox !== 'visible') clipped = true;
+          }
+          if (clipped) continue;
+          const range = document.createRange();
+          range.selectNodeContents(n);
+          for (const r of range.getClientRects()) {
+            const over = Math.max(box.left + bl - r.left, r.right - (box.right - br));
+            if (over > 1) {
+              const label = (e.getAttribute('aria-label') ?? e.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, 40);
+              return [`${e.dataset.testid ?? e.tagName.toLowerCase()} "${label}": "${n.textContent.trim().slice(0, 20)}" ${Math.round(over)} px over its border`];
+            }
+          }
+        }
+        return [];
+      }),
+  );
+  expect.soft(out, `text running over the border of its control (${where})`).toEqual([]);
+}
+
+/**
  * A segmented choice's options stay inside it, each on one line: "Zwart
  * (OLED)" broke over two lines past the edge on a 343 px wide phone, and
  * later hung below its box over the colours.
@@ -2631,6 +2689,8 @@ async function lookOnce(page: Page, name: string, opts: { tips?: boolean; axe?: 
   await contentUnderBar(page, name);
   await nothingOutOfReach(page, name);
   await nothingCutSideways(page, name);
+  await textInsideItsBorder(page, name);
+  await spacerInARow(page, name);
   await wordsWhole(page, name);
   await rowsReachable(page, name);
   await separatorsSpaced(page, name);

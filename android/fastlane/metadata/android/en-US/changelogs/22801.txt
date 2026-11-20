@@ -1,0 +1,1 @@
+A terminal in tmux on a phone: a fast swipe back opens the history where your finger went, not far above it. Apps: an app that is down keeps its status inside its tile on a narrow screen. Processes: CPU/Memory sits beside its words on a computer.

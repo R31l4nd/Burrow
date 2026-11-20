@@ -6,6 +6,22 @@ says how it was verified.
 
 ## [Unreleased]
 
+## [2.28.1] - 2026-11-20
+
+### Fixed
+
+- A terminal in Burrow's tmux on a phone: scrolled back with a fast finger, the history layer opens as far back as the finger went, not well above it, and keeps what the finger moved while the history was on its way (report 622704).
+- Apps: an app down on a narrow tile (a phone turned, in Dutch) keeps its dot and "onbereikbaar" inside the tile, in smaller type, instead of running over its edges (report 95ce1f).
+- A host's processes on a computer: CPU/Memory beside its words at the right, as other title rows, instead of under them at the left and half as wide; on a phone a line of its own, filled; switched, the CPU and RAM figures stay where they are instead of moving a few px with the bold (report 3767a7).
+
+### Verified
+
+- The history layer: a new e2e test of a fast swipe back in Burrow's tmux on a phone, with the history held 1.5 s and with it arriving mid-swipe (red on 2.28.0: the layer opened 824-1044 px and 236-457 px back for a 288 px swipe); green 6 runs.
+- Apps: a new e2e test of an app down in Dutch on tiles 698x394 and 343x711 (red on 2.28.0: the state 4 px past its tile), green; screenshot looked at. A new check of every screenshot: text running over the border of its button or link; the whole tour on all six passes found nothing else.
+- Processes: a new e2e test in Dutch on a computer and a phone, CPU and Memory each chosen, the switch and the figures measured (red on 2.28.0: the switch under its words; with that fixed, the figures 3 px aside when switched), green; the 387b0e test green; screenshots looked at. A new check of every screenshot: a spacer in a row that is not a flex row (red on 2.28.0 on the processes screens; nothing else in the whole tour).
+- The test images' pins moved to their new digests (`make repin`).
+- The gate, the Android app's test on an emulator, and a fresh install.
+
 ## [2.28.0] - 2026-11-17
 
 ### Added

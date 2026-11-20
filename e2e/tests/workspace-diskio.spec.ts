@@ -130,6 +130,54 @@ test('the processes behind CPU and memory, htop-like: the busiest and the larges
   await page.keyboard.press('Escape');
 });
 
+test('the processes dialog in Dutch: CPU/Memory beside its line on a computer, a line of its own filled on a phone; switched, neither it nor the figures move (report 3767a7)', async ({ page }) => {
+  await page.setViewportSize({ width: 1222, height: 635 });
+  await signIn(page);
+  await page.evaluate(() => localStorage.setItem('burrow.locale', 'nl'));
+  const sshd = await hostNamed(page, 'test-sshd');
+  // Figures that stay put while it samples again: a busy one, a large one, a quiet one.
+  const p = (pid: number, name: string, cpu: number, memBytes: number) => ({ pid, name, user: 'root', cpu, memBytes, command: `/usr/bin/${name}`, container: null });
+  await page.route(PROCS, (r) => r.fulfill({ json: { hostId: sshd, at: new Date().toISOString(), seconds: 2, cores: 8, memTotal: 33_554_432_000, total: 3, top: [p(10, 'python3', 322.4, 1_073_741_824), p(11, 'Lidarr', 52.7, 434_110_464), p(12, 'slskd', 1.5, 319_815_680)] } }));
+  await page.goto(`/#/hosts/${sshd}/stats`);
+  await page.reload();
+  await page.getByTestId('tile-cpu').click({ timeout: 20_000 });
+  const d = page.locator('dialog[open][data-tour=processes]');
+  await expect(d.getByTestId('procs-sampled')).toBeVisible({ timeout: 20_000 });
+  // Where the switch is against its line of words and the toolbar holding both.
+  const place = () =>
+    d.locator('.segmented').evaluate((s) => {
+      const bar = s.parentElement!.getBoundingClientRect();
+      const what = s.parentElement!.querySelector('p')!.getBoundingClientRect();
+      const r = s.getBoundingClientRect();
+      const halves = [...s.querySelectorAll('button')].map((b) => Math.round(b.getBoundingClientRect().left));
+      return { beside: r.top < what.bottom && r.left >= what.right, right: Math.round(bar.right - r.right), fill: Math.round(bar.width - r.width), halves };
+    });
+  // Each process's CPU and RAM figures, edge by edge: the one sorted by in bold moved them a few px.
+  const figures = () => d.locator('[data-testid=proc] .nums > span').evaluateAll((s) => s.map((e) => { const r = e.getBoundingClientRect(); return [Math.round(r.left * 4) / 4, Math.round(r.right * 4) / 4]; }));
+  // A computer: beside the words, at the right of the dialog (it lay under them at the left, half as wide).
+  const cpu = await place();
+  const byCpu = await figures();
+  expect(cpu.beside, 'beside its line on a computer').toBe(true);
+  expect(cpu.right).toBe(0);
+  await d.getByTestId('procs-by-mem').click();
+  await expect(d.getByTestId('procs-by-mem')).toHaveAttribute('aria-checked', 'true');
+  expect(await place(), 'where it was, switched').toEqual(cpu);
+  expect(await figures(), 'the figures where they were, switched').toEqual(byCpu);
+  // A phone: a line of its own under the words, filled.
+  await page.setViewportSize({ width: 343, height: 711 });
+  const phone = await place();
+  const byMem = await figures();
+  expect(phone.beside).toBe(false);
+  expect(phone.fill, 'its line filled on a phone').toBe(0);
+  await d.getByTestId('procs-by-cpu').click();
+  await expect(d.getByTestId('procs-by-cpu')).toHaveAttribute('aria-checked', 'true');
+  expect(await place(), 'where it was, switched back').toEqual(phone);
+  expect(await figures(), 'the figures where they were, switched back').toEqual(byMem);
+  await page.keyboard.press('Escape');
+  await page.unroute(PROCS);
+  await page.evaluate(() => localStorage.setItem('burrow.locale', 'en'));
+});
+
 /** SMART as the host might report it: every kind of reason, one disk getting worse since the oldest check kept. */
 async function judged(p: Page, hostId: number, keptFails: boolean) {
   const at = new Date().toISOString();

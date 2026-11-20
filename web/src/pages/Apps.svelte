@@ -326,7 +326,7 @@
       <span class="name">{a.name}{#if openIds.includes(a.id)}<span class="sr-only"> ({t('apps.isOpen')})</span>{/if}</span>
       <!-- Up or down (watched every minute), and how often up the last day. -->
       {#if a.up !== null}
-        <span class="state small" class:down={!a.up} data-testid="app-state" title={a.up ? t('apps.upFor', { pct: uptimeLabel(a.uptime) }) : t('apps.downSince', { since: relativeTime(a.downSince) })}>
+        <span class="state small" class:down={!a.up} style:--len={(a.up ? uptimeLabel(a.uptime) : t('apps.down')).length} data-testid="app-state" title={a.up ? t('apps.upFor', { pct: uptimeLabel(a.uptime) }) : t('apps.downSince', { since: relativeTime(a.downSince) })}>
           <span class="sdot" aria-hidden="true"></span>{a.up ? uptimeLabel(a.uptime) : t('apps.down')}
         </span>
       {/if}
@@ -640,6 +640,10 @@
     align-items: center;
     gap: 4px;
     color: var(--text-dim);
+    /* Its word and dot inside the tile, smaller on a narrow one: "onbereikbaar" in bold ran over
+       the tile's edges on a phone turned (report 95ce1f). About 0.62 em a bold letter, 12 px the dot. */
+    font-size: clamp(0.6rem, calc((100cqi - 12px) / (var(--len, 6) * 0.62)), 0.85rem);
+    white-space: nowrap;
   }
   .state.down {
     color: var(--danger);

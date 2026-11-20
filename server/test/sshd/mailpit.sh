@@ -6,7 +6,7 @@ set -euo pipefail
 SMTP="${MAILPIT_SMTP_PORT:-1025}"
 API="${MAILPIT_API_PORT:-8025}"
 NAME="${MAILPIT_CONTAINER:-burrowtest-mailpit}"
-MAILPIT="axllent/mailpit:latest@sha256:aef2aacc11f075ec0fb6874275ee4a421e688e11a96ebb296134d1735c7761ce"
+MAILPIT="axllent/mailpit:latest@sha256:23a2ef85bc50853ab3093645d1d64679afd8887e89da5e48a88940c172591a4e"
 case "${1:-}" in
   up)
     docker rm -fv "$NAME" >/dev/null 2>&1 || true
