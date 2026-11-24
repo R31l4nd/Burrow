@@ -203,6 +203,17 @@ scan_image() {
     -v "$ROOT/.trivyignore.yaml":/ignore.yaml:ro "$TRIVY_IMAGE" image --quiet --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed \
     --ignorefile /ignore.yaml --exit-code 1 --format table "$1"
 }
+# Two weeks before an exception ends, a NOTE (as the audit's, scripts/audit-check.mjs): the gate
+# turned red on the day without a word before. In whole days from today's date, the date quoted or
+# not. BURROW_TODAY: another day, to try it (as for the audit).
+ignore_ends_soon() {
+  local d days today
+  today="$(date -u -d "${BURROW_TODAY:-$(date -u +%F)}" +%s)"
+  for d in $(sed -nE "s/^[ -]*expired_at: *[\"']?([0-9]{4}-[0-9]{2}-[0-9]{2}).*/\\1/p" "$1"); do
+    days=$(( ($(date -u -d "$d" +%s) - today) / 86400 ))
+    [ "$days" -gt 14 ] || [ "$days" -lt 0 ] || echo "NOTE: $(basename "$1"): an exception ends $d, in $days days: look again (a fixed version, or a new date with why)"
+  done
+}
 check_image() {
   docker image inspect burrow:e2e >/dev/null 2>&1 || { echo "no burrow:e2e image (the e2e step builds it)"; return 1; }
   # No setuid or setgid file: harmless under compose's no-new-privileges,
@@ -210,6 +221,7 @@ check_image() {
   local suid
   suid="$(docker run --rm --label burrow.ignore=true --user 0:0 --entrypoint find burrow:e2e / -xdev -perm /6000 -type f 2>/dev/null)"
   [ -z "$suid" ] || { echo "setuid/setgid files in the image:"; echo "$suid"; return 1; }
+  ignore_ends_soon "$ROOT/.trivyignore.yaml"
   scan_image burrow:e2e
 }
 
@@ -274,9 +286,12 @@ check_versions() {
 # from deploy/local/private-patterns.txt when you have one): found at the
 # push, not after it. Seconds.
 check_public() {
-  local t rc
+  local t rc copied
   t="$(mktemp -d)"
+  # The copy whole or the step fails: a file tar could not read was left out, and the rest passed (audit 2026-11-23).
   git ls-files -co --exclude-standard -z | while IFS= read -r -d '' f; do [ -e "$f" ] && printf '%s\0' "$f"; done | tar --null -T - -cf - | tar -xf - -C "$t"
+  local copied=("${PIPESTATUS[@]}")
+  [ "${copied[2]}" = 0 ] && [ "${copied[3]}" = 0 ] || { echo "the copy to look at could not be made whole"; rm -rf "$t"; return 1; }
   bash scripts/check-public.sh "$t"
   rc=$?
   rm -rf "$t"
@@ -377,7 +392,7 @@ check_e2e() {
   if [ -n "$partial" ]; then
     echo "NOTE: resumed: e2e ran again only $(echo "$again" | wc -w) spec(s), the rest as in the run before: $(echo $again)"
     # shellcheck disable=SC2086
-    E2E_RESUME=1 E2E_RETRIES=1 bash scripts/e2e.sh --no-deps --project=setup --project=desktop --project=mobile tests/setup.spec.ts tests/hosts.spec.ts $again
+    E2E_RESUME=1 E2E_RETRIES=1 bash scripts/e2e.sh --no-deps --project=setup --project=hosts --project=desktop --project=docker --project=global --project=mobile tests/setup.spec.ts tests/hosts.spec.ts $again
   else
     E2E_RETRIES=1 bash scripts/e2e.sh
   fi

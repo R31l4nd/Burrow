@@ -1,4 +1,4 @@
-import { DIAL_MS, failedDials } from './dial.js';
+import { DIAL_MS, failedDials, whenSignedInAgain } from './dial.js';
 import { INPUT_MAX, type ClientMessage, type ServerMessage, type ShellState, type TerminalMode, type TerminalViewer } from '@burrow/shared';
 
 // One WebSocket to one server-side session. Survives network drops: it
@@ -38,6 +38,8 @@ export class TerminalConnection {
   #attempt = 0;
   #timer: ReturnType<typeof setTimeout> | null = null;
   #stopped = false;
+  /** Waiting for the account to sign in again (4401 on a kept page): what takes that back. */
+  #backIn: (() => void) | null = null;
   #lastSize: { cols: number; rows: number } | null = null;
   #alive: ReturnType<typeof setTimeout> | null = null;
   /** The server's reason it could not attach, said when the socket closes. */
@@ -125,6 +127,13 @@ export class TerminalConnection {
       if (e.code === 4401) {
         this.#stopped = true;
         this.on.state('signed-out');
+        // Signed in again on this page (kept for its unsaved work): connected again.
+        this.#backIn = whenSignedInAgain(() => {
+          this.#backIn = null;
+          this.#stopped = false;
+          this.#attempt = 0;
+          this.#open();
+        });
         return;
       }
       // Refused by the server (it could not attach: the host away, SSH refused; no longer
@@ -223,6 +232,8 @@ export class TerminalConnection {
 
   close(): void {
     this.#stopped = true;
+    this.#backIn?.();
+    this.#backIn = null;
     if (this.#timer) clearTimeout(this.#timer);
     if (this.#alive) clearTimeout(this.#alive);
     if (this.#dial) clearTimeout(this.#dial);

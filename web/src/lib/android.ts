@@ -32,6 +32,8 @@ export interface AndroidInfo {
   phoneArchives?: boolean;
   /** forgetDevice, wgSave and setScreenshots(true) are asked by the app itself, which answers {cancelled} on No (apps from 2.19.0). */
   asksItself?: boolean;
+  /** phoneSetAllFiles(true) is asked by the app itself too, also with Android's permission held; {cancelled} on No (apps from 2.29.0). */
+  asksAllFiles?: boolean;
   /** The home screen widget (widget*; apps from 2.11.0). */
   widget?: boolean;
 }

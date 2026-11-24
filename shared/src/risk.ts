@@ -29,9 +29,9 @@ const re = (src: string) => new RegExp(src.replace(/REST/g, REST).replace(/RUNNE
 
 const RULES: Rule[] = [
   { re: re(String.raw`\brm\bREST\s(-[a-zA-Z]*[rRf][a-zA-Z]*|--recursive|--force)\b`), risk: 'high', reason: 'rm with -r or -f deletes without asking' },
-  { re: /\brm\b/, risk: 'medium', reason: 'rm deletes files' },
+  { re: /\brm\b|\bunlink\b/, risk: 'medium', reason: 'rm deletes files' },
   { re: /\bdd\b.*\bof=/, risk: 'high', reason: 'dd writes raw to a file or disk' },
-  { re: re(String.raw`\bmkfs(\.\w+)?\b|\bmke2fs\b|\bmkswap\b|\bwipefs\b|\b[sgc]?fdisk\b|\bgdisk\b|\bparted\b|\bsgdisk\b|\bblkdiscard\b|\bcryptsetup\bREST\s(luksFormat|erase|luksErase|luksKillSlot)\b`), risk: 'high', reason: 'formats or repartitions a disk' },
+  { re: re(String.raw`\bmkfs(\.\w+)?\b|\bmke2fs\b|\bmkswap\b|\bwipefs\b|\b[sgc]?fdisk\b|\bgdisk\b|\bparted\b|\bsgdisk\b|\bblkdiscard\b|\bcryptsetup\bREST\s(luksFormat|erase|luksErase|luksKillSlot)\b|\bnvme\bREST\s(format|sanitize)\b|\bhdparm\bREST\s--security-erase|\bbadblocks\bREST\s-[a-zA-Z]*w|\bmdadm\bREST\s(--zero-superblock|--create|-C)(?=\s|$)`), risk: 'high', reason: 'formats or repartitions a disk' },
   { re: re(String.raw`\bchmod\bREST\s(-[a-zA-Z]*R|--recursive)`), risk: 'high', reason: 'chmod -R changes permissions of a whole tree' },
   { re: re(String.raw`\bchown\bREST\s(-[a-zA-Z]*R|--recursive)`), risk: 'high', reason: 'chown -R changes ownership of a whole tree' },
   { re: re(String.raw`>\s*DISK|\btee\bREST\sDISK|\b(cp|mv|install|rsync)\b[^;&|\n]*\sDISKLAST`), risk: 'high', reason: 'writes directly to a disk device' },
@@ -44,17 +44,19 @@ const RULES: Rule[] = [
   { re: /\b(iptables|nft|ufw)\b.*(-F|--flush|flush|reset|disable)/, risk: 'high', reason: 'drops firewall rules' },
   { re: /\buserdel\b|\bdeluser\b|\bpasswd\b|\bvisudo\b|\b(usermod|chpasswd|chsh|chage|gpasswd)\b/, risk: 'high', reason: 'changes accounts or passwords' },
   { re: re(String.raw`\b(curl|wget)\b.*RUNNER`), risk: 'high', reason: 'runs a script from the internet' },
+  // Saved first, then run: the install-script form a model suggests most (audit 2026-11-23).
+  { re: /\b(curl|wget)\b[^\n]*?(;|&&|\|\|)\s*(sudo\s+)?(((ba|z|da|k)?sh|python[\d.]*|perl|ruby|node)\s+[^-\s]|\.\/\S)/, risk: 'high', reason: 'runs a script from the internet' },
   { re: /\btruncate\b|\bshred\b/, risk: 'high', reason: 'destroys file contents' },
   // Classes the rules missed (A3-SRV-12).
   { re: re(String.raw`\bfind\bREST\s(-delete\b|-(exec|execdir|ok|okdir)\s+(sudo\s+)?(\S*/)?(rm|shred|unlink)\b)`), risk: 'high', reason: 'find deletes everything it matches' },
   { re: re(String.raw`\b(zfs|zpool)\bREST\s(destroy|labelclear)\b|\b(lvremove|vgremove|pvremove)\b|\bbtrfs\bREST\s(subvolume|sub|su)\s+(delete|del)\b`), risk: 'high', reason: 'destroys a pool, volume or subvolume' },
-  { re: re(String.raw`\bcrontab\bREST\s-[a-zA-Z]*r`), risk: 'high', reason: 'crontab -r removes every scheduled job' },
+  { re: re(String.raw`\bcrontab\bREST\s(-[a-zA-Z]*r|/dev/null\b)`), risk: 'high', reason: 'crontab -r removes every scheduled job' },
   { re: re(String.raw`\bip6?tables\bREST\s(-P|--policy)\s+\S+\s+(DROP|REJECT)\b|\bip6?tables\bREST\s(-j|--jump)\s+(DROP|REJECT)\b|\bufw\bREST\s(deny|reject|default\s+deny)\b|\bnft\bREST\spolicy\s+drop\b`), risk: 'high', reason: 'firewall rule can cut off access' },
-  { re: re(String.raw`\bip\bREST\slink\bREST\s(down|delete|del)\b|\bip\bREST\s(a|addr|address|r|ro|route)\s+(flush|del|delete)\b|\bifdown\b|\bifconfig\bREST\sdown\b|\bnmcli\bREST\s(down|disconnect|delete)\b`), risk: 'high', reason: 'takes a network interface down' },
+  { re: re(String.raw`\bip\bREST\slink\bREST\s(down|delete|del)\b|\bip\bREST\s(a|addr|address|r|ro|route)\s+(flush|del|delete)\b|\bifdown\b|\bifconfig\bREST\sdown\b|\bnmcli\bREST\s(down|disconnect|delete)\b|\btailscale\bREST\s(down|logout)\b|\bwg-quick\bREST\sdown\b|\bzerotier-cli\bREST\sleave\b`), risk: 'high', reason: 'takes a network interface down' },
   { re: re(String.raw`\bsystemctl\bREST\s(isolate|rescue|emergency)\b|\binit\s+[016]\b|\btelinit\s+[016]\b`), risk: 'high', reason: 'switches the machine to another run state' },
   { re: re(String.raw`\$\(\s*(curl|wget)\b|\`\s*(curl|wget)\b|<\(\s*(curl|wget)\b|\bbase64\s[^;&\n]*(-d|--decode)\b[^;&\n]*RUNNER`), risk: 'high', reason: 'runs a script fetched or decoded on the spot' },
   { re: re(String.raw`\brsync\bREST\s--(del|delete(-[a-z]+)*|remove-source-files)\b`), risk: 'high', reason: 'rsync deletes files at the destination' },
-  { re: /\b(DROP\s+(DATABASE|SCHEMA|TABLE)|TRUNCATE\s+TABLE)\b|\bdropdb\b|\bFLUSHALL\b|\bFLUSHDB\b/i, risk: 'high', reason: 'drops database data' },
+  { re: /\b(DROP\s+(DATABASE|SCHEMA|TABLE)|TRUNCATE\s+TABLE)\b|\bdropdb\b|\bFLUSHALL\b|\bFLUSHDB\b|\bmysqladmin\b[^;&|\n]*\sdrop\b/i, risk: 'high', reason: 'drops database data' },
   { re: re(String.raw`\bkubectl\bREST\sdelete\b|\bhelm\bREST\s(uninstall|delete)\b`), risk: 'high', reason: 'deletes Kubernetes resources' },
   { re: re(String.raw`\b(tee|cp|install|ln)\b[^;&|\n]*\s/etc/[^\s;&|]*\s*(?:$|[;&|])|\btee\bREST\s/etc/|\bsed\bREST\s(-[a-zA-Z]*i|--in-place)\S*REST\s/etc/|>\s*/etc/`), risk: 'high', reason: 'overwrites system configuration in /etc' },
   { re: re(String.raw`\bchmod\bREST\s/(etc|usr|bin|sbin|lib|lib64|boot|var|root|home)?/?(\s|$)`), risk: 'high', reason: 'chmod on a system folder' },
@@ -67,6 +69,8 @@ const RULES: Rule[] = [
   // storage rolled back or shrunk, a container with the host's root, the way in (sshd), an instant
   // reboot, rows deleted, and a command whose name the rules cannot read ($'..', globs, a variable).
   { re: re(String.raw`\b(qm|pct)\bREST\s(destroy|purge)\b|\bpvesm\bREST\s(remove|free)\b`), risk: 'high', reason: 'removes Proxmox guests or storage' },
+  { re: re(String.raw`\bvirsh\bREST\s(undefine|destroy|vol-delete|pool-delete)\b|\b(lxc|incus)\bREST\s(delete|rm)\b|\bpvesh\bREST\sdelete\b|\bceph\bREST\sosd\s+(purge|destroy)\b|\bpveceph\bREST\spurge\b`), risk: 'high', reason: 'removes virtual machines, containers or storage' },
+  { re: re(String.raw`\bunlink\bREST\s/(etc|usr|bin|sbin|lib|lib64|boot|root)/|\bchmod\bREST\s(0?000|[ugoa]*-[rwx]+)\sREST/(etc|usr|bin|sbin|lib|lib64|boot|root)/`), risk: 'high', reason: 'removes a system file or the rights to it' },
   { re: re(String.raw`\bpodman\bREST\s(system|volume|image|container|network|pod)\s+prune\b|\bpodman\bREST\s(rm|rmi|volume\s+rm)\b`), risk: 'high', reason: 'removes Podman data' },
   { re: re(String.raw`\bgit\bREST\spush\bREST\s(--delete|-d)\b|\bgit\bREST\spush\bREST\s\S+\s+\+?:\S`), risk: 'high', reason: 'git push deletes a branch' },
   { re: re(String.raw`\bzfs\bREST\srollback\b|\blvreduce\b|\bresize2fs\b`), risk: 'high', reason: 'rolls back or shrinks storage' },
@@ -83,7 +87,7 @@ const RULES: Rule[] = [
   // `> file`, but not `2>`, `>>`, `>&2` or `> /dev/null`.
   { re: /(^|[^>&|0-9])>\s*(?!\/dev\/null\b)[^\s&|>]|(^|\s)1>\s*(?!\/dev\/null\b)[^\s&|>]/, risk: 'medium', reason: 'overwrites a file with >' },
   { re: re(String.raw`>>\s*SHELL_FILE|\btee\bREST\sSHELL_FILE`), risk: 'medium', reason: 'appends to a file that grants a shell or runs at a login' },
-  { re: re(String.raw`\b(apt(-get)?|dnf|yum|pacman|apk)\bREST\s(remove|purge|autoremove|erase|del)\b`), risk: 'medium', reason: 'removes packages' },
+  { re: re(String.raw`\b(apt(-get)?|dnf|yum|pacman|apk)\bREST\s(remove|purge|autoremove|erase|del)\b|\bdpkg\bREST\s(-r|-P|--remove|--purge)(?=\s|$)|\brpm\bREST\s(-e|--erase)(?=\s|$)|\bsnap\bREST\sremove\b`), risk: 'medium', reason: 'removes packages' },
   { re: re(String.raw`\bsystemctl\bREST\s(stop|disable|mask|restart)\b`), risk: 'medium', reason: 'stops or restarts a service' },
   { re: re(String.raw`\bdocker\bREST\s(stop|kill|restart)\b|\bdocker[-\s]+compose\bREST\s(down|stop|restart)\b`), risk: 'medium', reason: 'stops or restarts containers' },
   { re: /\bkill(all)?\b|\bpkill\b/, risk: 'medium', reason: 'kills processes' },

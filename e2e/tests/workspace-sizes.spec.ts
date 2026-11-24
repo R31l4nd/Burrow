@@ -1,8 +1,8 @@
-import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures.js';
 import { lookAt, loneControlsFill, widthUsed } from './checks.js';
 import { SETTINGS_PARTS } from './pages.js';
 import { signIn } from './passkey.js';
+import { mainViews } from './views.js';
 
 // Every kind of screen at every kind of size, not only a phone and a
 // desktop: small and tall phones, a phone turned, a foldable with and without
@@ -31,38 +31,10 @@ const SIZES: [string, number, number][] = [
 // The key vault, snippets and forms keep a width that reads well.
 const LISTS = ['hosts', 'containers', 'alerts', 'reports', 'apps'];
 
-async function api<T>(page: Page, path: string, body?: unknown): Promise<T> {
-  return page.evaluate(
-    async ([p, b]) => (await fetch(p, b === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })).json(),
-    [path, body] as const,
-  ) as Promise<T>;
-}
-
 test('every page at every size', async ({ page }) => {
   test.setTimeout(30 * 60_000);
   await signIn(page);
-  const hosts = await api<{ id: number; name: string }[]>(page, '/api/hosts');
-  const real = hosts.find((h) => h.name === 'docker-real') ?? hosts[0]!;
-  const sshd = hosts.find((h) => h.name === 'test-sshd') ?? hosts[0]!;
-  const term = await api<{ id: string }>(page, '/api/terminal/sessions', { hostId: sshd.id, cols: 80, rows: 24 });
-  const views: [string, string][] = [
-    ['hosts', '/#/hosts'],
-    ['host-stats', `/#/hosts/${real.id}/stats`],
-    ['host-journal', `/#/hosts/${sshd.id}/journal`],
-    ['host-edit', `/#/hosts/${real.id}/edit`],
-    ['files', `/#/files/${real.id}?p=/etc`],
-    ['terminal', `/#/term/${term.id}`],
-    ['containers', '/#/containers'],
-    ['alerts', '/#/alerts'],
-    ['reports', '/#/reports'],
-    ['apps', '/#/apps'],
-    ['logs', '/#/logs'],
-    ['snippets', '/#/snippets'],
-    ['keys', '/#/keys'],
-    ['settings', '/#/settings'],
-    ['settings-security', '/#/settings/security'],
-    ['settings-report', '/#/settings/report'],
-  ];
+  const { views, done } = await mainViews(page);
   for (const [i, [size, w, h]] of SIZES.entries()) {
     await page.setViewportSize({ width: w, height: h });
     for (const [name, url] of views) {
@@ -74,7 +46,7 @@ test('every page at every size', async ({ page }) => {
       await lookAt(page, `size-${size}-${name}`, { axe: i === 0 });
     }
   }
-  await page.evaluate((id) => fetch(`/api/terminal/sessions/${id}`, { method: 'DELETE' }), term.id);
+  await done();
 });
 
 test("on a computer every part of Settings as on a phone: a button or field alone on its line takes the line, ones side by side share it (reports c7665e, c75bda, 46158b, c07d68, bc933c, a08646, 23a0b1, 7107f7, f6bfd6)", async ({ page }) => {

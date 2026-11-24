@@ -177,4 +177,13 @@ class AllFilesTest {
         phone.clear()
         assertEquals(1, phone.rootsJson().length())
     }
+
+    /** Switched on only after the app's own question, also with Android's permission still held (audit 2026-11-23). */
+    @Test
+    fun switchingOnIsAskedByTheAppAlsoWithAndroidsPermissionHeld() {
+        assertEquals(BridgeRules.AllFilesStep.ASK, BridgeRules.allFilesStep(on = true, available = true, onNow = false))
+        assertEquals(BridgeRules.AllFilesStep.ON_ALREADY, BridgeRules.allFilesStep(on = true, available = true, onNow = true))
+        assertEquals(BridgeRules.AllFilesStep.OFF, BridgeRules.allFilesStep(on = false, available = true, onNow = true))
+        assertEquals(BridgeRules.AllFilesStep.OFF, BridgeRules.allFilesStep(on = true, available = false, onNow = false))
+    }
 }

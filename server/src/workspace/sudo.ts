@@ -26,6 +26,39 @@ const LINKS_ROOTS_ONLY = [
   'else c="$c/$x"; fi; done; }',
 ].join('\n');
 
+/**
+ * The root save, as root: $1 the staged text, $2 the path, $3 a random word, $4 the file the path
+ * led to when the save began (its content then checked against the base). Staged beside the
+ * target (through a symlink to its file), given the target's owner and mode, then renamed over it
+ * in one step. "cat > file" truncated the original first: a full disk or a broken connection left
+ * an empty /etc file. A failed staging is removed. Exit 4: a link on the way not root's; exit 5:
+ * the path leads elsewhere now (a link swapped in after the check: root wrote over /etc/shadow,
+ * audit 2026-11-23). Once resolved, the target is a file of its own: mv replaces a link put there
+ * in its place, never what it points to.
+ */
+export const SUDO_SAVE = [
+  'set -e',
+  // Every link on the way must be root's: one a less trusted user planted (in /tmp, a
+  // bind-mounted folder) sent root's write wherever it pointed (A3-SRV-21).
+  LINKS_ROOTS_ONLY,
+  'chk "$2"',
+  't=$(readlink -f -- "$2")',
+  '[ "$t" = "$4" ] || { echo "the path leads to another file now: $t" >&2; exit 5; }',
+  'n="$(dirname -- "$t")/.$(basename -- "$t").burrow-$3"',
+  'gone() { rm -f -- "$n"; }',
+  'trap gone EXIT',
+  // Private from the start, and only a file of its own: other users cannot read the
+  // staged copy of a private file before its mode is set (AUDIT2 FS-26).
+  'umask 077',
+  'set -C',
+  'cat -- "$1" > "$n"',
+  'set +C',
+  'chown "$(stat -c %u:%g -- "$t")" "$n"',
+  'chmod "$(stat -c %a -- "$t")" "$n"',
+  'mv -f -- "$n" "$t"',
+  'trap - EXIT',
+].join('; ');
+
 const sudo = (password: string | null) => (password !== null ? "sudo -S -p ''" : 'sudo -n');
 
 function sudoFailure(stderr: string): HttpError | null {
@@ -37,25 +70,32 @@ function sudoFailure(stderr: string): HttpError | null {
 }
 
 export async function sudoRead(client: Client, path: string, password: string | null): Promise<TextFile> {
+  return (await readAsRoot(client, path, password)).file;
+}
+
+/** The file as root reads it, and where its path led then (the save checks it still leads there). */
+async function readAsRoot(client: Client, path: string, password: string | null): Promise<{ file: TextFile; target: string }> {
   const q = shellQuote(path);
   // Through a link to its file (-L), a regular file only, and its bytes
   // counted as read: a link's own size let a large target through, cut off
   // at the limit and opened as if whole; a shorter save then lost the rest
   // (AUDIT2 FS-03).
-  const cmd = `${sudo(password)} sh -c '[ -f "$1" ] || { echo "not a regular file" >&2; exit 3; }; stat -L -c "%s %Y %a" -- "$1" && head -c ${MAX_TEXT_BYTES + 1} -- "$1" | base64 -w0' _ ${q}`;
+  const cmd = `${sudo(password)} sh -c '[ -f "$1" ] || { echo "not a regular file" >&2; exit 3; }; readlink -f -- "$1" && stat -L -c "%s %Y %a" -- "$1" && head -c ${MAX_TEXT_BYTES + 1} -- "$1" | base64 -w0' _ ${q}`;
   // In base64: the bytes as they are, so text that is not UTF-8 is seen, not decoded with replacements (AUDIT2 FS-30).
   const r = await exec(client, cmd, 20_000, Math.ceil((MAX_TEXT_BYTES + 1) / 3) * 4 + 4096, password !== null ? `${password}\n` : undefined);
   const fail = sudoFailure(r.stderr);
   if (fail) throw fail;
   if (r.code === 3) throw new HttpError(400, 'not_a_file', `${path} is not a regular file.`);
   if (r.code !== 0) throw new HttpError(r.stderr.includes('No such file') ? 404 : 400, 'sudo_failed', r.stderr.trim().split('\n').pop() || 'sudo failed');
-  const nl = r.stdout.indexOf('\n');
-  const [size = '0', mtime = '0', mode = '644'] = r.stdout.slice(0, nl).split(' ');
+  const first = r.stdout.indexOf('\n');
+  const target = r.stdout.slice(0, first);
+  const nl = r.stdout.indexOf('\n', first + 1);
+  const [size = '0', mtime = '0', mode = '644'] = r.stdout.slice(first + 1, nl).split(' ');
   const bytes = Buffer.from(r.stdout.slice(nl + 1).trim(), 'base64');
   if (Number(size) > MAX_TEXT_BYTES || bytes.length > MAX_TEXT_BYTES) throw new HttpError(413, 'too_large', 'The editor opens files up to 5 MB.');
   if (bytes.subarray(0, 8192).includes(0)) throw new HttpError(415, 'binary', 'This looks like a binary file.');
   const content = utf8Text(bytes);
-  return { path, content, hash: sha256(bytes), size: Number(size), mtime: new Date(Number(mtime) * 1000).toISOString(), mode: parseInt(mode, 8) };
+  return { file: { path, content, hash: sha256(bytes), size: Number(size), mtime: new Date(Number(mtime) * 1000).toISOString(), mode: parseInt(mode, 8) }, target };
 }
 
 const TYPES: Record<string, FileType> = { f: 'file', d: 'dir', l: 'link' };
@@ -113,7 +153,9 @@ async function sudoWriteNow(
   baseHash: string,
   password: string | null,
 ): Promise<{ ok: true; file: TextFile } | { ok: false; current: TextFile }> {
-  const current = await sudoRead(client, path, password);
+  // Where the path leads, as root sees it, read with the content: a link swapped in before this
+  // read changes the content (a conflict), one swapped in after it the place (the script refuses).
+  const { file: current, target } = await readAsRoot(client, path, password);
   if (current.hash !== baseHash) return { ok: false, current };
   const tmp = `/tmp/.burrow-sudo-${randomBytes(6).toString('hex')}`;
   await new Promise<void>((resolve, reject) => sftp.writeFile(tmp, Buffer.from(content, 'utf8'), { mode: 0o600 }, (err) => (err ? reject(err) : resolve())));
@@ -122,30 +164,10 @@ async function sudoWriteNow(
     // given the target's owner and mode, then renamed over it in one step.
     // "cat > file" truncated the original first: a full disk or a broken
     // connection left an empty /etc file. A failed staging is removed.
-    const script = [
-      'set -e',
-      // Every link on the way must be root's: one a less trusted user planted (in /tmp, a
-      // bind-mounted folder) sent root's write wherever it pointed (A3-SRV-21).
-      LINKS_ROOTS_ONLY,
-      'chk "$2"',
-      't=$(readlink -f -- "$2")',
-      'n="$(dirname -- "$t")/.$(basename -- "$t").burrow-$3"',
-      'gone() { rm -f -- "$n"; }',
-      'trap gone EXIT',
-      // Private from the start, and only a file of its own: other users cannot read the
-      // staged copy of a private file before its mode is set (AUDIT2 FS-26).
-      'umask 077',
-      'set -C',
-      'cat -- "$1" > "$n"',
-      'set +C',
-      'chown "$(stat -c %u:%g -- "$t")" "$n"',
-      'chmod "$(stat -c %a -- "$t")" "$n"',
-      'mv -f -- "$n" "$t"',
-      'trap - EXIT',
-    ].join('; ');
-    const r = await exec(client, `${sudo(password)} sh -c ${shellQuote(script)} _ ${shellQuote(tmp)} ${shellQuote(path)} ${randomBytes(4).toString('hex')}`, 20_000, 64 * 1024, password !== null ? `${password}\n` : undefined);
+    const r = await exec(client, `${sudo(password)} sh -c ${shellQuote(SUDO_SAVE)} _ ${shellQuote(tmp)} ${shellQuote(path)} ${randomBytes(4).toString('hex')} ${shellQuote(target)}`, 20_000, 64 * 1024, password !== null ? `${password}\n` : undefined);
     const fail = sudoFailure(r.stderr);
     if (fail) throw fail;
+    if (r.code === 5) throw new HttpError(409, 'sudo_moved', 'Not saved as root: the path leads to another file than when the save began. Open it again.');
     if (r.code === 4) throw new HttpError(409, 'sudo_link', `Not saved as root: ${r.stderr.trim().split('\n').pop() || 'the path goes through a link that root does not own'}.`);
     if (r.code !== 0) throw new HttpError(400, 'sudo_failed', r.stderr.trim().split('\n').pop() || 'sudo failed');
   } finally {

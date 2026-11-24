@@ -13,7 +13,24 @@
   import { go, up } from '../lib/router.svelte.js';
   import { prefs } from '../lib/sessions.svelte.js';
   import { cssVar, followTheme, termTheme } from '../lib/termtheme.js';
-  import { toast } from '../lib/ui.svelte.js';
+  import { requestStepUp, toast } from '../lib/ui.svelte.js';
+
+  // A recording is read after a fresh step-up (server/src/terminal/recordings.ts): asked again here
+  // when it ran out while the page was open, then read once more.
+  const stale = async (res: Response) => res.status === 403 && ((await res.clone().json().catch(() => null)) as { error?: string } | null)?.error === 'step_up_required';
+  async function castOf(id: number): Promise<Response> {
+    const res = await fetch(`/api/recordings/${id}/cast`);
+    return (await stale(res)) && (await requestStepUp()) ? fetch(`/api/recordings/${id}/cast`) : res;
+  }
+  /** The download link, after a step-up if one is needed (else it saved the refusal as the file). */
+  async function downloadCast(e: MouseEvent, link: HTMLAnchorElement) {
+    if (link.dataset.checked) return void delete link.dataset.checked;
+    e.preventDefault();
+    const res = await fetch(link.href, { method: 'HEAD' });
+    if (res.status === 403 && !(await requestStepUp())) return;
+    link.dataset.checked = '1';
+    link.click();
+  }
 
   // Recorded terminal sessions (F3), kept as long as chosen here (30 days by
   // default, decision 16): the list, and one played back as it happened
@@ -126,7 +143,7 @@
     x.open(el);
     term = x;
     let gone = false;
-    fetch(`/api/recordings/${id}/cast`).then(async (res) => {
+    castOf(id).then(async (res) => {
       if (gone) return;
       if (!res.ok) return void (loadError = t('rec.unreadable'));
       const lines = (await res.text()).split('\n').filter(Boolean);
@@ -224,7 +241,7 @@
       </label>
       <span class="dim small time" data-testid="rec-time">{clock(at)} / {clock(length)}</span>
       <span class="spacer"></span>
-      <a class="btn small" href={`/api/recordings/${id}/cast`} download data-testid="rec-download"><Icon name="download" size={16} /> {t('rec.download')}</a>
+      <a class="btn small" href={`/api/recordings/${id}/cast`} download onclick={(e) => void downloadCast(e, e.currentTarget)} data-testid="rec-download"><Icon name="download" size={16} /> {t('rec.download')}</a>
     </div>
   {/if}
 </div>

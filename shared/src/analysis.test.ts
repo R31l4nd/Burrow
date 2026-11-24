@@ -381,3 +381,30 @@ describe('fileAskText', () => {
     expect(fileAskText('a\nb')).toBe('a\nb');
   });
 });
+
+describe('passwords on command lines and in config files a model was sent (audit 2026-11-23)', () => {
+  it('masks each, keeping what the line does', () => {
+    const cases: [string, string][] = [
+      ['nmcli dev wifi connect Home password hunter2pass', 'hunter2pass'],
+      ['smbclient //nas/share -U rick%S3cretPw', 'S3cretPw'],
+      ["echo 'Sup3rSecret' | sudo -S apt update", 'Sup3rSecret'],
+      ['printf "%s\\n" Sup3rSecret | sudo -k -S true', 'Sup3rSecret'],
+      ['openssl enc -aes-256-cbc -k Sup3rSecret -in a -out b', 'Sup3rSecret'],
+      ['openssl enc -d -pass pass:Sup3rSecret -in b', 'Sup3rSecret'],
+      ['zip -P Sup3rSecret backup.zip notes.txt', 'Sup3rSecret'],
+      ['7z a -pSup3rSecret backup.7z notes', 'Sup3rSecret'],
+      ['wpa_passphrase HomeNet hunter2wifi', 'hunter2wifi'],
+      ['ldap_default_authtok = Sup3rSecret', 'Sup3rSecret'],
+      ['bindpw Sup3rSecret', 'Sup3rSecret'],
+      ['totp_secret: JBSWY3DPEHPK3PXP', 'JBSWY3DPEHPK3PXP'],
+    ];
+    for (const [line, secret] of cases) {
+      const out = maskText(line, { ips: false });
+      expect(out, line).not.toContain(secret);
+      expect(out, line).toContain('<secret>');
+    }
+    // What the line does stays readable.
+    expect(maskText('nmcli dev wifi connect Home password hunter2pass', { ips: false })).toBe('nmcli dev wifi connect Home password <secret>');
+    expect(maskText('zip -r backup.zip notes', { ips: false })).toBe('zip -r backup.zip notes');
+  });
+});

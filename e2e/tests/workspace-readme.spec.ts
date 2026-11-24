@@ -8,7 +8,7 @@ import { hostNamed, signIn, stepUpAgain } from './passkey.js';
 // The README's and F-Droid's pictures, with made-up hosts and containers of
 // a homelab: never the test fixtures' names, and never this machine's own
 // Docker (the test instance watches it, with other projects on it). Only when asked:
-//   README_SHOTS=1 bash scripts/e2e.sh --no-deps --project=setup --project=desktop --grep "claims a fresh instance|builds a group|README|F-Droid"
+//   README_SHOTS=1 bash scripts/e2e.sh --no-deps --project=setup --project=hosts --project=desktop --grep "claims a fresh instance|builds a group|README|F-Droid"
 // The pictures land in e2e/test-results/readme/; docs/screenshots/ and
 // android/fastlane/metadata/android/en-US/images/phoneScreenshots/ hold the chosen ones.
 

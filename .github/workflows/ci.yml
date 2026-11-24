@@ -42,6 +42,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      # A tag on main only: one on a branch not merged would be published as latest, and self-updates
+      # would take it (audit 2026-11-23).
+      - name: The tag is on main
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "$GITHUB_REF_NAME is not on main"; exit 1; }
       - id: tag
         run: bash scripts/release-tag.sh "$GITHUB_REF_NAME"
 
@@ -183,16 +187,20 @@ jobs:
         run: |
           bash scripts/node.sh npm ci --no-fund --no-audit
           bash scripts/direct-assets.sh
-      # Nothing that ran above changed what gradle runs with the key: a package's script could
-      # have written the app's build files (audit 2026-11-09). Only the direct page's assets may differ.
-      - name: The app's sources as committed
+      # The APK is built in a checkout of its own that nothing above ran in: a package's script could
+      # have written files beside the sources, ignored ones too (a compose.override.yaml, the app's
+      # build files, scripts/apk.sh), that compose and gradle read with the key there (audit 2026-11-09,
+      # 2026-11-23). Only the direct page's assets come along, and the settings written here.
+      - name: A clean copy to build the APK in
         if: env.HAS_KEY == 'true'
         run: |
-          git diff --exit-code --stat -- android ':!android/app/src/main/assets/direct'
-          extra=$(git ls-files --others --exclude-standard -- android ':!android/app/src/main/assets/direct')
-          [ -z "$extra" ] || { echo "files under android/ that are not in git: $extra"; exit 1; }
+          git worktree add --detach "$RUNNER_TEMP/apk" HEAD
+          rm -rf "$RUNNER_TEMP/apk/android/app/src/main/assets/direct"
+          cp -r android/app/src/main/assets/direct "$RUNNER_TEMP/apk/android/app/src/main/assets/direct"
+          printf 'BURROW_ORIGIN=http://localhost:8080\n' > "$RUNNER_TEMP/apk/.env"
       - name: APK
         if: env.HAS_KEY == 'true'
+        working-directory: ${{ runner.temp }}/apk
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -201,9 +209,11 @@ jobs:
           echo "$KEYSTORE_B64" | base64 -d > android/keystore/burrow.jks
           printf 'KEYSTORE_PASSWORD=%s\n' "$KEYSTORE_PASSWORD" > .env.build
           APK_DIRECT_BUILT=1 bash scripts/apk.sh
+          mkdir -p "$GITHUB_WORKSPACE/artifacts"
+          cp artifacts/burrow.apk artifacts/burrow.apk.json "$GITHUB_WORKSPACE/artifacts/"
       - name: Remove the signing key
         if: always()
-        run: rm -f android/keystore/burrow.jks .env.build
+        run: rm -f "$RUNNER_TEMP/apk/android/keystore/burrow.jks" "$RUNNER_TEMP/apk/.env.build" android/keystore/burrow.jks .env.build
       - name: Release
         env:
           GH_TOKEN: ${{ github.token }}

@@ -14,3 +14,8 @@ export function remember<T>(key: string, value: T): T {
   if (kept.size > 300) kept.delete(kept.keys().next().value!);
   return value;
 }
+
+/** Another account on this tab: nothing of what the last one saw (a folder's listing; audit 2026-11-23). */
+export function forgetSeen(): void {
+  kept.clear();
+}

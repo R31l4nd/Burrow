@@ -11,6 +11,7 @@
   import ShortcutsTable from '../components/ShortcutsTable.svelte';
   import AiSettings from '../components/AiSettings.svelte';
   import SystemSettings from '../components/SystemSettings.svelte';
+  import UsageSettings from '../components/UsageSettings.svelte';
   import AndroidSettings from '../components/AndroidSettings.svelte';
   import UpdateSettings from '../components/UpdateSettings.svelte';
   import PushSettings from '../components/PushSettings.svelte';
@@ -21,6 +22,7 @@
   import Icon from '../components/Icon.svelte';
   import TotpSetup from '../components/TotpSetup.svelte';
   import { del, errorMessage, get, post, put } from '../lib/api.js';
+  import { countUse } from '../lib/usage.js';
   import { bug, setArmed } from '../lib/bugreport.svelte.js';
   import ProblemReports from '../components/ProblemReports.svelte';
   import { formatBytes } from '../lib/files.svelte.js';
@@ -328,6 +330,8 @@
         ...(admin ? [{ id: 'backups', label: t('backup.title'), icon: 'save' }] : []),
         // What was only in the .env file (the user, 2026-11-03).
         ...(admin ? [{ id: 'system', label: t('system.title'), icon: 'layers' }] : []),
+        // Which parts are used and which are not, by name only (the user, 2026-11-23).
+        ...(admin ? [{ id: 'usage', label: t('usage.title'), icon: 'chart' }] : []),
         { id: 'about', label: t('about.title'), icon: 'info' },
         { id: 'report', label: t('bug.title'), icon: 'bug' },
       ] as const
@@ -351,6 +355,11 @@
   let viewHeight = $state(typeof window === 'undefined' ? 0 : window.innerHeight);
   const shown = $derived(current ?? (wide ? (sections[0]?.id ?? null) : null));
   const at = (id: string) => shown === id;
+  // Settings -> Usage: on a wide screen the first part opens with the list, its address still
+  // #/settings: counted as that part too, or it looked unused (lib/usage.ts).
+  $effect(() => {
+    if (!current && shown) countUse(`page:settings/${shown}`);
+  });
 
   // #/settings?s=push: straight to that section (from "Set up push").
   // #/settings?s=channels (links from elsewhere): that part's own page.
@@ -548,6 +557,11 @@
     {#if at('system')}
     <h2 id="system">{t('system.title')}</h2>
     <SystemSettings />
+
+    {/if}
+    {#if at('usage')}
+    <h2 id="usage">{t('usage.title')} <HelpTip text={t('help.usage')} /></h2>
+    <UsageSettings />
 
     {/if}
     {#if at('ai')}

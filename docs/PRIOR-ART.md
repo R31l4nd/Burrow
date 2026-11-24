@@ -1001,3 +1001,23 @@ Checked 2026-10-06.
     the apps' domain are in Settings -> System as well, the environment's
     value the default and said under each field, so an install keeps what it
     has and a change needs no restart.
+
+## Usage counts
+
+- **Grafana** (Enterprise, [usage insights](https://grafana.com/docs/grafana/latest/dashboards/assess-dashboard-usage/)):
+  views per dashboard and data source, shown to admins, to find dashboards
+  nobody opens and clean them up.
+  - Taken over: counts per page an admin sees, the ones never opened
+    listed too, for deciding what to keep.
+- **Home Assistant** ([analytics](https://www.home-assistant.io/integrations/analytics/)):
+  opt-in levels of what integrations an install uses, sent to the project
+  and published in aggregate.
+  - Not taken over: sending anything out. Burrow's counts stay in the
+    instance; nobody but its admin sees them.
+- **Plausible** ([data policy](https://plausible.io/data-policy)): page
+  views counted without cookies or anything that names a person.
+  - Taken over: pages by name only. Burrow goes further: a page's address
+    without its numbers and names (`hosts/:id/stats`, as the tour names
+    them), dialogs by their fixed name; the server refuses any other key.
+    On by default (nothing leaves), can be turned off and cleared in
+    Settings -> Usage, kept 180 days.

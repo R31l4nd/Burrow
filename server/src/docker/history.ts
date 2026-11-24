@@ -3,6 +3,7 @@ import { and, eq, gte, lt, sql } from 'drizzle-orm';
 import type { Ctx } from '../context.js';
 import { containerSamples, hosts } from '../db/schema.js';
 import { eachLimited, type Jobs } from '../jobs.js';
+import { connectFailure } from '../hosts/stats.js';
 
 // Every container's CPU and memory every five minutes, kept a month, on
 // every host with Docker (report 428102: the sparklines started over at each
@@ -135,8 +136,9 @@ export class ContainerHistory {
           await this.sample(h.id).then(
             () => this.jobs?.fine('container history', h.name, { hostId: h.id }),
             (err: Error) => {
-              // Said once per host and message, at warn: at debug nobody saw it (OPS-W-14).
-              failure ??= `${h.name}: ${err.message}`;
+              // Said once per host and message, at warn: at debug nobody saw it (OPS-W-14). A host that
+              // cannot be reached is the unreachable alert's, not the job failing (audit 2026-11-23).
+              if (!connectFailure(err)) failure ??= `${h.name}: ${err.message}`;
               this.jobs?.failed('container history', h.name, err.message, { hostId: h.id });
             },
           );

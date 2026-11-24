@@ -138,8 +138,8 @@ class WireGuardRulesTest {
         assertEquals("vpn.example.com:51820", shown["endpoint"])
         assertEquals("10.99.0.0/24, 192.168.1.0/24", shown["allowedIps"])
         assertFalse(shown.values.any { it.contains("cHJpdmF0ZS") || it.contains("cHVibGlj") })
-        assertEquals(listOf("10.99.0.1"), WgConf.values(conf, "dns"))
-        assertEquals(emptyList<String>(), WgConf.values("", "Address"))
+        assertEquals(listOf("10.99.0.1"), WgConf.values(conf, "interface", "dns"))
+        assertEquals(emptyList<String>(), WgConf.values("", "interface", "Address"))
     }
 
     /** Started without keepalives, in any case and indentation; everything else as it was. */

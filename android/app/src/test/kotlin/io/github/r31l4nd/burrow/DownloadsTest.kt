@@ -408,4 +408,13 @@ class DownloadsTest {
         assertNull(unknown.secondsLeft)
         assertNull(unknown.minutesLeft)
     }
+
+    /** Removed at start: this app's own half-written items only, never another app's (audit 2026-11-23). */
+    @Test
+    fun staleItemsAreThisAppsOwnOnly() {
+        val (where, args) = Downloads.stalePending("io.github.r31l4nd.burrow")
+        assertTrue(where.contains("owner_package_name = ?"))
+        assertTrue(where.contains("relative_path LIKE ?"))
+        assertArrayEquals(arrayOf("io.github.r31l4nd.burrow", "Download/Burrow/%"), args)
+    }
 }

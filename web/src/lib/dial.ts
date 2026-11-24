@@ -32,3 +32,19 @@ export function failedDials(n: number): void {
 export function doubtSession(): void {
   doubt?.();
 }
+
+// A socket the server closed as signed out (4401) on a page kept for its unsaved work: dialled
+// again once the same account signs back in there. It stayed closed without a word, every key
+// typed into its terminal going nowhere (audit 2026-11-23).
+const backIn = new Set<() => void>();
+/** Called once, when the same account is signed in again on the kept page. */
+export function whenSignedInAgain(fn: () => void): () => void {
+  backIn.add(fn);
+  return () => backIn.delete(fn);
+}
+/** The kept page's account signed in again (lib/session.svelte.ts). */
+export function signedInAgain(): void {
+  const all = [...backIn];
+  backIn.clear();
+  for (const fn of all) fn();
+}

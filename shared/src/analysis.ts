@@ -118,8 +118,26 @@ export function isIpv6(s: string): boolean {
   return halves.length === 2 ? all.length <= 7 : all.length === 8;
 }
 
+// Passwords on command lines and in config files that went as they were (audit 2026-11-23). Only
+// looked for in text that has one of their words: run on every line, they made grouping a large
+// log a fifth slower.
+const COMMAND_HINT = /nmcli|-U|sudo|openssl|zip|7z|wpa_passphrase|authtok|bindpw|otp|2fa|mfa/i;
+const COMMAND_MASKS: [RegExp, string][] = [
+  [/(\bnmcli(?=\s)[^\n]*?\bpassword\s+)("[^"\n]*"|'[^'\n]*'|[^\s"']+)/gi, '$1<secret>'],
+  [/(\s-U\s*["']?[^%\s"']+%)([^\s"']+)/g, '$1<secret>'],
+  [/(\b(?:echo|printf)\s+(?:-\w+\s+)*(?:"%s\\n"\s+|'%s\\n'\s+)?)("[^"\n]*"|'[^'\n]*'|[^\s|]+)(\s*\|\s*sudo\s+(?:-[a-zA-Z]+\s+)*-[a-zA-Z]*S\b)/g, '$1<secret>$3'],
+  [/(\bopenssl(?=\s)[^\n]*?\s-(?:k|pass)\s+(?:pass:)?)([^\s]+)/g, '$1<secret>'],
+  [/(\bzip(?=\s)[^\n]*?\s-P\s*)([^\s]+)/g, '$1<secret>'],
+  [/(\b7za?(?=\s)[^\n]*?\s-p)([^\s]+)/g, '$1<secret>'],
+  [/(\bwpa_passphrase\s+(?:"[^"\n]*"|\S+)\s+)("[^"\n]*"|\S+)/g, '$1<secret>'],
+  [/(authtok\s*[=:]\s*)(\S.*)$/gim, '$1<secret>'],
+  [/(^\s*bindpw\s+)(\S+)/gim, '$1<secret>'],
+  [/(\b(?:totp|otp|2fa|mfa)[\w-]*\s*[:=]\s*["']?)([A-Z2-7]{16,64})\b/gi, '$1<secret>'],
+];
+
 export function maskText(text: string, opts: { ips: boolean }): string {
   let s = text;
+  if (COMMAND_HINT.test(s)) for (const [re, to] of COMMAND_MASKS) s = s.replace(re, to);
   for (const [re, to] of MASKS) s = s.replace(re, to);
   s = s.replace(GENERIC_TOKEN, (m) => (looksRandom(m) ? '<secret>' : m));
   if (opts.ips) s = s.replace(IPV4, '<ip>').replace(IPV6_LIKE, (m) => (isIpv6(m) ? '<ip>' : m));

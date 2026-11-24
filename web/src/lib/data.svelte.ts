@@ -2,7 +2,7 @@ import { inBackground } from './ui.svelte.js';
 import type { ConnectionDefaults, Group, Host, HostStatus, PackageSummary, SshKey } from '@burrow/shared';
 import { android } from './android.js';
 import { errorMessage, get } from './api.js';
-import { session } from './session.svelte.js';
+import { onAccountChange, session } from './session.svelte.js';
 
 // Hosts, groups, keys and reachability, loaded once and refreshed after
 // every change. Small enough to keep entirely in memory.
@@ -78,3 +78,6 @@ export function groupPath(id: number | null): string {
   }
   return names.join(' / ');
 }
+
+// Another account on this tab: nothing of the last one's hosts, keys or reachability (audit 2026-11-23).
+onAccountChange(() => Object.assign(data, { hosts: [], groups: [], keys: [], hostDefaults: {}, status: {}, packages: {}, loaded: false }));

@@ -26,6 +26,9 @@
     <string name="shots_ask_title">Schermafbeeldingen van Burrow toestaan?</string>
     <string name="shots_ask_text">Schermafbeeldingen, schermopnames en de lijst met recente apps tonen dan wat Burrow toont, ook wachtwoorden, sleutels en terminals.</string>
     <string name="shots_ask_ok">Toestaan</string>
+    <string name="allfiles_ask_title">Burrow alle bestanden op deze telefoon geven?</string>
+    <string name="allfiles_ask_text">De Bestanden-pagina kan dan elk bestand op deze telefoon en de geheugenkaart lezen, wijzigen en kopiëren: foto\'s, downloads, back-ups van andere apps. De pagina komt van je Burrow-server, dus wie die server in handen heeft kan er ook bij.</string>
+    <string name="allfiles_ask_ok">Alle bestanden geven</string>
     <string name="phone_delete_title">Van deze telefoon verwijderen?</string>
     <string name="phone_delete_note">Dit kan niet ongedaan worden. Een map gaat met alles erin.</string>
     <string name="phone_delete_ok">Verwijderen</string>

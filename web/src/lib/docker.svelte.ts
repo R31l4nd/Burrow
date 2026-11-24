@@ -1,8 +1,9 @@
 import { untrack } from 'svelte';
-import { dialLimit, doubtSession, failedDials } from './dial.js';
+import { dialLimit, doubtSession, failedDials, whenSignedInAgain } from './dial.js';
 import { applyDockerDelta, type DockerClientMessage, type DockerServerMessage, type HostContainers } from '@burrow/shared';
 import { get } from './api.js';
 import { loadAll } from './data.svelte.js';
+import { onAccountChange } from './session.svelte.js';
 import { t } from './i18n/index.svelte.js';
 
 // The container overview's socket: which hosts to watch goes out, a
@@ -17,6 +18,8 @@ export const SILENT_AFTER_MS = 20_000;
 // The last snapshot per host, kept across pages: a page that opens shows it
 // at once, and the socket's fresh one replaces it a moment later.
 const lastSeen = new Map<number, HostContainers>();
+// Another account: nothing of the last one's containers shown as last seen (audit 2026-11-23).
+onAccountChange(() => lastSeen.clear());
 
 export class DockerWatch {
   hosts = $state<Record<number, HostContainers>>({});
@@ -35,6 +38,8 @@ export class DockerWatch {
   #attempt = 0;
   #timer: ReturnType<typeof setTimeout> | null = null;
   #stopped = false;
+  // Waiting for the account to sign in again (4401 on a kept page): what takes that back.
+  #backIn: (() => void) | null = null;
   /** Dials in a row that closed before they opened (lib/dial.ts: the sign-in may be gone). */
   #unopened = 0;
 
@@ -101,6 +106,7 @@ export class DockerWatch {
       this.silent = {};
       if (this.#stopped) return;
       // Signed out, or no longer allowed: not dialled again, and the app told (it shows its sign-in).
+      if (e.code === 4401) this.#backIn = whenSignedInAgain(() => ((this.#backIn = null), this.#stopped || this.#open()));
       if (e.code === 4401 || e.code === 4403) return doubtSession();
       if (!opened) failedDials(++this.#unopened);
       const delay = BACKOFF_MS[Math.min(this.#attempt++, BACKOFF_MS.length - 1)]!;
@@ -155,6 +161,8 @@ export class DockerWatch {
 
   close(): void {
     this.#stopped = true;
+    this.#backIn?.();
+    this.#backIn = null;
     if (this.#timer) clearTimeout(this.#timer);
     if (this.#ticker) clearInterval(this.#ticker);
     this.#ws?.close(1000);

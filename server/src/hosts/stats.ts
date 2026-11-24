@@ -1,5 +1,5 @@
 import { and, eq, gte, lt } from 'drizzle-orm';
-import { judgeDisk, plural, sameDisk, sensorLabel, type DiskActivity, type DiskAttr, type ProcessList, type DiskHistory, type DiskUsage, type HostSample, type HostStats, type SmartDisk, type SmartReport, type Temperature } from '@burrow/shared';
+import { diskPercent, judgeDisk, plural, sameDisk, sensorLabel, type DiskActivity, type DiskAttr, type ProcessList, type DiskHistory, type DiskUsage, type HostSample, type HostStats, type SmartDisk, type SmartReport, type Temperature } from '@burrow/shared';
 import type { Ctx } from '../context.js';
 import { hostDiskSamples, hostSamples, hostSmart, hostSmartHistory, hosts } from '../db/schema.js';
 import type { SftpPool } from '../files/pool.js';
@@ -93,11 +93,11 @@ export function parseStats(hostId: number, out: string, at: number): HostStats {
       const mount = p.slice(6).join(' ');
       // An overlay only as the root (a host that is itself a container).
       if (IGNORE_MOUNTS.test(mount) || (p[1] === 'overlay' && mount !== '/')) continue;
-      disks.push({ device: p[0]!, fs: p[1]!, sizeBytes: Number(p[2]), usedBytes: Number(p[3]), mount });
+      disks.push({ device: p[0]!, fs: p[1]!, sizeBytes: Number(p[2]), usedBytes: Number(p[3]), availBytes: Number(p[4]), mount });
     } else if (!typed && p.length >= 6) {
       const mount = p.slice(5).join(' ');
       if (IGNORE_MOUNTS.test(mount) || /^(tmpfs|devtmpfs|shm|none)$/.test(p[0]!) || (p[0] === 'overlay' && mount !== '/')) continue;
-      disks.push({ device: p[0]!, fs: '', sizeBytes: Number(p[1]) * 1024, usedBytes: Number(p[2]) * 1024, mount });
+      disks.push({ device: p[0]!, fs: '', sizeBytes: Number(p[1]) * 1024, usedBytes: Number(p[2]) * 1024, availBytes: Number(p[3]) * 1024, mount });
     }
   }
   // The same filesystem mounted twice (bind mounts) counts once.
@@ -291,7 +291,7 @@ export function sustainedTrouble(
 export function statsTrouble(s: HostStats, t: Thresholds): Trouble[] {
   const out: Trouble[] = [];
   for (const d of s.disks) {
-    const pct = (d.usedBytes / d.sizeBytes) * 100;
+    const pct = diskPercent(d);
     if (pct >= t.diskPercent) out.push({ subject: `@disk ${d.mount}`, event: 'disk_full', title: `disk ${Math.floor(pct)}% full` });
   }
   const hot = s.temps.filter((x) => x.celsius >= t.cpuCelsius).sort((a, b) => b.celsius - a.celsius)[0];
@@ -595,7 +595,7 @@ export class HostStatsService {
     const { sec, markers } = statsSections(out);
     const rows = counterRows(sec, markers, at).map((r) => ({ hostId, ...r }));
     if (rows.length) this.ctx.db.insert(hostDiskSamples).values(rows).run();
-    const diskPercent = Math.max(0, ...s.disks.map((d) => (d.usedBytes / d.sizeBytes) * 100));
+    const fullest = Math.max(0, ...s.disks.map(diskPercent));
     this.ctx.db
       .insert(hostSamples)
       .values({
@@ -604,7 +604,7 @@ export class HostStatsService {
         cpu: s.cpu,
         memPercent: s.memTotal ? Math.round((s.memUsed / s.memTotal) * 1000) / 10 : 0,
         load1: s.load[0],
-        diskPercent: Math.round(diskPercent * 10) / 10,
+        diskPercent: Math.round(fullest * 10) / 10,
         maxCelsius: s.temps.length ? Math.max(...s.temps.map((t) => t.celsius)) : null,
       })
       .run();
@@ -690,8 +690,10 @@ export class HostStatsService {
       if (m?.told) this.onTrouble?.(h.id, { subject: '@reachable', event: 'unreachable', title: `reachable again after ${Math.round((this.ctx.now() - m.since) / 60_000)} minutes` }, new Date(this.ctx.now()).toISOString());
     } catch (err) {
       // At warn, once per host and message: at debug nobody saw it (OPS-W-14).
-      failed((err as Error).message);
       this.jobs?.failed('host statistics', h.name, (err as Error).message, { hostId: h.id });
+      // A host that cannot be reached is the unreachable alert's to tell, not the job failing: a host
+      // switched off on purpose (Wake-on-LAN) made "Burrow keeps failing" notices (audit 2026-11-23).
+      if (!connectFailure(err)) failed((err as Error).message);
       // Only a host that cannot be reached or refuses Burrow: numbers that could not be read, a
       // slow command or full sessions are the job's failure, said above (audit 2026-11-09).
       if (!connectFailure(err)) return void (await this.#afterSample(h));
@@ -719,7 +721,7 @@ export class HostStatsService {
 
 // A failed connect (the pool's codes, or the socket's own error), not a host that answered.
 const CONNECT_CODES = new Set(['unreachable', 'auth_failed', 'unknown_host_key', 'host_key_mismatch', 'connect_timeout', 'error']);
-function connectFailure(err: unknown): boolean {
+export function connectFailure(err: unknown): boolean {
   if (err instanceof HttpError) return CONNECT_CODES.has(err.code);
   return /\b(ECONNREFUSED|EHOSTUNREACH|ENETUNREACH|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ECONNRESET)\b|handshake/i.test(err instanceof Error ? err.message : String(err));
 }

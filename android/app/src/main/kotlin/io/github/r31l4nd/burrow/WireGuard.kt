@@ -475,15 +475,41 @@ class WireGuard(private val context: Context) {
 
 /** A wg-quick configuration read as text: what the settings show, and what the tunnel is started with. */
 object WgConf {
-    /** The values of [key] in any section, comments and spaces left out, the key in any case. */
-    fun values(conf: String, key: String): List<String> =
-        conf.lines().map { it.substringBefore('#').trim() }.filter { it.substringBefore('=').trim().equals(key, true) }.map { it.substringAfter('=').trim() }
+    /** Space as Go's strings.TrimSpace sees it (unicode.IsSpace): NEL (U+0085) and NBSP among it. */
+    private fun goSpace(c: Char) = c in "\t\n\u000B\u000C\r \u0085\u00A0" || Character.isSpaceChar(c)
+    private fun goTrim(s: String) = s.trim(::goSpace)
+
+    /**
+     * The configuration's settings as the tunnel reads them (android/wg tunnel.go parseConfig):
+     * lines split at "\n" only, a comment cut off, space trimmed as Go does, each under its section.
+     * Read otherwise, the app's question named an endpoint the tunnel did not use and missed the
+     * one it did (audit 2026-11-23).
+     */
+    fun entries(conf: String): List<Triple<String, String, String>> {
+        var section = ""
+        return conf.split("\n").mapNotNull { raw ->
+            val line = goTrim(goTrim(raw).substringBefore('#'))
+            when {
+                line.isEmpty() -> null
+                line.startsWith("[") -> {
+                    section = line.trim('[', ']', ' ').lowercase()
+                    null
+                }
+                '=' !in line -> null
+                else -> Triple(section, goTrim(line.substringBefore('=')).lowercase(), goTrim(line.substringAfter('=')))
+            }
+        }
+    }
+
+    /** One setting of a section ("interface", "peer"), every time it is given. */
+    fun values(conf: String, section: String, key: String): List<String> =
+        entries(conf).filter { it.first == section && it.second == key.lowercase() }.map { it.third }
 
     /** What the settings show of it: never the keys. */
     fun shown(conf: String): Map<String, String> = mapOf(
-        "address" to values(conf, "Address").joinToString(", "),
-        "endpoint" to values(conf, "Endpoint").joinToString(", "),
-        "allowedIps" to values(conf, "AllowedIPs").joinToString(", "),
+        "address" to values(conf, "interface", "Address").joinToString(", "),
+        "endpoint" to values(conf, "peer", "Endpoint").joinToString(", "),
+        "allowedIps" to values(conf, "peer", "AllowedIPs").joinToString(", "),
     )
 
     /**

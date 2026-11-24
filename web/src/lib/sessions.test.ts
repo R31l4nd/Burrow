@@ -46,6 +46,16 @@ function server(list: { id: string; hostId: number; lastActivityAt: string; titl
 }
 
 describe('one tap on a host', () => {
+  it('two taps at once (a double tap) open one session, not two (audit 2026-11-23)', async () => {
+    const calls = server([]);
+    await Promise.all([connectHost(9), connectHost(9)]);
+    expect(calls.filter((c) => c.startsWith('POST'))).toHaveLength(1);
+    expect(location.hash).toBe('/term/new1');
+    // Done: a later tap is a tap of its own again.
+    await connectHost(9, true);
+    expect(calls.filter((c) => c.startsWith('POST'))).toHaveLength(2);
+  });
+
   it("back to the host's session used last; with none, or asked for a fresh one, a new session sized to the window", async () => {
     const calls = server([
       { id: 'old', hostId: 2, lastActivityAt: '2026-10-16T08:00:00Z' },

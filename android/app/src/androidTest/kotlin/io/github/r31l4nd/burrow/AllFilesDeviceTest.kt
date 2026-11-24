@@ -49,9 +49,10 @@ class AllFilesDeviceTest : WebTestBase() {
                 waitJs(web, "document.querySelector('[data-testid=phone-all-on]')", 20_000)
                 assertTrue("off until switched on", !Prefs(ctx).allFiles)
                 js(web, "document.querySelector('[data-testid=phone-all-on]').click()")
-                waitJs(web, "document.querySelector('dialog[open] [data-testid=confirm-ok]')")
+                // Asked by the app itself, Android's permission held already (audit 2026-11-23).
+                val give = device.wait(androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.text(ctx.getString(R.string.allfiles_ask_ok))), 20_000)
                 screenshot("46-phone-all-files-warning")
-                js(web, "document.querySelector('[data-testid=confirm-ok]').click()")
+                give.click()
                 val volume = "[...document.querySelectorAll('[data-testid=phone-root]')].find(r => r.querySelector('[data-testid=phone-all-off]'))"
                 waitJs(web, volume, 20_000)
                 assertTrue("switched on in the app", Prefs(ctx).allFiles)

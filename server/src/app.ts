@@ -73,6 +73,7 @@ import { registerSnippetRoutes } from './snippets/routes.js';
 import { TerminalManager } from './terminal/manager.js';
 import { registerTerminalRoutes } from './terminal/routes.js';
 import { registerRecordingRoutes } from './terminal/recordings.js';
+import { registerUsageRoutes } from './usage.js';
 
 export interface AppDeps {
   config: Config;
@@ -391,6 +392,7 @@ export async function buildApp(deps: AppDeps): Promise<BurrowApp> {
   registerWakeRoutes(app, ctx, status, files);
   registerTerminalRoutes(app, ctx, terminals);
   registerRecordingRoutes(app, ctx);
+  registerUsageRoutes(app, ctx);
   registerSnippetRoutes(app, ctx);
   registerHistoryRoutes(app, ctx);
   registerAiRoutes(app, ctx, terminals);
@@ -559,6 +561,8 @@ export async function buildApp(deps: AppDeps): Promise<BurrowApp> {
     alerts.stop();
     reports.stop();
     hostStats.stop();
+    // Started with the others: a round still to come wrote to the database closed after it (audit 2026-11-23).
+    containerHistory.stop();
     scheduled.stop();
     widget.stop();
     uptime.stop();

@@ -1,4 +1,4 @@
-import { android, type AllFilesStatus } from './android.js';
+import { android, androidInfo, type AllFilesStatus } from './android.js';
 import { ask } from './confirm.svelte.js';
 import { t } from './i18n/index.svelte.js';
 import { phoneFailure } from './phonefiles.js';
@@ -13,8 +13,10 @@ export async function switchAllFiles(on: boolean): Promise<AllFilesStatus | null
   if (!android) return null;
   try {
     if (on) {
-      if (!(await ask({ text: t('phone.allFilesWarn'), confirm: t('phone.allFilesOn'), danger: true }))) return null;
+      // The app asks itself (apps from 2.29.0): not asked twice. An older app: the page asks.
+      if (!(await androidInfo())?.asksAllFiles && !(await ask({ text: t('phone.allFilesWarn'), confirm: t('phone.allFilesOn'), danger: true }))) return null;
       const s = await android.phoneSetAllFiles(true);
+      if ((s as { cancelled?: boolean }).cancelled) return null;
       toast(s.on ? t('phone.allFilesIsOn') : t('phone.allFilesRefused'), s.on ? 'info' : 'error');
       return s;
     }

@@ -27,6 +27,9 @@
     <string name="shots_ask_title">Allow screenshots of Burrow?</string>
     <string name="shots_ask_text">Screenshots, screen recordings and the list of recent apps then show what Burrow shows: passwords, keys and terminals included.</string>
     <string name="shots_ask_ok">Allow</string>
+    <string name="allfiles_ask_title">Give Burrow all files on this phone?</string>
+    <string name="allfiles_ask_text">The Files page can then read, change and copy every file on this phone and its SD card: photos, downloads, other apps\' backups. The page comes from your Burrow server, so whoever controls that server could reach them too.</string>
+    <string name="allfiles_ask_ok">Give all files</string>
     <string name="phone_delete_title">Delete from this phone?</string>
     <string name="phone_delete_note">This cannot be undone. A folder goes with everything in it.</string>
     <string name="phone_delete_ok">Delete</string>

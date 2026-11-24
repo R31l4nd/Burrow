@@ -3,11 +3,13 @@ import type { Ctx } from './context.js';
 import { alertCounts, alerts, auditLog, reports, stackUpdates } from './db/schema.js';
 import { pruneLogEvents } from './logevents.js';
 import { pruneRecordings } from './terminal/recordings.js';
+import { pruneUsage } from './usage.js';
 
 // What Burrow keeps, so the database does not grow for ever: the audit log a
 // year, alerts 90 days after they last happened (their counts per minute 90
 // days too: one that keeps recurring is never pruned itself), the newest 100
 // reports, the newest 100 updates of each stack.
+// Pages and dialogs opened (Settings -> Usage) 180 days.
 // Terminal recordings as long as an admin chose (30 days by default), Burrow's own warnings
 // 30 days after a kind was last seen. (Analyses, host samples and problem reports
 // have their own limits.)
@@ -34,6 +36,7 @@ export function pruneOld(ctx: Ctx): { audit: number; alerts: number; reports: nu
   }
   const recordingsGone = pruneRecordings(ctx);
   pruneLogEvents(ctx);
-  if (audit || old || reportsGone || recordingsGone || counts || updates) ctx.log.info({ audit, alerts: old, reports: reportsGone, recordings: recordingsGone, alertCounts: counts, stackUpdates: updates }, 'retention: old entries removed');
+  const usageGone = pruneUsage(ctx);
+  if (audit || old || reportsGone || recordingsGone || counts || updates || usageGone) ctx.log.info({ audit, alerts: old, reports: reportsGone, recordings: recordingsGone, alertCounts: counts, stackUpdates: updates, usage: usageGone }, 'retention: old entries removed');
   return { audit, alerts: old, reports: reportsGone };
 }

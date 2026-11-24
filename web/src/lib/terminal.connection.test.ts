@@ -235,3 +235,24 @@ describe('a long paste (report 940168)', () => {
     expect(parts.every((p) => !/[\uD800-\uDBFF]$/.test(p.d))).toBe(true);
   });
 });
+
+describe('signed out, kept for unsaved work, signed in again (audit 2026-11-23)', () => {
+  it('connects again once the same account is back: before, every key typed went nowhere', async () => {
+    const { signedInAgain } = await import('./dial.js');
+    const states: string[] = [];
+    const c = new TerminalConnection('s1', { ...events(), state: (s) => states.push(s) });
+    FakeSocket.all[0]!.open();
+    FakeSocket.all[0]!.onclose?.({ code: 4401 });
+    expect(states.at(-1)).toBe('signed-out');
+    vi.advanceTimersByTime(60_000);
+    expect(FakeSocket.all).toHaveLength(1);
+    signedInAgain();
+    expect(FakeSocket.all).toHaveLength(2);
+    // Closed by its page meanwhile: not again.
+    FakeSocket.all[1]!.open();
+    FakeSocket.all[1]!.onclose?.({ code: 4401 });
+    c.close();
+    signedInAgain();
+    expect(FakeSocket.all).toHaveLength(2);
+  });
+});

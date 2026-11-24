@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { route } from '../lib/router.svelte.js';
+  import { returnPath, route } from '../lib/router.svelte.js';
   import type { AuthState } from '@burrow/shared';
   import { errorMessage, post } from '../lib/api.js';
   import { t } from '../lib/i18n/index.svelte.js';
@@ -85,7 +85,7 @@
   {/if}
   {#if user?.hasSso}
     <!-- Off to the provider and back to this page; the action is tried again there. -->
-    <a class="btn block" href={`/api/auth/oidc/start?purpose=stepup&next=${encodeURIComponent(route.path.split('?')[0] || '/')}`} data-testid="stepup-sso">{t('stepup.sso')}</a>
+    <a class="btn block" href={`/api/auth/oidc/start?purpose=stepup&next=${encodeURIComponent(returnPath(route.path))}`} data-testid="stepup-sso">{t('stepup.sso')}</a>
   {/if}
   {#if noWay}<p class="alert error" data-testid="stepup-none">{android ? t('stepup.noneApp') : t('stepup.none')}</p>{/if}
   {#if error}<p class="alert error">{error}</p>{/if}

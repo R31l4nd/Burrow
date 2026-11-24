@@ -5,6 +5,8 @@ import { get, newAccount, post, put } from './api.js';
 import { dropAll } from './termpool.js';
 import { t } from './i18n/index.svelte.js';
 import { stepUpBecause } from './ui.svelte.js';
+import { signedInAgain } from './dial.js';
+import { forgetSeen } from './lastseen.js';
 
 // The signed-in state for the whole app. Components read `session.state`;
 // everything that changes it goes through the functions below.
@@ -29,6 +31,7 @@ const resets: (() => void)[] = [];
 export function onAccountChange(reset: () => void): void {
   resets.push(reset);
 }
+onAccountChange(forgetSeen);
 let account: number | null = null;
 // Set by the app shell: whether a page holds work not saved yet (lib/router.svelte.ts).
 let unsavedHere: () => boolean = () => false;
@@ -45,6 +48,8 @@ export function setSession(s: AuthState, keep = true): void {
     session.state = s;
     return;
   }
+  // The account of a page kept for its unsaved work signed in again: its sockets connect again.
+  const back = session.keptFor !== null && now === session.keptFor;
   session.keptFor = null;
   if (now !== account) {
     newAccount();
@@ -56,6 +61,7 @@ export function setSession(s: AuthState, keep = true): void {
     account = now;
   }
   session.state = s;
+  if (back) signedInAgain();
 }
 
 type Options = { challengeId: string; options: Parameters<typeof startAuthentication>[0]['optionsJSON'] };

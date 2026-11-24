@@ -9,6 +9,18 @@ export interface DiskUsage {
   device: string;
   sizeBytes: number;
   usedBytes: number;
+  /** What others than root may still write (absent in samples from before 2.29). */
+  availBytes?: number;
+}
+
+/**
+ * How full a disk is as df says it (its Capacity): used of what may be used, root's reserved
+ * blocks left out. Used of the size read a disk with nothing left to write as 95% full on ext4
+ * (audit 2026-11-23).
+ */
+export function diskPercent(d: DiskUsage): number {
+  const room = d.availBytes === undefined ? d.sizeBytes : d.usedBytes + d.availBytes;
+  return room > 0 ? (d.usedBytes / room) * 100 : 0;
 }
 
 export interface Temperature {

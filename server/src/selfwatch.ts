@@ -88,6 +88,9 @@ export function newErrors(events: LogEvent[], told: Record<string, number>, sinc
 }
 
 /** A newer version, and a self-update that went wrong, as one-off notices. */
+/** A failed self-update after which the version before was seen running (server/src/selfupdate.ts). */
+const OLD_RUNS = new Set(['pull_failed', 'build_failed', 'backup_failed', 'up_failed', 'keep_failed']);
+
 export function updateNotices(c: UpdateCheck): Problem[] {
   const out: Problem[] = [];
   if (c.available && compareVersions(c.available, c.running) > 0) {
@@ -105,15 +108,27 @@ export function updateNotices(c: UpdateCheck): Problem[] {
   }
   if (c.last && (c.last.state === 'failed' || c.last.state === 'rolledback')) {
     const rolled = c.last.state === 'rolledback';
+    // "The version before runs" only where it was seen running (nothing changed, or it came back
+    // healthy): said after "neither came up" too, it told of a Burrow that was not there (audit 2026-11-23).
+    const back = rolled || OLD_RUNS.has(c.last.code ?? '');
+    const both = c.last.code === 'both_unhealthy';
+    const then = back
+      ? { en: 'The version before runs. ', nl: 'De vorige versie draait. ' }
+      : both
+        ? { en: 'Neither the new version nor the one before runs healthy: look at the host. ', nl: 'De nieuwe versie noch de vorige draait gezond: kijk op de host. ' }
+        : { en: '', nl: '' };
     out.push({
       key: `selfupdate:${c.last.at}`,
-      en: { title: rolled ? 'Burrow: the update was rolled back' : 'Burrow: the update failed', body: `${c.last.message}\nThe version before runs. Settings -> About says more.` },
-      nl: { title: rolled ? 'Burrow: de update is teruggedraaid' : 'Burrow: de update is mislukt', body: `${c.last.message}\nDe vorige versie draait. Instellingen -> Over zegt meer.` },
+      en: { title: rolled ? 'Burrow: the update was rolled back' : 'Burrow: the update failed', body: `${c.last.message}\n${then.en}Settings -> About says more.` },
+      nl: { title: rolled ? 'Burrow: de update is teruggedraaid' : 'Burrow: de update is mislukt', body: `${c.last.message}\n${then.nl}Instellingen -> Over zegt meer.` },
       page: '/settings?s=about',
     });
   }
   return out;
 }
+
+/** How long a one-off notice's key is kept. */
+const ONCE_KEEP_MS = 30 * 86_400_000;
 
 interface Told {
   /** Problems told and not yet gone: key -> when told. */
@@ -215,9 +230,10 @@ export class SelfWatch {
       if (await this.#tell(p, 3)) {
         for (const e of errors) t.once[`error:${e.kind}`] = now;
         told.push('errors');
+        t.errorsSince = now;
       }
-    }
-    t.errorsSince = now;
+      // Not told (no channel took it): looked at again the next round, not dropped (audit 2026-11-23).
+    } else t.errorsSince = now;
 
     // A new version and a failed self-update: once a day, told once each.
     if (now - t.versionAt >= VERSION_EVERY_MS) {
@@ -230,6 +246,9 @@ export class SelfWatch {
       }
       for (const p of check ? updateNotices(check) : []) {
         if (t.once[p.key]) continue;
+        // A self-update of more than a month ago: told then (its key is let go after a month), not
+        // again every month while it stays the last one (audit 2026-11-23).
+        if (p.key.startsWith('selfupdate:') && now - Date.parse(p.key.slice('selfupdate:'.length)) > ONCE_KEEP_MS) continue;
         if (await this.#tell(p, 3, 'updates')) {
           t.once[p.key] = now;
           told.push(p.key);
@@ -253,7 +272,7 @@ export class SelfWatch {
     }
 
     // Old one-off keys go after a month, so the record stays small.
-    for (const [k, at] of Object.entries(t.once)) if (now - at > 30 * 86_400_000) delete t.once[k];
+    for (const [k, at] of Object.entries(t.once)) if (now - at > ONCE_KEEP_MS) delete t.once[k];
     this.#save(t);
     return told;
   }

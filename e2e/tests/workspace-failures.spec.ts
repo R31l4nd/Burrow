@@ -90,7 +90,8 @@ test("with the API failing, no page says Loading... for ever; it says why and tr
   // A workspace that failed to load: why, and Try again loads it once Burrow answers.
   await page.goto(`/#/ws/${own}`);
   await page.reload();
-  await expect(page.getByTestId('load-failed')).toContainText('Something broke.');
+  // On a busy run (two lanes side by side) the workspace's failed read took over the 5 s default (gate 2026-11-24).
+  await expect(page.getByTestId('load-failed')).toContainText('Something broke.', { timeout: 15_000 });
   await lookAt(page, 'desktop-load-failed');
   await page.unroute('**/api/**');
   await page.getByTestId('load-retry').click();

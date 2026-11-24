@@ -111,6 +111,19 @@ export function goFrom(from: string, path: string): void {
   if (route.path === from) go(path);
 }
 
+/**
+ * The page to come back to from somewhere else (a step-up at the provider): its query kept (the
+ * folder, the logs shown), the parts that act once left out (connect, run, sso). Without its query
+ * it came back to the host's home folder, or an empty Logs page (audit 2026-11-23).
+ */
+export function returnPath(path: string): string {
+  const [page = '', qs = ''] = path.split('?', 2);
+  const q = new URLSearchParams(qs);
+  for (const once of ['connect', 'run', 'sso']) q.delete(once);
+  const rest = q.toString();
+  return `${page || '/'}${rest ? `?${rest}` : ''}`;
+}
+
 /** A path with query parameters, e.g. to('/files/3', { p: '/etc' }). */
 export const to = (path: string, query: Record<string, string>): string => `${path}?${new URLSearchParams(query).toString()}`;
 

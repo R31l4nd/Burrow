@@ -277,3 +277,31 @@ describe('sizes in the overview', () => {
     expect([1536, 5 * 1024 ** 2, 3.25 * 1024 ** 3].map(formatBytesShort)).toEqual(['2 KB', '5 MB', '3.3 GB']);
   });
 });
+
+describe('signed in again on a page kept for its unsaved work (audit 2026-11-23)', () => {
+  it('the containers are watched again, not left without a word', async () => {
+    const { signedInAgain } = await import('./dial.js');
+    class Socket {
+      static OPEN = 1;
+      static all: Socket[] = [];
+      readyState = 0;
+      onopen: (() => void) | null = null;
+      onmessage: ((e: { data: string }) => void) | null = null;
+      onclose: ((e: { code: number }) => void) | null = null;
+      constructor() {
+        Socket.all.push(this);
+      }
+      send() {}
+      close() {}
+    }
+    vi.stubGlobal('WebSocket', Socket);
+    const w = new DockerWatch();
+    Socket.all[0]!.readyState = 1;
+    Socket.all[0]!.onopen?.();
+    Socket.all[0]!.onclose?.({ code: 4401 });
+    expect(Socket.all).toHaveLength(1);
+    signedInAgain();
+    expect(Socket.all).toHaveLength(2);
+    w.close();
+  });
+});

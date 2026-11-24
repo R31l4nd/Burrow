@@ -46,23 +46,39 @@ function audit(args) {
 }
 
 const allow = JSON.parse(readFileSync(new URL('./audit-allow.json', import.meta.url), 'utf8'));
-const today = new Date().toISOString().slice(0, 10);
+// BURROW_TODAY: another day, for the tests.
+const today = process.env.BURROW_TODAY || new Date().toISOString().slice(0, 10);
 const allowed = (id) => allow[id] && allow[id].until >= today;
+// Two weeks before an allowance ends, a NOTE: the gate turned red on the day without a word before.
+// Every allowance, also one npm audit does not name now (it may come back after the date); once each.
+const noted = new Set();
+const soon = (id) => {
+  const days = Math.round((Date.parse(allow[id].until) - Date.parse(today)) / 86_400_000);
+  if (days <= 14 && days >= 0 && !noted.has(id)) {
+    noted.add(id);
+    console.log(`NOTE: ${id} allowed until ${allow[id].until}, in ${days} days: look again (a fixed version, or a new date with why)`);
+  }
+};
 const shipped = audit(['--omit=dev']);
 const all = audit([]);
 const bad = [];
 for (const [id, f] of shipped) {
   const where = [...f.packages].join(', ');
-  if (allowed(id)) console.log(`allowed: ${id} (${where}): ${allow[id].reason.slice(0, 80)}...`);
-  else bad.push(`${f.severity} ${id} in ${where}: ${f.title}${allow[id] ? ` (allowed until ${allow[id].until}, past)` : ''}`);
+  if (allowed(id)) {
+    console.log(`allowed: ${id} (${where}): ${allow[id].reason.slice(0, 80)}...`);
+    soon(id);
+  } else bad.push(`${f.severity} ${id} in ${where}: ${f.title}${allow[id] ? ` (allowed until ${allow[id].until}, past)` : ''}`);
 }
 for (const [id, f] of all) {
   if (shipped.has(id)) continue;
   const where = [...f.packages].join(', ');
-  if (allowed(id)) console.log(`allowed (dev): ${id} (${where}): ${allow[id].reason.slice(0, 80)}...`);
-  else if (f.severity === 'critical') bad.push(`critical ${id} in the dev dependency ${where}: ${f.title}`);
+  if (allowed(id)) {
+    console.log(`allowed (dev): ${id} (${where}): ${allow[id].reason.slice(0, 80)}...`);
+    soon(id);
+  } else if (f.severity === 'critical') bad.push(`critical ${id} in the dev dependency ${where}: ${f.title}`);
   else console.log(`NOTE: high ${id} in the dev dependency ${where}: ${f.title} (npm audit fix, or name it in scripts/audit-allow.json)`);
 }
+for (const id of Object.keys(allow)) soon(id);
 if (bad.length) {
   console.log(`not allowed:\n  ${bad.join('\n  ')}`);
   process.exit(1);

@@ -109,6 +109,11 @@ const MUST_STEP_UP = [
   // What was recorded, deleted (audit 2026-10-30).
   'PUT /api/recordings/settings',
   'DELETE /api/recordings/:id',
+  // Watching what was recorded is as weighty as watching a session (audit 2026-11-23).
+  'GET /api/recordings',
+  'GET /api/recordings/:id/cast',
+  // What Settings -> Usage counted, cleared.
+  'DELETE /api/usage',
   'POST /api/snippets/run',
   'POST /api/docker/:hostId/containers/:name/action',
   'POST /api/docker/:hostId/containers/:name/shell',

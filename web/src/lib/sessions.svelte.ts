@@ -2,7 +2,8 @@ import type { TerminalSessionInfo } from '@burrow/shared';
 import { ApiFailure, del, get, post, put } from './api.js';
 import { ask } from './confirm.svelte.js';
 import { t } from './i18n/index.svelte.js';
-import { go } from './router.svelte.js';
+import { goFrom, here } from './router.svelte.js';
+import { onAccountChange } from './session.svelte.js';
 
 // Open terminal sessions, from every device. Refreshed when pages need it.
 
@@ -24,14 +25,28 @@ const reread = () => void loadSessions().catch(() => {});
  * One tap on a host: back to its open session if there is one, else a new
  * session (which may ask for a step-up).
  */
-export async function connectHost(hostId: number, fresh = false, cwd?: string, tmux?: 'always' | 'never'): Promise<void> {
+export function connectHost(hostId: number, fresh = false, cwd?: string, tmux?: 'always' | 'never'): Promise<void> {
+  // A second tap while the first is on its way (a double tap, a step-up answered for both) waits
+  // for it: both opened a session, two shells on the host (audit 2026-11-23).
+  const key = JSON.stringify([hostId, fresh, cwd ?? null, tmux ?? null]);
+  const running = connecting.get(key);
+  if (running) return running;
+  const p = connectNow(hostId, fresh, cwd, tmux).finally(() => connecting.delete(key));
+  connecting.set(key, p);
+  return p;
+}
+const connecting = new Map<string, Promise<void>>();
+
+async function connectNow(hostId: number, fresh: boolean, cwd?: string, tmux?: 'always' | 'never'): Promise<void> {
+  // Where the tap was made: a slow host (or a step-up) and the person gone on meanwhile, not pulled back (as ContainerDetail, AUDIT2 PAGE-17).
+  const from = here();
   if (!fresh && !cwd && !tmux) {
     // The one used last on this host (the list is in the order opened).
     const existing = (await loadSessions()).filter((s) => s.hostId === hostId).sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt))[0];
-    if (existing) return go(`/term/${existing.id}`);
+    if (existing) return goFrom(from, `/term/${existing.id}`);
   }
   const s = await newSession(hostId, cwd, tmux);
-  go(`/term/${s.id}`);
+  goFrom(from, `/term/${s.id}`);
 }
 
 /** A new session on the host (in that folder), the list read again. */
@@ -122,3 +137,6 @@ export function savePrefs(): void {
     // Kept for this page only.
   }
 }
+
+// Another account: the last one's sessions not in the tabs (audit 2026-11-23).
+onAccountChange(() => (terms.list = []));

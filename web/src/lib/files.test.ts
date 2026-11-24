@@ -189,6 +189,18 @@ describe('more of an upload', () => {
     expect(transfers.items).toEqual([]);
   });
 
+  it("a piece Burrow refused with its reason (the host's disk full, signed out): failed at once with that reason, not waited on as a lost connection for two minutes (audit 2026-11-23)", async () => {
+    answer = (method, url) => {
+      if (method === 'POST' && url.endsWith('/uploads')) return { status: 200, body: { id: 'up-f', offset: 0 } };
+      if (method === 'PUT') return { status: 507, body: { error: 'no_space', message: 'No space left on /tmp.' } };
+      return { status: 204 };
+    };
+    upload(1, '/tmp', [{ name: 'full.bin', size: 4, slice: () => new Blob(['abcd']) }]);
+    await vi.waitFor(() => expect(transfers.items.at(-1)).toMatchObject({ status: 'failed', error: 'No space left on /tmp.' }));
+    expect(calls).toContain('DELETE /api/files/uploads/up-f');
+    expect(calls).not.toContain('GET /api/files/uploads/up-f');
+  });
+
   it('an answer that is not Burrow\'s to a piece: a failure, not progress', async () => {
     vi.useFakeTimers();
     try {

@@ -18,7 +18,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 V="${1:-}"
-[[ "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "usage: bash scripts/bump-version.sh X.Y.Z" >&2; exit 2; }
+[[ "$V" =~ ^[0-9]+\.[0-9]{1,2}\.[0-9]{1,2}$ ]] || { echo "usage: bash scripts/bump-version.sh X.Y.Z (Y and Z below 100: the app's version code is X*10000 + Y*100 + Z)" >&2; exit 2; }
 
 bash scripts/node.sh node -e '
   const fs = require("fs");

@@ -96,6 +96,8 @@ class Bridge(private val activity: MainActivity, private val web: TermWebView, p
                         "phoneArchives" to true,
                         // forgetDevice, wgSave and setScreenshots(true) are asked by the app itself; the page does not ask too.
                         "asksItself" to true,
+                        // phoneSetAllFiles(true) too (apps from 2.29.0).
+                        "asksAllFiles" to true,
                         "phoneAllFiles" to AllFiles.available,
                         "widget" to true,
                     ),
@@ -460,19 +462,23 @@ class Bridge(private val activity: MainActivity, private val web: TermWebView, p
             "phoneRoots" -> app.whenUnlocked { background(answer) { phone.rootsJson() } }
 
             // "All files" (report 862305): off by default; on only by the person, here
-            // after the page's warning, and with Android's "All files access" too.
+            // after the app's own question, and with Android's "All files access" too.
             "phoneAllFiles" -> answer(Result.success(AllFiles.status(prefs)))
 
             "phoneSetAllFiles" -> {
                 val on = p.getBoolean("on")
                 app.whenUnlocked {
-                    if (!on || !AllFiles.available) {
-                        prefs.allFiles = false
-                        answer(Result.success(AllFiles.status(prefs)))
-                    } else {
-                        activity.askAllFiles { granted ->
-                            prefs.allFiles = granted
+                    when (BridgeRules.allFilesStep(on, AllFiles.available, prefs.allFiles)) {
+                        BridgeRules.AllFilesStep.OFF -> {
+                            prefs.allFiles = false
                             answer(Result.success(AllFiles.status(prefs)))
+                        }
+                        BridgeRules.AllFilesStep.ON_ALREADY -> answer(Result.success(AllFiles.status(prefs)))
+                        BridgeRules.AllFilesStep.ASK -> confirm(R.string.allfiles_ask_title, activity.getString(R.string.allfiles_ask_text), R.string.allfiles_ask_ok, true, answer) {
+                            activity.askAllFiles { granted ->
+                                prefs.allFiles = granted
+                                answer(Result.success(AllFiles.status(prefs)))
+                            }
                         }
                     }
                 }

@@ -6,6 +6,56 @@ says how it was verified.
 
 ## [Unreleased]
 
+## [2.29.0] - 2026-11-24
+
+### Breaking
+
+- Single sign-on no longer links an existing Burrow account by its user name the first time someone signs in through the provider: at some providers anyone may choose any name, an admin's too. Accounts linked already stay linked. For one not linked yet: set its e-mail address in Settings -> Users and choose "e-mail address" under single sign-on (the provider must verify e-mail addresses), or let the person accept an invite through the provider.
+
+### Added
+
+- Settings -> Usage (admins): how often each page and dialog was opened, over the last 7, 30, 90 or 180 days, the pages never opened listed too: for seeing which parts of Burrow are used. By name only (a host's statistics count as `hosts/:id/stats`, never the host), kept on this Burrow 180 days and never sent anywhere; on by default, can be turned off and cleared.
+
+### Security
+
+From a full audit of the code (2026-11-23):
+
+- Writing a program Burrow or root runs by name (/usr/local/bin, /usr/bin and the other PATH and library folders), or udev, sysctl, module and Docker daemon settings, asks for a fresh confirmation, as files that grant a shell do; so does setting a setuid or setgid bit.
+- A YAML file can no longer make Burrow's editor fetch an address or read a file of Burrow's own (`# yaml-language-server: $schema=`): the editor's language servers have no network.
+- Switching branches in a workspace takes a branch only: `.` or a file's name threw unsaved changes away without the confirmation Discard asks.
+- A root save refuses when the path leads to another file than when the save began (a link swapped in meanwhile).
+- Terminal recordings are listed and played back after a fresh confirmation, as watching a live session is.
+- Sign-ins with single sign-on that were begun and never finished are held up to a limit.
+- Single sign-on links an existing account only by the e-mail address the provider verified, never by a user name (see Breaking).
+- The Android app asks itself before "All files" is switched on, also when Android's permission is still held; at start it removes only its own half-written downloads; its WireGuard question names the endpoints the tunnel really uses.
+- AI: more destructive commands are rated high (disks wiped with nvme, hdparm, badblocks, mdadm; a script downloaded and then run; virtual machines and storage deleted; Tailscale, WireGuard or ZeroTier taken down), and more passwords on command lines and in config files are masked before anything goes to a model.
+- The gate's public check finds API tokens and webhooks of well-known kinds, and environment files anywhere; a release tag must be on main; the APK is signed in a checkout nothing else ran in.
+
+### Changed
+
+- The gate says two weeks ahead when an allowed advisory (npm or the image's) is about to stop being allowed, instead of turning red on the day.
+
+### Fixed
+
+- A host's disk is as full as df says, root's reserved blocks left out: one with nothing left to write read as 95%.
+- Proxmox VE guests are listed for a non-root user with sudo for qm and pct (in /usr/sbin, not on that user's PATH).
+- A host switched off on purpose (Wake-on-LAN) no longer makes "Burrow keeps failing" notices: that is the unreachable alert's to tell.
+- A failed self-update says the version before runs only when it was seen running; when neither came up, that nothing healthy runs.
+- A notification channel deleted, switched off or renamed after it failed is no longer told as failing.
+- After signing in again on a page kept for its unsaved work, its terminal and container list connect again (keys typed went nowhere).
+- A double tap on a host opens one session, not two; a slow new session no longer pulls the person back from where they went.
+- Another account signing in on the same tab starts from nothing of the last one's hosts, keys, folders, hints or sessions.
+- A problem report's picture keeps a line of several parts on one line, as on the screen: a process's pid or a disk's model no longer drawn over the line under it (report 3767a7).
+
+### Verified
+
+- A full audit of the code (2026-11-23): a review of the changes, then five reviewers over the server's security, the server's features, the web app, the Android app, and shared code with the scripts and CI. Each finding fixed started with a test that failed on the code before (unit, integration or Android JVM), green after; found by hand: Proxmox's detection on connect had the same PATH gap. Left for a later release (each needs a test on a device or a new e2e harness): five small Android points, three web races, the package state after a restart, and alert bookkeeping that grows slowly.
+- Settings -> Usage: unit tests of the names counted (no host, container or token; unknown names dropped, the rest kept), server tests (per day, the unopened listed, off, cleared, 180 days), an e2e test of pages and dialogs counted, a query not counted again, a failed switch said, the period, off and on.
+- The width sweep: every main page at 42 widths from 320 to 1960 px; the e2e specs in two lanes; checks.ts split into four modules.
+- The split terminals test closes its own sessions: 15 runs in a row green.
+- The report picture: a unit test of a name and its pid kept on one line, and of a paragraph wrapped beside a tall button left to wrap.
+- The gate, the Android app's test on an emulator, and a fresh install.
+
 ## [2.28.1] - 2026-11-20
 
 ### Fixed

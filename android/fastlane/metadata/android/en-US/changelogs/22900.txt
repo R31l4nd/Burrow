@@ -1,0 +1,1 @@
+Security: a full audit fixed writes that could give a shell, the editor fetching what a file names, single sign-on linking by name (now by verified e-mail only), and more. The app asks itself before All files. New: Settings, Usage shows which pages are used. Fixes: full disks, Proxmox with sudo, reconnecting after signing in again.

@@ -161,10 +161,16 @@ export class UptimeMonitor {
   async checkCert(id: number): Promise<void> {
     const a = this.ctx.db.select().from(apps).where(eq(apps.id, id)).get();
     if (!a) return;
-    const end = await this.certOf(a.url).catch(() => null);
+    // undefined: the read failed (a TLS hiccup), the date known kept; null: no certificate (http).
+    const end = await this.certOf(a.url).then(
+      (x) => x,
+      () => undefined,
+    );
     const still = this.ctx.db.select({ url: apps.url }).from(apps).where(eq(apps.id, id)).get();
     if (still?.url !== a.url) return;
     const now = this.ctx.now();
+    // Failed is not unknown: one failed read made a known date "unknown" for six hours (audit 2026-11-23).
+    if (end === undefined) return void this.ctx.db.update(apps).set({ certCheckedAt: now }).where(eq(apps.id, id)).run();
     const days = end === null ? null : Math.floor((end - now) / 86_400_000);
     const level = days === null ? null : (CERT_WARN_DAYS.find((d) => days < d) ?? null);
     const warned = level !== null ? `${end}:${level}` : a.certWarned;

@@ -71,4 +71,65 @@ describe("one line on the screen, one line in a report's picture (report 0d33eb)
     unmark();
     expect(tag.a.has(ONE_LINE)).toBe(false);
   });
+
+  it("keeps a line of several elements on one line: a name in bold and its pid beside it broke between them in the copy, the pid over the line under it (report 3767a7)", () => {
+    type R = ReturnType<typeof line>;
+    type El = { name: string; rects: R[]; whiteSpace: string; parentElement: El | null; a: Set<string>; setAttribute: (n: string) => void; removeAttribute: (n: string) => void };
+    type Text = { parentElement: El; nodeValue: string; rects: R[] };
+    // An element's range has its children's boxes in it too (a tall button's), a text's only its lines.
+    const make = (name: string, rects: R[], parentElement: El | null = null, whiteSpace = 'normal'): El => {
+      const el = { name, rects, whiteSpace, parentElement, a: new Set<string>() } as El;
+      el.setAttribute = (n) => void el.a.add(n);
+      el.removeAttribute = (n) => void el.a.delete(n);
+      return el;
+    };
+    const root = make('root', [line(0), line(500)]);
+    // A process: its line (name, pid) one line, the command line under it.
+    const proc = make('proc', [line(100), line(120)], root);
+    const pname = make('pname', [line(100), line(102, 16)], proc);
+    const b = make('b', [line(100)], pname);
+    const pid = make('pid', [line(102, 16)], pname);
+    const cmd = make('cmd', [line(120)], proc);
+    // A line kept as written (pre) is not marked, nor what holds it.
+    const keep = make('keep', [line(200)], root, 'pre');
+    const inPre = make('inPre', [line(200)], keep, 'pre');
+    // A 40 px button beside a paragraph over two lines: the row is not one line (audit 2026-11-23:
+    // the button's box set the tolerance, the paragraph passed as one line and was drawn so).
+    const row = make('row', [line(300, 40), line(300), line(320)], root);
+    const button = make('button', [line(300, 40)], row);
+    const para = make('para', [line(300), line(320)], row);
+    const texts: Text[] = [
+      { parentElement: b, nodeValue: 'python3', rects: [line(100)] },
+      { parentElement: pname, nodeValue: ' ', rects: [line(100)] },
+      { parentElement: pid, nodeValue: 'pid 10 | root', rects: [line(102, 16)] },
+      { parentElement: cmd, nodeValue: '/usr/bin/python3 -u -m worker', rects: [line(120)] },
+      { parentElement: inPre, nodeValue: 'as written', rects: [line(200)] },
+      { parentElement: button, nodeValue: 'Open', rects: [line(310)] },
+      { parentElement: para, nodeValue: 'a text wrapping over two lines', rects: [line(300), line(320)] },
+    ];
+    const under = (t: Text, el: El) => {
+      for (let x: El | null = t.parentElement; x; x = x.parentElement) if (x === el) return true;
+      return false;
+    };
+    let range: El | Text | null = null;
+    const measured: string[] = [];
+    Object.assign(g, {
+      document: {
+        createTreeWalker: (at: El) => {
+          const list = texts.filter((t) => under(t, at));
+          let i = 0;
+          return { nextNode: () => list[i++] ?? null };
+        },
+        createRange: () => ({ selectNodeContents: (x: El | Text) => ((range = x), 'name' in x && measured.push(x.name)), getClientRects: () => range!.rects }),
+      },
+      getComputedStyle: (el: El) => ({ whiteSpace: el.whiteSpace }),
+    });
+    const unmark = markLines(root as unknown as Element, () => false);
+    expect([proc, pname, b, pid, cmd, keep, inPre, row, button, para].filter((x) => x.a.has(ONE_LINE)).map((x) => x.name)).toEqual(['pname', 'b', 'pid', 'cmd', 'button']);
+    // Each element measured once, the root never (it is the page).
+    expect(measured.filter((n, i) => measured.indexOf(n) !== i)).toEqual([]);
+    expect(measured).not.toContain('root');
+    unmark();
+    expect([pname, b, pid, cmd, button].some((x) => x.a.has(ONE_LINE))).toBe(false);
+  });
 });

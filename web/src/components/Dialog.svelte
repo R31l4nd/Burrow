@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Snippet } from 'svelte';
+  import { untrack, type Snippet } from 'svelte';
   import { t } from '../lib/i18n/index.svelte.js';
   import { bug, startReport } from '../lib/bugreport.svelte.js';
   import { keyBars } from '../lib/keyboard.svelte.js';
@@ -9,6 +9,7 @@
   import { markOpened } from '../lib/back.js';
   import Icon from './Icon.svelte';
   import { lastPressed } from '../lib/pressed.js';
+  import { countUse } from '../lib/usage.js';
 
   // Native <dialog>: focus trapping, Esc to close and the backdrop come from
   // the browser. On phones it sits at the bottom like a sheet. Phones have no
@@ -46,6 +47,11 @@
     if (open) keptTitle = title;
   });
   const shownTitle = $derived(open ? title : keptTitle);
+  // Settings -> Usage: each time it opens, by its tour name then (lib/usage.ts); a name chosen
+  // while it is open (changelog, changelogs) not counted twice.
+  $effect(() => {
+    if (open) untrack(() => countUse(`dialog:${tour}`));
+  });
 
   let el: HTMLDialogElement | undefined = $state();
   let bodyEl: HTMLDivElement | undefined = $state();

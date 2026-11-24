@@ -2,7 +2,7 @@
   import { warnUnsaved } from '../lib/unsaved.svelte.js';
   import { untrack } from 'svelte';
   import type { DiskReason, HostLimitsView, HostSample, HostStats, SmartDisk, SmartReport } from '@burrow/shared';
-  import { sensorLabel } from '@burrow/shared';
+  import { diskPercent, sensorLabel } from '@burrow/shared';
   import HelpTip from '../components/HelpTip.svelte';
   import PageTitle from '../components/PageTitle.svelte';
   import ProxmoxGuests from '../components/ProxmoxGuests.svelte';
@@ -238,7 +238,7 @@
     <section class="card stack" aria-label={t('stats.disks')}>
       <h2>{t('stats.disks')}</h2>
       {#each now.disks as d (d.mount)}
-        {@const p = pct(d.usedBytes, d.sizeBytes)}
+        {@const p = Math.round(diskPercent(d))}
         <div class="disk" data-testid="disk">
           <div class="dline"><span class="mono">{d.mount}</span><span class="dim small">{formatBytes(d.usedBytes)} / {formatBytes(d.sizeBytes)} | {p}%</span></div>
           <div class="bar"><span class="fill {level(p)}" style:width={`${p}%`}></span></div>

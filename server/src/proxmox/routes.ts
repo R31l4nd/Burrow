@@ -18,7 +18,9 @@ const NO_PVE = 3;
 const NO_ROOT = 4;
 // Root runs them as they are; anyone else through sudo without a password,
 // tried once with a harmless call so a refusal is said, not an empty list.
-const AS_ROOT = `{ command -v qm || command -v pct; } >/dev/null 2>&1 || exit ${NO_PVE}; if [ "$(id -u)" = 0 ]; then S=; elif sudo -n qm list >/dev/null 2>&1 || sudo -n pct list >/dev/null 2>&1; then S='sudo -n'; else echo 'needs root, or sudo without a password for qm and pct' >&2; exit ${NO_ROOT}; fi;`;
+// Proxmox puts qm and pct in /usr/sbin, on root's PATH but not on another user's: found there too
+// (audit 2026-11-23: a user with sudo for them read as "not a Proxmox VE node").
+const AS_ROOT = `PATH="$PATH:/usr/sbin:/sbin"; { command -v qm || command -v pct; } >/dev/null 2>&1 || exit ${NO_PVE}; if [ "$(id -u)" = 0 ]; then S=; elif sudo -n qm list >/dev/null 2>&1 || sudo -n pct list >/dev/null 2>&1; then S='sudo -n'; else echo 'needs root, or sudo without a password for qm and pct' >&2; exit ${NO_ROOT}; fi;`;
 const tool = (kind: GuestKind) => (kind === 'vm' ? 'qm' : 'pct');
 
 // Both lists in one round trip, each under its own marker with its exit

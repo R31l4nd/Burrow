@@ -1,6 +1,7 @@
 import type { ImageCheck, OpInfo, OpServerMessage, UpdatesOverview } from '@burrow/shared';
 import { nudgeActivity } from './activity.svelte.js';
 import { get, post } from './api.js';
+import { doubtSession } from './dial.js';
 
 // Image updates (phase 8): the last check's result, for the badge on
 // Containers, the rows and the stack page. Loaded at start and now and then.
@@ -62,6 +63,8 @@ export function followOp(op: OpInfo, on: (m: OpServerMessage) => void, again: ()
       // Empty message: the connection dropped before the end.
       on({ t: 'error', message: '' });
       if (e?.code === 4404) return;
+      // Signed out, or no longer allowed: the sign-in read again, not dialled every 30 s for ever (audit 2026-11-23).
+      if (e?.code === 4401 || e?.code === 4403) return doubtSession();
       timer = setTimeout(connect, Math.min(30_000, 1000 * 2 ** tries++));
     };
   };

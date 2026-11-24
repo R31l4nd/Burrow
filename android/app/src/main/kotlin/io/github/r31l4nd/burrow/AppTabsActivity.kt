@@ -398,7 +398,8 @@ class AppTabsActivity : AppCompatActivity() {
         val name = FileNames.forDownload(url, disposition, mime)
         val size = if (length > 0) android.text.format.Formatter.formatShortFileSize(this, length) else ""
         val body = Style.askText(this, name, size, getString(R.string.download_ask_where), firstBold = true)
-        asking = Style.ask(this, getString(R.string.download_ask_title), body, getString(R.string.download_save)) {
+        // Guarded as the other questions a page brings up: a tap meant for the page saved a file unasked (audit 2026-11-23).
+        asking = Style.ask(this, getString(R.string.download_ask_title), body, getString(R.string.download_save), guarded = true) {
             val wg = app.wireguard
             // Sent on to another host (a CDN, a pre-signed address): followed, without this tab's cookie (A3-AND-11).
             Downloads.start(this, url, name, "file", Downloads.Target.Public, { cookies.getCookie(url) }, { wg.proxyFor(Uri.parse(url).host, null) }, userAgent, otherHost = { u -> wg.proxyFor(u.host, null) })

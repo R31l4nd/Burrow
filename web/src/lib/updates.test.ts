@@ -73,6 +73,27 @@ describe("a stack operation's output", () => {
     stop();
   });
 
+  it('signed out (4401) or not allowed (4403): the sign-in read again, not dialled for ever (audit 2026-11-23)', async () => {
+    vi.useFakeTimers();
+    const { onSessionDoubt } = await import('./dial.js');
+    const doubt = vi.fn();
+    onSessionDoubt(doubt);
+    try {
+      vi.stubGlobal('WebSocket', Socket);
+      for (const code of [4401, 4403]) {
+        followOp({ id: `op${code}` } as never, () => {});
+        const first = Socket.last;
+        first.onclose?.({ code });
+        vi.advanceTimersByTime(60_000);
+        expect(Socket.last, String(code)).toBe(first);
+      }
+      expect(doubt).toHaveBeenCalledTimes(2);
+    } finally {
+      onSessionDoubt(() => {});
+      vi.useRealTimers();
+    }
+  });
+
   it('a dropped connection is made again, and the output read again from the start: never stuck at "running"', () => {
     vi.useFakeTimers();
     try {

@@ -11,6 +11,7 @@ import { appSettings, invites, passkeys, sessions, users } from '../db/schema.js
 import { actor, HttpError, parse, requireAuth, secretFor } from '../http.js';
 import { markStepUp } from './sessions.js';
 import { openInvite } from './users.js';
+import { makeRoom } from './passkeys.js';
 
 // Single sign-on with OpenID Connect (Authelia, Authentik, Pocket ID,
 // Keycloak): the authorization code flow with PKCE. A user signs in through
@@ -205,6 +206,8 @@ export function registerOidcRoutes(app: FastifyInstance, ctx: Ctx, hooks: OidcHo
     const config = await configuration(ctx, s);
     const state = randomBytes(24).toString('base64url');
     prune();
+    // Anyone may begin one: held up to a limit, the oldest let go (as passkey challenges are; audit 2026-11-23).
+    makeRoom(flows);
     flows.set(state, flow);
     const url = client.buildAuthorizationUrl(config, {
       redirect_uri: redirectUri(ctx),
@@ -298,10 +301,12 @@ export function registerOidcRoutes(app: FastifyInstance, ctx: Ctx, hooks: OidcHo
       return back('/');
     }
 
-    // Sign in: the linked account, or (linked now) the one whose name is the
-    // provider's username, or whose e-mail is the verified e-mail, as chosen.
+    // Sign in: the linked account, or (linked now) the one whose e-mail is the e-mail the provider
+    // verified, when e-mail is what accounts are matched by. Never by the provider's username: a
+    // name anyone may choose there (self-registration, an editable profile) was linked to the
+    // account of that name, an admin's too (audit 2026-11-23).
     let user = ctx.db.select().from(users).where(and(eq(users.oidcSub, sub), eq(users.oidcIss, iss))).get();
-    const by = s.claim === 'email' ? (email ? sql`lower(${users.email}) = lower(${email})` : null) : claimValue ? sql`lower(${users.username}) = lower(${claimValue})` : null;
+    const by = s.claim === 'email' && email ? sql`lower(${users.email}) = lower(${email})` : null;
     if (!user && by) {
       const match = ctx.db
         .select()

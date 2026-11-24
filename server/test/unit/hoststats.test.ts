@@ -44,6 +44,17 @@ describe('host statistics', () => {
     ]);
   });
 
+  it("a disk as full as df says, its reserved blocks left out: one with nothing left to write was 95% (audit 2026-11-23)", () => {
+    // ext4's 5% reserved for root: used 95 of 100, nothing available to anyone else.
+    const full = OUT.replace('/dev/sda2      ext4 100000000000 95000000000 5000000000 95% /', '/dev/sda2      ext4 100000000000 95000000000 0 100% /');
+    const s = parseStats(1, full, 0);
+    expect(s.disks[0]).toMatchObject({ mount: '/', availBytes: 0 });
+    expect(statsTrouble(s, { ...DEFAULT_THRESHOLDS, diskPercent: 99 })[0]).toEqual({ subject: '@disk /', event: 'disk_full', title: 'disk 100% full' });
+    // df without types (busybox): Available in 1K blocks, read the same way.
+    const plain = '@@df-plain\nFilesystem 1K-blocks Used Available Use% Mounted on\n/dev/root 1000 950 0 100% /\n';
+    expect(parseStats(1, OUT.replace(/@@df[\s\S]*?@@temp/, `${plain}@@temp`), 0).disks[0]).toMatchObject({ sizeBytes: 1000 * 1024, usedBytes: 950 * 1024, availBytes: 0 });
+  });
+
   it('reads nothing from a host that answered without its numbers (no zeros that look idle)', () => {
     expect(statsGap(OUT)).toBeNull();
     expect(statsGap('')).toBe('/proc/stat');
@@ -84,7 +95,7 @@ describe('host statistics', () => {
 
   it('reads busybox df without types', () => {
     const s = parseStats(1, '@@df\n@@df-plain\nFilesystem 1024-blocks Used Available Capacity Mounted on\n/dev/root 1000 500 500 50% /\ntmpfs 100 0 100 0% /tmp\n', 0);
-    expect(s.disks).toEqual([{ device: '/dev/root', fs: '', sizeBytes: 1024000, usedBytes: 512000, mount: '/' }]);
+    expect(s.disks).toEqual([{ device: '/dev/root', fs: '', sizeBytes: 1024000, usedBytes: 512000, availBytes: 512000, mount: '/' }]);
   });
 
   it("a disk SMART cannot read (a USB enclosure) says why, and no 0 C as if it were a temperature (live UI round)", () => {

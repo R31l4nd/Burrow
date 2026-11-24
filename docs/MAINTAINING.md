@@ -59,6 +59,10 @@ purpose, so it is looked at:
   new reason.
 - `scripts/audit-allow.json`: npm advisories without a fix (`deps` step),
   the same way.
+
+Two weeks before one of the first two ends, the gate says so as a NOTE
+(`deps` and `image` steps), so it does not turn red on the day without
+a word before.
 - `e2e/controls-todo.json`: controls no test presses yet. It may only
   shrink.
 
@@ -70,6 +74,15 @@ step.
 People report problems from inside Burrow (Settings -> Reports received);
 an admin turns one into a filled-in GitHub issue. A fix starts with a test
 that fails without it, and gets a row in `docs/REGRESSIONS.md`.
+
+### When to release
+
+Not one release per fix: fixes collect on `main` (or in the working tree)
+and go out together, about every two weeks. Sooner only for a security
+fix, or a fault that keeps people from using Burrow (sign-in, terminals,
+updating). Each release costs a gate, the Android test, a fresh install
+and CI; for one small fix that is more than it gives, and every update
+asks the people running Burrow to update again.
 
 ## Releasing
 

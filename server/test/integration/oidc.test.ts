@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { AuthState, Invite, OidcSettings, UserSummary } from '@burrow/shared';
 import { startIdp } from '../fake-idp.js';
 import { makeApp, PASSWORD, setupAdmin, totpNow, type TestApp } from '../helpers.js';
+import { challengeLimit } from '../../src/auth/passkeys.js';
 
 // Phase 11: single sign-on against a small OpenID Connect provider
 // (server/test/fake-idp.ts): sign-in for a linked account only, linking by
@@ -100,7 +101,7 @@ describe('single sign-on', () => {
     expect((await viaProvider('/api/auth/oidc/start?purpose=stepup', 'alice', mine)).location).toBe('http://localhost:8080/#/?sso=wrong_user');
   });
 
-  it('an existing account is linked by its name the first time', async () => {
+  it('an existing account is linked by its verified e-mail the first time, never by its name: a name anyone may choose at the provider made them an admin (audit 2026-11-23)', async () => {
     // Olivia joined with a password; the provider knows her by the same name.
     // The admin's step-up expired meanwhile: confirm again.
     t.cookie = admin;
@@ -115,14 +116,43 @@ describe('single sign-on', () => {
     await t.json('POST', '/api/setup/finish');
     t.cookie = null;
 
+    // By name: not linked, whatever the provider calls her.
+    expect((await viaProvider('/api/auth/oidc/start', 'olivia', null)).location).toBe('http://localhost:8080/#/?sso=unknown');
+    // By the e-mail the provider verified, set on her account: linked.
+    t.cookie = admin;
+    t.advance(30_000);
+    await t.json('POST', '/api/auth/step-up/totp', { code: await totpNow(adminSecret, t) });
+    const olivia = (await t.json<UserSummary[]>('GET', '/api/users')).find((u) => u.username === 'olivia')!;
+    await t.json('PUT', `/api/users/${olivia.id}`, { role: 'operator', email: 'olivia@example.com' });
+    await t.json('PUT', '/api/settings/oidc', { enabled: true, issuer: ISSUER, clientId: 'burrow', label: 'Test IdP', claim: 'email' });
+    admin = t.cookie;
+    t.cookie = null;
     const r = await viaProvider('/api/auth/oidc/start', 'olivia', null);
     expect(r.location).toBe('http://localhost:8080/#/');
     expect((await t.json<AuthState>('GET', '/api/auth/state')).user).toMatchObject({ username: 'olivia', hasSso: true });
     t.cookie = admin;
+    await t.json('PUT', '/api/settings/oidc', { enabled: true, issuer: ISSUER, clientId: 'burrow', label: 'Test IdP', claim: 'preferred_username' });
+    admin = t.cookie;
     const users = await t.json<UserSummary[]>('GET', '/api/users');
     expect(users.find((u) => u.username === 'olivia')).toMatchObject({ sso: true, password: true });
     const audit = await t.json<{ action: string }[]>('GET', '/api/audit');
     expect(audit.map((a) => a.action)).toEqual(expect.arrayContaining(['auth.sso_unknown', 'auth.sso_linked', 'invite.accepted']));
+  });
+
+  it('sign-ins begun and never finished are held up to a limit, the oldest let go: anyone could begin them without end (audit 2026-11-23)', async () => {
+    t.cookie = null;
+    const was = challengeLimit.max;
+    try {
+      const r = await viaProvider('/api/auth/oidc/start', 'olivia', null, {
+        between: async () => {
+          challengeLimit.max = 3;
+          for (let i = 0; i < 3; i++) expect((await t.request('GET', '/api/auth/oidc/start')).statusCode).toBe(302);
+        },
+      });
+      expect(r.location).toBe('http://localhost:8080/#/?sso=expired');
+    } finally {
+      challengeLimit.max = was;
+    }
   });
 
   it('a sign-in started elsewhere does not finish in this browser (login CSRF)', async () => {

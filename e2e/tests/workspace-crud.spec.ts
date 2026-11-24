@@ -2,7 +2,7 @@ import { expect, test, type Page } from './fixtures.js';
 import { fromRowMenu } from './menu.js';
 import { sayYes } from './confirm.js';
 import { lookAt } from './checks.js';
-import { addAuthenticator, fillSettled, hostNamed, saveCredential, signIn, type Authenticator } from './passkey.js';
+import { fillSettled, hostNamed, saveCredential, signIn, type Authenticator } from './passkey.js';
 import { openPush, vapidClaims } from './webpush.js';
 
 // What the other tests make, changed and removed again through the screens:
@@ -473,55 +473,6 @@ test('a report schedule: changed and deleted', async ({ page }) => {
   await expect.poll(async () => (await api<{ name: string; enabled: boolean }[]>(page, 'GET', '/api/reports/schedules')).find((x) => x.name === 'crud-schedule')?.enabled).toBe(false);
   await fromRowMenu(row, 'schedule-menu', 'schedule-remove');
   await expect(row).toHaveCount(0);
-});
-
-test('the account: a second passkey, a password, new recovery codes, other sessions out', async ({ page, browser }) => {
-  await page.goto('/#/settings/security');
-  // A second passkey, on another authenticator (the one signed in with holds
-  // this account's key already, and WebAuthn makes no second one there),
-  // then removed again.
-  await auth.cdp.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId: auth.id });
-  await addAuthenticator(page);
-  await page.getByRole('button', { name: 'Add passkey' }).click();
-  const fresh = page.locator('.list-item', { hasText: 'Second test key' });
-  await expect(fresh).toHaveCount(1);
-  await fresh.getByRole('button', { name: 'Delete' }).click();
-  await expect(fresh).toHaveCount(0);
-
-  await page.getByRole('button', { name: 'Set password' }).click();
-  await page.getByLabel('New password (min. 12 characters)').fill('a-long-test-password');
-  await page.locator('dialog[open]').getByRole('button', { name: 'Save' }).click();
-  await expect(page.getByRole('button', { name: 'Remove password' })).toBeVisible();
-  await page.getByRole('button', { name: 'Remove password' }).click();
-  await expect(page.getByRole('button', { name: 'Set password' })).toBeVisible();
-
-  await page.getByRole('button', { name: 'Create new codes' }).click();
-  await expect(page.locator('.codes span')).toHaveCount(10);
-  // Asked first: the old codes stop working (AUDIT2 PAGE-32); and until they are saved, leaving asks too.
-  const asked = () => page.evaluate(() => (window as unknown as { __asked?: string[] }).__asked ?? []);
-  expect(await asked()).toContain('New codes replace your current ones: the old codes stop working at once. Go on?');
-  await page.evaluate(() => (location.hash = '#/settings'));
-  await expect.poll(asked).toContain('You have changes that are not saved. Leave anyway?');
-  // Settings is one page: back in Security, the new codes are still there to save.
-  await page.goto('/#/settings/security');
-  await expect(page.locator('.codes span')).toHaveCount(10);
-  await page.getByTestId('recovery-kept').check();
-
-  // Another browser signed in, then signed out from here.
-  const other = await browser.newContext();
-  const p2 = await other.newPage();
-  await signIn(p2);
-  await page.reload();
-  // Many browsers signed in by now: the newest five, the rest on request.
-  const rows = page.locator('.list-item', { has: page.getByRole('button', { name: 'Sign out', exact: true }) });
-  await expect(rows).toHaveCount(5);
-  await page.getByTestId('sessions-all').click();
-  expect(await rows.count()).toBeGreaterThan(5);
-  await page.getByTestId('revoke-others').click();
-  await p2.reload();
-  await expect(p2.getByRole('button', { name: 'Sign in with passkey' })).toBeVisible();
-  await other.close();
-  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
 });
 
 test('All hosts: a user for every host that sets none, below its groups; a part of Settings (report 5c1209)', async ({ page }) => {

@@ -157,6 +157,13 @@ describe('git', () => {
     expect((await branches()).current).toBe('main');
   });
 
+  it('a branch that is a path ("." or a file) throws nothing away: that is Discard, after a step-up (audit 2026-11-23)', async () => {
+    await run(`printf 'unsaved\\n' >> ${ROOT}/a.txt`);
+    for (const branch of ['.', 'a.txt', 'sub']) expect((await g('checkout', { branch })).statusCode, branch).toBe(400);
+    expect((await run(`cat ${ROOT}/a.txt`))[0]!.stdout).toBe('one pin\ntwo pin\nunsaved\n');
+    await run(`cd ${ROOT} && git checkout -q -- a.txt`);
+  });
+
   it('a staged rename unstaged: neither the new name nor the old one stays staged (AUDIT2 FS-06)', async () => {
     await run(`cd ${ROOT} && git mv a.txt moved.txt`);
     const renamed = (await status()).files.find((f) => f.path === 'moved.txt')!;

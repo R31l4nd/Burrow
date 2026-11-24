@@ -45,8 +45,12 @@ export function closedToOperators(path: string): boolean {
 }
 
 const SHELL_FILES = new Set(['.bashrc', '.bash_profile', '.bash_login', '.bash_logout', '.profile', '.zshrc', '.zshenv', '.zprofile', '.zlogin', '.zlogout', '.kshrc', '.cshrc', '.tcshrc', '.mkshrc', '.bash_aliases']);
-const SHELL_FOLDERS = ['/etc/cron.d', '/etc/cron.daily', '/etc/cron.hourly', '/etc/cron.weekly', '/etc/cron.monthly', '/var/spool/cron', '/etc/sudoers.d', '/etc/profile.d', '/etc/zsh', '/etc/systemd', '/lib/systemd', '/usr/lib/systemd', '/etc/init.d', '/etc/ssh', '/etc/pam.d', '/etc/update-motd.d', '/etc/logrotate.d', '/etc/apt/apt.conf.d', '/etc/ld.so.conf.d'];
-const SHELL_PATHS = new Set(['/etc/crontab', '/etc/anacrontab', '/etc/sudoers', '/etc/profile', '/etc/bash.bashrc', '/etc/environment', '/etc/rc.local', '/etc/ld.so.preload', '/etc/ld.so.conf', '/etc/logrotate.conf', '/etc/passwd', '/etc/shadow', '/etc/group', '/etc/gitconfig']);
+const SHELL_FOLDERS = ['/etc/cron.d', '/etc/cron.daily', '/etc/cron.hourly', '/etc/cron.weekly', '/etc/cron.monthly', '/var/spool/cron', '/etc/sudoers.d', '/etc/profile.d', '/etc/zsh', '/etc/systemd', '/lib/systemd', '/usr/lib/systemd', '/etc/init.d', '/etc/ssh', '/etc/pam.d', '/etc/update-motd.d', '/etc/logrotate.d', '/etc/apt/apt.conf.d', '/etc/ld.so.conf.d',
+  // Programs Burrow and root run by name (a docker of its own in /usr/local/bin ran as root from the
+  // Containers page), the libraries they load, and what the kernel, udev, modules and Docker run
+  // (audit 2026-11-23).
+  '/usr/local/bin', '/usr/local/sbin', '/usr/bin', '/usr/sbin', '/bin', '/sbin', '/lib', '/lib64', '/usr/lib', '/usr/lib64', '/usr/local/lib', '/etc/udev', '/etc/sysctl.d', '/etc/modprobe.d', '/etc/modules-load.d', '/etc/docker', '/etc/xdg/autostart'];
+const SHELL_PATHS = new Set(['/etc/crontab', '/etc/anacrontab', '/etc/sudoers', '/etc/profile', '/etc/bash.bashrc', '/etc/environment', '/etc/rc.local', '/etc/ld.so.preload', '/etc/ld.so.conf', '/etc/logrotate.conf', '/etc/passwd', '/etc/shadow', '/etc/group', '/etc/gitconfig', '/etc/sysctl.conf']);
 
 /**
  * A repository's own config and hooks: what git runs when the SSH user runs it there. The .git

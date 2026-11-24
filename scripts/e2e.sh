@@ -10,7 +10,7 @@
 # analyses, workspaces), without a whole run each time:
 #   E2E_KEEP=1 bash scripts/e2e.sh                 # a run that leaves everything up
 #   E2E_REUSE=1 bash scripts/e2e.sh --no-deps --project=press-each   # just that, again and again
-#   TOUR_ONLY=phone-nl-host bash scripts/e2e.sh --no-deps --project=setup --project=desktop --project=look --grep "claims a fresh|builds a group|every page and dialog"   # a few tour screens
+#   TOUR_ONLY=phone-nl-host bash scripts/e2e.sh --no-deps --project=setup --project=hosts --project=desktop --project=look --grep "claims a fresh|builds a group|every page and dialog"   # a few tour screens
 # The gate uses neither.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

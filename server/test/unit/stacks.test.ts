@@ -802,6 +802,19 @@ describe('telling about updates', () => {
     t.updater.tellNew();
     expect(sent).toHaveLength(2);
     expect(sent[1]).toMatchObject({ title: '1 image update available', body: 'postgres:16 (nas)' });
+    // A check the registry did not answer (unknown, no tag list), then a good one: not told again (audit 2026-11-23).
+    const { eq } = await import('drizzle-orm');
+    t.ctx.db.update(imageChecks).set({ newerTag: '1.27-alpine' }).where(eq(imageChecks.image, 'nginx:alpine')).run();
+    t.updater.tellNew();
+    t.updater.tellNewTags();
+    const told = sent.length;
+    t.ctx.db.update(imageChecks).set({ status: 'unknown', remoteDigest: null, newerTag: null, error: 'registry: 429' }).where(eq(imageChecks.image, 'nginx:alpine')).run();
+    t.updater.tellNew();
+    t.updater.tellNewTags();
+    t.ctx.db.update(imageChecks).set({ status: 'update', remoteDigest: D2, newerTag: '1.27-alpine', error: null }).where(eq(imageChecks.image, 'nginx:alpine')).run();
+    t.updater.tellNew();
+    t.updater.tellNewTags();
+    expect(sent).toHaveLength(told);
     await t.close();
   });
 });

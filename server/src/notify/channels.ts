@@ -254,8 +254,25 @@ export function emailHtml(n: Notice, url: string, lang: 'en' | 'nl'): string {
 
 /** Every enabled channel for a topic gets the notice; failures are logged, not thrown. */
 export class Notifier {
-  /** Channels whose last send failed, by name: since when, and why (told by the self-watch through the others). */
-  readonly failing = new Map<string, { error: string; since: number }>();
+  /** Channels whose last send failed, by id: since when, and why. */
+  readonly #failing = new Map<number, { error: string; since: number }>();
+
+  /**
+   * The channels whose last send failed, by their name now: since when, and why (told by the
+   * self-watch through the others). Only those still there and on: one deleted, switched off or
+   * renamed stayed "failing" for good, and the self-watch never said it was fine (audit 2026-11-23).
+   */
+  get failing(): Map<string, { error: string; since: number }> {
+    const out = new Map<string, { error: string; since: number }>();
+    const there = new Set<number>();
+    for (const r of this.ctx.db.select({ id: channels.id, name: channels.name, enabled: channels.enabled }).from(channels).all()) {
+      there.add(r.id);
+      const f = this.#failing.get(r.id);
+      if (f && r.enabled) out.set(r.name, f);
+    }
+    for (const id of this.#failing.keys()) if (!there.has(id)) this.#failing.delete(id);
+    return out;
+  }
 
   constructor(
     private readonly ctx: Ctx,
@@ -281,10 +298,10 @@ export class Notifier {
         try {
           await sendTo(this.ctx, r, n, this.deps);
           sent++;
-          this.failing.delete(r.name);
+          this.#failing.delete(r.id);
         } catch (err) {
           failed.push({ channel: r.name, error: (err as Error).message });
-          if (!this.failing.has(r.name)) this.failing.set(r.name, { error: (err as Error).message, since: this.ctx.now() });
+          if (!this.#failing.has(r.id)) this.#failing.set(r.id, { error: (err as Error).message, since: this.ctx.now() });
           this.ctx.log.warn(`notify: ${r.kind} "${r.name}" failed: ${(err as Error).message}`);
         }
       }),

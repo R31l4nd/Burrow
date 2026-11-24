@@ -169,6 +169,23 @@ describe("an app's certificate", () => {
     }
   });
 
+  it('a read that fails keeps the date known: one TLS hiccup made it "unknown" for six hours (audit 2026-11-23)', async () => {
+    const t = await makeApp({ fetch: async () => new Response('', { status: 200 }) });
+    await setupAdmin(t);
+    const end = Date.parse('2027-01-01T00:00:00Z');
+    let fail = false;
+    (t.uptime as unknown as { certOf: () => Promise<number | null> }).certOf = async () => (fail ? Promise.reject(new Error('ECONNRESET')) : end);
+    try {
+      const a = await t.json<AppTab>('POST', '/api/apps', { name: 'Vault', url: 'https://vault.lan/' });
+      await t.uptime.checkCert(a.id);
+      fail = true;
+      await t.uptime.checkCert(a.id);
+      expect((await t.json<AppTab[]>('GET', '/api/apps'))[0]!.certExpiresAt).toBe(new Date(end).toISOString());
+    } finally {
+      await t.close();
+    }
+  });
+
   it('plain http has none, and an answer that is no TLS is none too', async () => {
     const { certExpiry } = await import('../../src/apps/cert.js');
     expect(await certExpiry('http://radarr.lan:7878/')).toBeNull();

@@ -1,0 +1,1 @@
+Beveiliging: een volledige audit dichtte schrijfacties die een shell konden geven, de editor die ophaalde wat een bestand noemt, en SSO-koppelen op naam (nu alleen op gecontroleerd e-mailadres). De app vraagt zelf voor Alle bestanden. Nieuw: Instellingen, Gebruik. Fixes: volle schijven, Proxmox met sudo, opnieuw verbinden na inloggen.

@@ -292,7 +292,16 @@ async function runUpload(item: { tr: Transfer; hostId: number; dir: string; file
       if (state.offset <= before) throw new ApiFailure(502, 'no_progress', 'no progress');
       t().bytes = state.offset;
       failures = 0;
-    } catch {
+    } catch (err) {
+      // Refused by Burrow with its reason (the host's disk full, signed out, the upload gone after a
+      // restart): failed at once with that reason. Waited on as a lost connection, it said
+      // "connection lost" after two minutes (audit 2026-11-23).
+      if (refusal(err)) {
+        t().status = 'failed';
+        t().error = errorMessage(err);
+        drop();
+        return;
+      }
       // Network gone (tunnel down, phone asleep): wait, ask where to
       // resume, carry on. Give up after about two minutes of failures.
       if (++failures > 12) {
@@ -324,6 +333,13 @@ async function runUpload(item: { tr: Transfer; hostId: number; dir: string; file
   } finally {
     finishing.delete(item.tr.id);
   }
+}
+
+/** An answer of Burrow's that says why (not the way to it gone: no answer, a proxy's 502-504, not Burrow's). */
+function refusal(err: unknown): boolean {
+  if (!(err instanceof ApiFailure)) return false;
+  if (err.status === 0 || err.status === 502 || err.status === 503 || err.status === 504) return false;
+  return !['not_json', 'empty_answer', 'timeout', 'read_failed', 'no_progress'].includes(err.code);
 }
 
 export { api };

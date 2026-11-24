@@ -292,8 +292,9 @@ test('single sign-on, an invited operator who may look but not change, host stat
   await expect(p3.getByText('there is no Burrow account for you')).toBeVisible();
   await third.close();
 
-  // The provider changed: the admin unlinks the account (after a yes), and its next sign-in
-  // through the provider links it again by its username (AUDIT2 AUTH-06).
+  // The provider changed: the admin unlinks the account (after a yes, AUDIT2 AUTH-06). Its next
+  // sign-in through the provider is not linked again by its name (a name anyone may choose at some
+  // providers, audit 2026-11-23); with its e-mail set and accounts matched by e-mail, it is.
   await page.goto('/#/settings/users');
   const row = page.getByTestId('user').filter({ hasText: 'newbie' });
   await expect(row).toContainText('single sign-on');
@@ -302,10 +303,22 @@ test('single sign-on, an invited operator who may look but not change, host stat
   expect((await questions()).some((q) => q.includes('Unlink newbie'))).toBe(true);
   const fourth = await browser.newContext();
   const p4 = await fourth.newPage();
-  await p4.goto('/');
-  await p4.getByTestId('login-sso').click();
-  await p4.getByRole('button', { name: 'Sign in as newbie' }).click();
+  const viaProvider = async () => {
+    await p4.goto('/');
+    await p4.getByTestId('login-sso').click();
+    await p4.getByRole('button', { name: 'Sign in as newbie' }).click();
+  };
+  await viaProvider();
+  await expect(p4.getByText('there is no Burrow account for you')).toBeVisible();
+  const oidc = (claim: string) => ({ enabled: true, issuer: IDP, clientId: 'burrow', label: 'Test IdP', claim });
+  const put = (url: string, body: unknown) => page.evaluate(async ([u, b]) => (await fetch(u, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })).status, [url, body] as const);
+  const nb = await page.evaluate(async () => ((await (await fetch('/api/users')).json()) as { id: number; username: string; role: string }[]).find((u) => u.username === 'newbie')!);
+  expect(await put(`/api/users/${nb.id}`, { role: nb.role, email: 'newbie@example.com' })).toBe(200);
+  expect(await put('/api/settings/oidc', oidc('email'))).toBe(200);
+  await p4.context().clearCookies();
+  await viaProvider();
   await expect(p4.getByRole('link', { name: 'Hosts' })).toBeVisible();
+  expect(await put('/api/settings/oidc', oidc('preferred_username'))).toBe(200);
   await fourth.close();
   await page.reload();
   await expect(row).toContainText('single sign-on');

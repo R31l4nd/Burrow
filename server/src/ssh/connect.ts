@@ -436,7 +436,8 @@ export const FACTS_COMMAND = [
   // Docker-over-SSH needs; a binary without access counts as no Docker.
   'command -v docker >/dev/null 2>&1 && docker info --format "{{.ServerVersion}}" >/dev/null 2>&1 && echo docker=1 || echo docker=0',
   // A Proxmox VE node: its guests on the host's page (F5).
-  '{ command -v qm || command -v pct; } >/dev/null 2>&1 && echo pve=1 || echo pve=0',
+  // In /usr/sbin, not on a non-root user's PATH (audit 2026-11-23).
+  'PATH="$PATH:/usr/sbin:/sbin" sh -c "command -v qm || command -v pct" >/dev/null 2>&1 && echo pve=1 || echo pve=0',
   // The MAC address of the interface with the default route, for Wake-on-LAN.
   'i=$(ip route show default 2>/dev/null | awk \'{print $5; exit}\'); [ -n "$i" ] && echo "mac=$(cat /sys/class/net/$i/address 2>/dev/null)" || echo mac=',
 ].join("; ");

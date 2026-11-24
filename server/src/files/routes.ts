@@ -222,6 +222,9 @@ export async function registerFileRoutes(app: FastifyInstance, ctx: Ctx, pool: S
 
   app.post('/api/files/:hostId/chmod', async (req) => {
     const b = parse(chmodInput, req.body);
+    // A setuid or setgid bit runs the file as its owner (root): as weighty as a file that grants a
+    // shell, a fresh step-up first (audit 2026-11-23).
+    if (b.mode & 0o6000) requireStepUp(ctx, req);
     const hostId = hostOf(req);
     await pool.with(hostId, async (conn) => fs.chmod(conn.client, await access.check(req, hostId, conn, b.path, 'write'), b.mode, b.recursive));
     audit(ctx, actor(req), 'file.chmod', b.path, { hostId, mode: b.mode.toString(8), recursive: b.recursive });

@@ -3,7 +3,7 @@
 #
 # Pinned by digest like the other images in this repo: a tag can be
 # re-published, and then the "same" build would silently build something else.
-FROM eclipse-temurin:21-jdk-noble@sha256:06c1f157dacf6b68198bd9a4186dd4c34ef24e65d7bbbe2a0cf8e62571ad38c9
+FROM eclipse-temurin:21-jdk-noble@sha256:bc12ebd88ffa6dda0092940e179365b05aef8d813b867f9df5a1f168c9a44feb
 # Which of Burrow's images this is: an untagged one left behind by a build is found by it (scripts/gate.sh, leftovers).
 LABEL burrow.image="android-build"
 

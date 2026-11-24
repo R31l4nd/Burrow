@@ -72,8 +72,14 @@ run_gate() {
   local now
   now="$(snapshot_tree_of "$SNAP")"
   if make -C "$SNAP" gate "$@"; then
-    [ "$(snapshot_tree_of "$SNAP")" = "$now" ] && echo "$now" > "$SNAP/.gate/snapshot-passed"
-    echo "snapshot passed: $now (commit it: bash scripts/gate-snapshot.sh commit -m ...)"
+    # Passed for the tree it began with only: changed while it ran, commit would refuse it (audit 2026-11-23).
+    if [ "$(snapshot_tree_of "$SNAP")" = "$now" ]; then
+      echo "$now" > "$SNAP/.gate/snapshot-passed"
+      echo "snapshot passed: $now (commit it: bash scripts/gate-snapshot.sh commit -m ...)"
+    else
+      echo "the gate passed, but the snapshot changed while it ran: not recorded as passed; run: bash scripts/gate-snapshot.sh resume"
+      return 1
+    fi
   else
     echo "snapshot gate failed; fix in $SNAP and here, then: bash scripts/gate-snapshot.sh resume"
     return 1

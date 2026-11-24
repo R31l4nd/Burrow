@@ -45,6 +45,20 @@ object BridgeProtocol {
  * before anything is done with it: plain Kotlin, for the JVM tests.
  */
 object BridgeRules {
+    /** What phoneSetAllFiles(on) does: switch off, keep it on, or ask the person (the app itself). */
+    enum class AllFilesStep { OFF, ON_ALREADY, ASK }
+
+    /**
+     * Switching "All files" on is asked by the app whenever it is off in the app, also when
+     * Android's permission is still held: the page alone switched it back on without a word,
+     * after it was switched off or after a change of server (audit 2026-11-23).
+     */
+    fun allFilesStep(on: Boolean, available: Boolean, onNow: Boolean): AllFilesStep = when {
+        !on || !available -> AllFilesStep.OFF
+        onNow -> AllFilesStep.ON_ALREADY
+        else -> AllFilesStep.ASK
+    }
+
     /** An exported log, at most (characters). */
     const val MAX_SAVED_TEXT = 32 shl 20
 
@@ -63,12 +77,7 @@ object BridgeRules {
      * then used (audit 2026-11-09). An endpoint that says nothing shows as "?".
      */
     fun wgEndpoint(conf: String): String? =
-        conf.lines().mapNotNull { raw ->
-            val line = raw.substringBefore('#').trim()
-            val eq = line.indexOf('=')
-            if (eq < 0 || !line.substring(0, eq).trim().equals("endpoint", ignoreCase = true)) null
-            else line.substring(eq + 1).trim().ifEmpty { "?" }
-        }.distinct().joinToString(", ").ifEmpty { null }?.take(400)
+        WgConf.values(conf, "peer", "Endpoint").map { it.ifEmpty { "?" } }.distinct().joinToString(", ").ifEmpty { null }?.take(400)
 
     /** The status bar's colour from the page's own CSS: "#rrggbb" for "#rgb" or "#rrggbb", null for anything else. */
     fun topColor(top: String): String? {

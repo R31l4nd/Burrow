@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const COMPOSE_SCHEMA = fileURLToPath(new URL('../../assets/compose-spec.json', import.meta.url));
+// Loaded first into each language server: no network, and for a schema only Burrow's own files.
+const SANDBOX = fileURLToPath(new URL('../../assets/lsp-sandbox.cjs', import.meta.url));
 
 export type LanguageId = 'yaml' | 'shellscript' | 'dockerfile' | 'json' | 'toml' | 'python';
 
@@ -57,6 +59,23 @@ export function findOnPath(name: string): string | null {
 }
 
 export function serverFor(lang: LanguageId): ServerDef | null {
+  const def = server(lang);
+  if (!def || def.command !== process.execPath) return def;
+  return { ...def, args: ['--require', SANDBOX, ...def.args], ...(lang === 'yaml' ? { env: { ...def.env, BURROW_LSP_READ: yamlReads() } } : {}) };
+}
+
+/** What the YAML server may read: Burrow's schemas, and its own package (its translations). */
+function yamlReads(): string {
+  let own = '';
+  try {
+    own = dirname(require.resolve('yaml-language-server/package.json'));
+  } catch {
+    // Not installed: serverFor finds no server either.
+  }
+  return [dirname(COMPOSE_SCHEMA), own].filter(Boolean).join(':');
+}
+
+function server(lang: LanguageId): ServerDef | null {
   const node = process.execPath;
   switch (lang) {
     case 'yaml': {

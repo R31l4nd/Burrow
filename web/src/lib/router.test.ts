@@ -232,3 +232,14 @@ describe('the hash router', () => {
     expect(route.parts).toEqual([]);
   });
 });
+
+describe('back to the page after a step-up at the provider (audit 2026-11-23)', () => {
+  it('keeps the page with its query (a folder, the logs shown), not the one-shot parts', async () => {
+    const { returnPath } = await import('./router.svelte.js');
+    expect(returnPath('/files/3?p=%2Fsrv%2Fapp')).toBe('/files/3?p=%2Fsrv%2Fapp');
+    expect(returnPath('/logs?t=1%3A%3Aweb&at=5')).toBe('/logs?t=1%3A%3Aweb&at=5');
+    expect(returnPath('/hosts?connect=12')).toBe('/hosts');
+    expect(returnPath('/settings/scheduled?run=1&sso=ok')).toBe('/settings/scheduled');
+    expect(returnPath('')).toBe('/');
+  });
+});

@@ -74,4 +74,10 @@ describe('confirmed as the person first', () => {
     expect((await t.request('POST', '/api/system/update', {})).json()).toMatchObject({ error: 'step_up_required' });
     expect((await t.request('PUT', '/api/docker/updates/settings', {})).json()).toMatchObject({ error: 'step_up_required' });
   });
+
+  it('a setuid or setgid bit set on a file asks for a fresh sign-in, before the host is reached; a plain mode does not (audit 2026-11-23)', async () => {
+    t.advance(16 * 60_000);
+    for (const mode of [0o4755, 0o2755, 0o6777]) expect((await t.request('POST', '/api/files/999999/chmod', { path: '/srv/x', mode })).json(), mode.toString(8)).toMatchObject({ error: 'step_up_required' });
+    expect((await t.request('POST', '/api/files/999999/chmod', { path: '/srv/x', mode: 0o755 })).json().error).not.toBe('step_up_required');
+  });
 });

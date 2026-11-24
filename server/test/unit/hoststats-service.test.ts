@@ -194,3 +194,24 @@ describe('security updates told once, also with a failed check between (audit 20
     expect(told).toEqual(['1 security update waiting: tar']);
   });
 });
+
+describe('a host that is off (Wake-on-LAN, audit 2026-11-23)', () => {
+  it('is the unreachable alert, not the sampling job failing: two "Burrow keeps failing" notices for a host switched off on purpose', async () => {
+    const off = await t.json<Host>('POST', '/api/hosts', { name: 'off', address: 'off.lan', username: 'me' });
+    t.ctx.db.update(hosts).set({ facts: JSON.stringify({ checkedAt: new Date(t.clock.now).toISOString() }) }).where(eq(hosts.id, off.id)).run();
+    const s = new HostStatsService(t.ctx, {} as never);
+    const ran: (string | null)[] = [];
+    s.jobs = { ran: (_name: string, _ms: number, failure: string | null) => ran.push(failure), failed: () => {}, fine: () => {} } as never;
+    s.sample = async () => {
+      throw new Error('connect ECONNREFUSED 10.0.0.9:22');
+    };
+    await s.tick();
+    expect(ran).toEqual([null]);
+    // A host that answers but whose numbers cannot be read is the job's failure still.
+    s.sample = async () => {
+      throw new Error('the statistics command printed nothing');
+    };
+    await s.tick();
+    expect(ran[1]).toContain('off: the statistics command printed nothing');
+  });
+});

@@ -610,3 +610,14 @@ export const uploads = sqliteTable('uploads', {
   overwrite: integer('overwrite', { mode: 'boolean' }).notNull(),
   touched: integer('touched').notNull(),
 });
+
+/** Pages and dialogs opened, per day (YYYY-MM-DD, UTC) and name (Settings -> Usage). */
+export const usageDays = sqliteTable(
+  'usage_counts',
+  {
+    day: text('day').notNull(),
+    key: text('key').notNull(),
+    n: integer('n').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.day, t.key] })],
+);

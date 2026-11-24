@@ -84,7 +84,9 @@ export function registerRecordingRoutes(app: FastifyInstance, ctx: Ctx): void {
     return { keepDays: days, removed };
   });
 
-  app.get('/api/recordings', async (): Promise<Recording[]> => {
+  // What a recorded shell showed: as weighty as watching a session (terminal/routes.ts, sharing one
+  // asks a step-up), so the list and the playback ask one too (audit 2026-11-23).
+  app.get('/api/recordings', { config: { stepUp: true } }, async (): Promise<Recording[]> => {
     const names = new Map(ctx.db.select({ id: users.id, username: users.username }).from(users).all().map((u) => [u.id, u.username]));
     return ctx.db
       .select()
@@ -105,7 +107,7 @@ export function registerRecordingRoutes(app: FastifyInstance, ctx: Ctx): void {
       }));
   });
 
-  app.get('/api/recordings/:id/cast', async (req, reply) => {
+  app.get('/api/recordings/:id/cast', { config: { stepUp: true } }, async (req, reply) => {
     const r = ctx.db.select().from(recordings).where(eq(recordings.id, idParam(req))).get();
     if (!r) throw new HttpError(404, 'not_found');
     let size: number;

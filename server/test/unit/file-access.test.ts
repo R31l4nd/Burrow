@@ -21,6 +21,12 @@ describe('files closed to operators whatever was granted (A3-SRV-01)', () => {
 });
 
 describe('files whose new content grants a shell (A3-SRV-08)', () => {
+  it('programs Burrow and root run by name, and what the kernel, udev, modules and Docker run (audit 2026-11-23: a docker of its own in /usr/local/bin ran as root from the Containers page)', () => {
+    for (const p of ['/usr/local/bin/docker', '/usr/local/sbin/x', '/usr/bin/ls', '/usr/sbin/sshd', '/bin/sh', '/sbin/init', '/lib/x86_64-linux-gnu/security/pam_unix.so', '/usr/lib/x.so', '/usr/local/lib/x.so', '/lib64/ld-linux-x86-64.so.2', '/etc/udev/rules.d/99-x.rules', '/etc/sysctl.d/99-x.conf', '/etc/sysctl.conf', '/etc/modprobe.d/x.conf', '/etc/modules-load.d/x.conf', '/etc/docker/daemon.json', '/etc/xdg/autostart/x.desktop', '/usr/local/bin'])
+      expect(grantsAShell(p), p).toBe(true);
+    for (const p of ['/usr/local/share/doc/x', '/srv/bin/run.sh', '/home/me/bin.txt']) expect(grantsAShell(p), p).toBe(false);
+  });
+
   it('keys, start-up files of a shell, cron, sudoers, units', () => {
     for (const p of ['/home/me/.ssh/authorized_keys', '/root/.bashrc', '/home/me/.profile', '/home/me/.config/fish/config.fish', '/home/me/.config/systemd/user/x.service', '/etc/cron.d/job', '/var/spool/cron/crontabs/root', '/etc/sudoers.d/me', '/etc/profile.d/x.sh', '/etc/systemd/system/x.service', '/etc/ld.so.preload'])
       expect(grantsAShell(p), p).toBe(true);

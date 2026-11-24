@@ -100,6 +100,24 @@ describe('Burrow tells about itself (2026-11-07)', () => {
     await t.close();
   });
 
+  it('errors logged while no channel could take the message are told the next hour, not dropped (audit 2026-11-23)', async () => {
+    const t = await makeApp();
+    const { w, state, sent } = watch(t);
+    const ev = (kind: string): LogEvent => ({ kind, level: 'error', count: 1, firstAt: new Date(t.clock.now).toISOString(), lastAt: new Date(t.clock.now).toISOString(), example: `${kind} happened` });
+    // A round with nothing to tell; then an error is logged, and the next round has no channel that takes it.
+    expect(await w.tick()).toEqual([]);
+    t.advance(10 * 60_000);
+    state.events = [ev('db locked')];
+    t.advance(50 * 60_000);
+    state.channels = 0;
+    expect(await w.tick()).toEqual([]);
+    t.advance(HOUR);
+    state.channels = 1;
+    expect(await w.tick()).toEqual(['errors']);
+    expect(sent.at(-1)!.body).toContain('db locked happened');
+    await t.close();
+  });
+
   it('a new version once a day, told once; a rolled-back self-update told once', async () => {
     const t = await makeApp();
     const { w, state, sent } = watch(t);
@@ -121,11 +139,36 @@ describe('Burrow tells about itself (2026-11-07)', () => {
     await t.close();
   });
 
+  it('a self-update that went wrong is told once, not again every month while it stays the last one (audit 2026-11-23)', async () => {
+    const t = await makeApp();
+    const { w, state } = watch(t);
+    state.check = check({ last: { state: 'rolledback', at: new Date(t.clock.now).toISOString(), message: 'not healthy' } });
+    expect(await w.tick()).toEqual([`selfupdate:${new Date(t.clock.now).toISOString()}`]);
+    const again: string[] = [];
+    for (let d = 0; d < 40; d++) {
+      t.advance(24 * HOUR);
+      again.push(...(await w.tick()));
+    }
+    expect(again.filter((k) => k.startsWith('selfupdate:'))).toEqual([]);
+    await t.close();
+  });
+
   it('an install whose image tag does not reach the new version is told the tag that does', () => {
     const pinned = updateNotices(check({ mode: 'image', available: '2.22.0', image: 'ghcr.io/r31l4nd/burrow:2.21', pinned: { image: 'ghcr.io/r31l4nd/burrow:2.21', next: 'ghcr.io/r31l4nd/burrow:2.22' } }))[0]!;
     expect(pinned.en.body).toContain('set BURROW_IMAGE=ghcr.io/r31l4nd/burrow:2.22 in .env');
     expect(pinned.nl.body).toContain('zet BURROW_IMAGE=ghcr.io/r31l4nd/burrow:2.22 in .env');
     expect(updateNotices(check({ mode: 'image', available: '2.22.0', image: 'ghcr.io/r31l4nd/burrow:latest' }))[0]!.en.body).not.toContain('BURROW_IMAGE');
+  });
+
+  it('a failed self-update says the version before runs only when it was seen back; when neither came up, that nothing healthy runs (audit 2026-11-23)', () => {
+    const told = (code: string | undefined) => updateNotices(check({ last: { state: 'failed', at: '2026-01-02T10:00:00Z', code, message: 'x' } }))[0]!;
+    for (const code of ['pull_failed', 'build_failed', 'backup_failed', 'up_failed', 'keep_failed']) expect(told(code).en.body, code).toContain('The version before runs.');
+    const both = told('both_unhealthy');
+    expect(both.en.body).not.toContain('The version before runs.');
+    expect(both.en.body).toContain('Neither the new version nor the one before runs healthy');
+    expect(both.nl.body).toContain('De nieuwe versie noch de vorige draait gezond');
+    // Without a code (written before 1.2): what happened is not known, so neither is said.
+    expect(told(undefined).en.body).not.toContain('The version before runs.');
   });
 
   it('a check that fails is tried again the next hour, not a day later', async () => {

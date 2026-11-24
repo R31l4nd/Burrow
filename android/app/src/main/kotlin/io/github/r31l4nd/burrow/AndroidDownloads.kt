@@ -23,14 +23,20 @@ import java.io.OutputStream
 object AndroidDownloads {
     /**
      * Files this app left half written in Downloads (IS_PENDING) when its process went: removed at
-     * start, so no stale partial download stays behind out of sight (AUDIT2 AND-18).
+     * start, so no stale partial download stays behind out of sight (AUDIT2 AND-18). Its own only
+     * (Downloads.stalePending).
      */
     fun dropStalePending(context: Context) {
         // Matching pending items by query needs API 30; on 29 they stay as before.
         if (Downloads.list().isNotEmpty() || android.os.Build.VERSION.SDK_INT < 30) return
         runCatching {
             val resolver = context.contentResolver
-            val query = android.os.Bundle().apply { putInt(MediaStore.QUERY_ARG_MATCH_PENDING, MediaStore.MATCH_ONLY) }
+            val (where, args) = Downloads.stalePending(context.packageName)
+            val query = android.os.Bundle().apply {
+                putInt(MediaStore.QUERY_ARG_MATCH_PENDING, MediaStore.MATCH_ONLY)
+                putString(android.content.ContentResolver.QUERY_ARG_SQL_SELECTION, where)
+                putStringArray(android.content.ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS, args)
+            }
             resolver.query(MediaStore.Downloads.EXTERNAL_CONTENT_URI, arrayOf(MediaStore.Downloads._ID), query, null)?.use { c ->
                 while (c.moveToNext()) {
                     val uri = android.content.ContentUris.withAppendedId(MediaStore.Downloads.EXTERNAL_CONTENT_URI, c.getLong(0))

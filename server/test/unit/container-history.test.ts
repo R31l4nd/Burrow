@@ -69,7 +69,7 @@ describe('container history', () => {
     const warn = vi.spyOn(t.ctx.log, 'warn');
     const read = async (id: number) => {
       if (id === hung.id) return new Promise<HostContainers>((r) => setTimeout(() => r(snap(id, [], t.clock.now)), 300));
-      if (id === down.id) return { ...snap(id, [], t.clock.now), error: 'connection refused' } as HostContainers;
+      if (id === down.id) return { ...snap(id, [], t.clock.now), error: 'connect ECONNREFUSED 10.0.0.9:22' } as HostContainers;
       return snap(id, [['x', 'app', 1, 1]], t.clock.now);
     };
     const hist = new ContainerHistory(t.ctx, read, jobs);
@@ -86,8 +86,10 @@ describe('container history', () => {
     expect(hourly.every((k) => k.cpu === 0.5 && k.memBytes === 100)).toBe(true);
     expect(kept.length).toBeLessThan(864 - 250);
     expect(hist.history(two.id, 'app', 86_400_000)).toHaveLength(2);
-    expect(warn.mock.calls.filter((c) => String(c.at(-1)).includes('connection refused'))).toHaveLength(1);
-    expect(jobs.list()).toEqual([expect.objectContaining({ name: 'container-history', runs: 2, ok: false, lastError: 'down: connection refused' })]);
+    expect(warn.mock.calls.filter((c) => String(c.at(-1)).includes('ECONNREFUSED'))).toHaveLength(1);
+    // A host that cannot be reached is the unreachable alert's, not the job failing (audit 2026-11-23: a
+    // host switched off on purpose made "Burrow keeps failing" notices).
+    expect(jobs.list()).toEqual([expect.objectContaining({ name: 'container-history', runs: 2, ok: true })]);
   });
 
   it('a host that never answers no longer holds the round: the others are sampled again, the hung one is not asked again on top', async () => {
@@ -224,5 +226,27 @@ describe('the background jobs, for admins (OPS-W-14)', () => {
     expect(await t.json('GET', '/api/system/jobs')).toEqual([]);
     await t.updates.check([]);
     expect(await t.json('GET', '/api/system/jobs')).toEqual([expect.objectContaining({ name: 'update-check', runs: 1, ok: true, lastError: null, lastRunAt: new Date(t.clock.now).toISOString() })]);
+  });
+});
+
+describe('a host whose containers cannot be read, though it answers', () => {
+  it('is the job failing (a host that is off is not, audit 2026-11-23)', async () => {
+    const { Jobs } = await import('../../src/jobs.js');
+    const h = await t.json<Host>('POST', '/api/hosts', { name: 'denied', address: 'denied.lan', username: 'me' });
+    t.ctx.db.update(hosts).set({ facts: JSON.stringify({ hasDocker: true }) }).where(eq(hosts.id, h.id)).run();
+    const jobs = new Jobs(t.ctx);
+    const hist = new ContainerHistory(t.ctx, async (id) => ({ ...snap(id, [], t.clock.now), error: 'permission denied while trying to connect to the Docker daemon socket' }) as HostContainers, jobs);
+    await hist.tick();
+    expect(jobs.list()).toEqual([expect.objectContaining({ name: 'container-history', ok: false, lastError: 'denied: permission denied while trying to connect to the Docker daemon socket' })]);
+  });
+});
+
+describe('Burrow closing (audit 2026-11-23)', () => {
+  it('stops the history first: a round still to come wrote to the database closed after it', async () => {
+    const stop = vi.spyOn(ContainerHistory.prototype, 'stop');
+    const app = await makeApp();
+    await app.close();
+    expect(stop).toHaveBeenCalled();
+    stop.mockRestore();
   });
 });

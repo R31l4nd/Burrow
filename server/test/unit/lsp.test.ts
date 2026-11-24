@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { spawn } from 'node:child_process';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Decoder, encode } from '../../src/lsp/framing.js';
 import { configFor, serverFor, toolEnv, type LanguageId } from '../../src/lsp/servers.js';
 import { serverInitialize } from '../../src/lsp/bridge.js';
@@ -114,4 +119,43 @@ describe('framing limits (AUDIT2 FS-20)', () => {
     const h = new Decoder();
     expect(() => h.push(Buffer.alloc(70_000, 0x41))).toThrow(/header/);
   });
+});
+
+describe('a YAML file that names its own schema (audit 2026-11-23)', () => {
+  it('makes Burrow fetch nothing and read no file of its own: "# yaml-language-server: $schema=" pointed it at any address', async () => {
+    let hits = 0;
+    const web = createServer((_q, s) => {
+      hits++;
+      s.end('{"type":"object","additionalProperties":false}');
+    });
+    await new Promise<void>((r) => web.listen(0, '127.0.0.1', r));
+    const dir = mkdtempSync(join(tmpdir(), 'burrow-lsp-'));
+    const local = join(dir, 'schema.json');
+    writeFileSync(local, '{"type":"object","additionalProperties":false}');
+    const def = serverFor('yaml')!;
+    const child = spawn(def.command, def.args, { stdio: ['pipe', 'pipe', 'ignore'], env: { ...process.env, ...def.env } });
+    const d = new Decoder();
+    const said: string[] = [];
+    child.stdout!.on('data', (c: Buffer) => {
+      for (const m of d.push(c)) {
+        const j = JSON.parse(m) as { method?: string; params?: { diagnostics?: { message: string }[] } };
+        if (j.method === 'textDocument/publishDiagnostics') said.push(...(j.params?.diagnostics ?? []).map((x) => x.message));
+      }
+    });
+    const send = (o: object) => child.stdin!.write(encode(JSON.stringify({ jsonrpc: '2.0', ...o })));
+    try {
+      send({ id: 1, method: 'initialize', params: { processId: null, rootUri: null, capabilities: {} } });
+      send({ method: 'initialized', params: {} });
+      const port = (web.address() as AddressInfo).port;
+      send({ method: 'textDocument/didOpen', params: { textDocument: { uri: 'file:///srv/a.yaml', languageId: 'yaml', version: 1, text: `# yaml-language-server: $schema=http://127.0.0.1:${port}/s.json\na: 1\n` } } });
+      send({ method: 'textDocument/didOpen', params: { textDocument: { uri: 'file:///srv/b.yaml', languageId: 'yaml', version: 1, text: `# yaml-language-server: $schema=file://${local}\nb: 1\n` } } });
+      await new Promise((r) => setTimeout(r, 4000));
+      expect(hits).toBe(0);
+      expect(said.filter((m) => /not allowed/i.test(m))).toEqual([]);
+    } finally {
+      child.kill();
+      web.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 20_000);
 });

@@ -54,6 +54,7 @@
   import { upload } from './lib/files.svelte.js';
   import { connectHost } from './lib/sessions.svelte.js';
   import { data, loadAll } from './lib/data.svelte.js';
+  import { countUse, pageKey, startUsage } from './lib/usage.js';
 
   let loadError = $state('');
   // xterm is most of the bundle; load it only when a terminal is opened.
@@ -127,6 +128,16 @@
   // Setup stays on screen until the wizard is finished, also after the
   // account exists but before the recovery codes were shown.
   const inSetup = $derived(s !== null && (s.setupRequired || s.user?.incomplete === true));
+  // Settings -> Usage: each page opened, by its name (lib/usage.ts). Once per page: not again for
+  // a query of its own (a folder opened in Files) or a new session state (a step-up, a refresh).
+  startUsage();
+  const usageKey = $derived(pageKey(`#${route.path}`));
+  $effect(() => {
+    const key = usageKey;
+    untrack(() => {
+      if (s?.user && !inSetup) countUse(key);
+    });
+  });
   // The update count on Containers: at sign-in and every ten minutes.
   // What runs on the server (the busy pill): admins start operations.
   $effect(() => {

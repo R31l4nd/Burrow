@@ -1,63 +1,11 @@
-// Every page of Burrow, as the tour sees it (a hash with its numbers and
-// names replaced): the tour fails when one of these was never looked at.
-// web/src/pages.test.ts checks that App.svelte has no page missing here.
-export const PAGES = [
-  'login',
-  'setup',
-  'invite/:name',
-  'hosts',
-  'hosts/new',
-  'hosts/:id/edit',
-  'hosts/:id/stats',
-  'hosts/:id/journal',
-  'hosts/:id/docker',
-  'groups/new',
-  'groups/:id/edit',
-  'import',
-  'files',
-  'files/:id',
-  // The phone's own files, in the Android app (workspace-android.spec.ts, with a stand-in for the app).
-  'files/phone',
-  'term',
-  'term/:name',
-  'edit/:id',
-  'edit/phone',
-  'ws/:id',
-  'containers',
-  'containers/:id/:name',
-  'stacks/:id/:name',
-  'logs',
-  'alerts',
-  'reports',
-  'reports/:id',
-  'apps',
-  'apps/:id',
-  'share',
-  'watch/:name',
-  'recordings/:id',
-  // Parts of Settings now: 'keys', 'snippets' and 'recordings' (the list) lead to #/settings/<part>
-  // (report e34ebd; workspace-extras.spec.ts checks the old addresses), 'groups/all' to #/settings/hosts (report 5c1209).
-  'settings',
-  'settings/audit',
-  'settings/:name',
-];
-
-// The parts of Settings, each a page of its own (#/settings/<part>).
-export const SETTINGS_PARTS = ['appearance', 'terminal', 'shortcuts', 'notify', 'ai', 'channels', 'updates', 'users', 'sso', 'hosts', 'keys', 'snippets', 'scheduled', 'recordings', 'android', 'security', 'backups', 'system', 'about', 'report'] as const;
+// The pages and their names (shared/src/pages.ts: Burrow counts their use by these names too).
+import { PAGES, SETTINGS_PARTS } from '../../shared/src/pages.js';
+export { PAGES, SETTINGS_PARTS, pageOf } from '../../shared/src/pages.js';
 
 // Dialogs that live outside the web app's pages and no e2e test can open.
 // The direct route's (the Android app's) were here: workspace-direct.spec.ts
 // and mobile-direct.spec.ts look at them now, with a stand-in for the app (UIA-17).
 export const DIALOGS_ELSEWHERE: Record<string, string> = {};
-
-/** "#/hosts/12/edit" -> "hosts/:id/edit"; "#/containers/3/web" -> "containers/:id/:name". */
-export function pageOf(hash: string, signedIn: boolean): string {
-  const path = hash.replace(/^#\/?/, '').split('?')[0]!;
-  if (!path) return signedIn ? 'hosts' : 'login';
-  const [first, ...rest] = path.split('/');
-  const words = new Set(['new', 'edit', 'stats', 'docker', 'journal', 'audit', 'all', 'phone']);
-  return [first, ...rest.map((x) => (/^\d+$/.test(x) ? ':id' : words.has(x) ? x : ':name'))].join('/');
-}
 
 /** What a page's numbers and names stand for: real records of the run, by name. */
 export interface PageIds {

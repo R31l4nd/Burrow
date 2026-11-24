@@ -168,6 +168,18 @@ class BridgeProtocolTest {
         assertTrue(BridgeRules.wgEndpoint("[Peer]\nEndpoint =   # none\n")!!.contains("?"))
     }
 
+    /** The question names the endpoints the tunnel uses, no other (audit 2026-11-23). */
+    @Test
+    fun wgEndpointIsThePeersOnlyTrimmedAsGoDoes() {
+        // An Endpoint under [Interface] the tunnel ignores; one under [Peer] behind a NEL (U+0085),
+        // which Go trims and Kotlin's trim() did not.
+        val conf = "[Interface]\nPrivateKey = x\nEndpoint = home.example:51820\n[Peer]\n\u0085Endpoint = evil.example:51820\nAllowedIPs = 0.0.0.0/0\n"
+        assertEquals("evil.example:51820", BridgeRules.wgEndpoint(conf))
+        assertEquals(mapOf("address" to "", "endpoint" to "evil.example:51820", "allowedIps" to "0.0.0.0/0"), WgConf.shown(conf))
+        // A carriage return alone does not end a line for the tunnel: one line, not two endpoints.
+        assertEquals("a.example:1\rEndpoint = b.example:2", BridgeRules.wgEndpoint("[Peer]\nEndpoint = a.example:1\rEndpoint = b.example:2\n"))
+    }
+
     @Test
     fun aShareOfNothingIsRefused() {
         assertThrows(IllegalArgumentException::class.java) { BridgeRules.sharePaths(JSONArray()) }

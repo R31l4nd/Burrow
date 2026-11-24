@@ -19,9 +19,10 @@ COPY --chmod=755 docker /usr/local/bin/docker
 COPY --chmod=755 systemctl journalctl /usr/local/bin/
 RUN groupadd -f systemd-journal && usermod -aG systemd-journal tester
 # A Proxmox VE node's qm and pct, allowed to the test user through sudo
-# without a password, as Burrow's guests list asks (server/src/proxmox).
-COPY --chmod=755 qm pct /usr/local/bin/
-RUN echo 'tester ALL=(root) NOPASSWD: /usr/local/bin/qm, /usr/local/bin/pct' > /etc/sudoers.d/tester-pve && chmod 440 /etc/sudoers.d/tester-pve
+# without a password, as Burrow's guests list asks (server/src/proxmox). In
+# /usr/sbin, where Proxmox puts them: not on a user's PATH (audit 2026-11-23).
+COPY --chmod=755 qm pct /usr/sbin/
+RUN echo 'tester ALL=(root) NOPASSWD: /usr/sbin/qm, /usr/sbin/pct' > /etc/sudoers.d/tester-pve && chmod 440 /etc/sudoers.d/tester-pve
 # Package updates (server/src/hosts/packages.ts): a local repository that
 # offers newer builds of a few installed packages, two from a -security
 # suite, so apt list --upgradable has something to say. Only this

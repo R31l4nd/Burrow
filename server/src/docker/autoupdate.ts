@@ -701,12 +701,15 @@ export class Updater {
    * last one: each update once, whatever the check that found it.
    */
   tellNew(): void {
-    const found = this.checker.list().filter((c) => c.status === 'update' && c.remoteDigest);
+    const all = this.checker.list();
+    const found = all.filter((c) => c.status === 'update' && c.remoteDigest);
     const key = (c: (typeof found)[number]) => `${c.hostId} ${c.image} ${c.remoteDigest}`;
     const told = new Set(getUpdateState(this.ctx).notified ?? []);
     const fresh = found.filter((c) => !told.has(key(c)));
-    // Keep only what is still an update: the list does not grow forever.
-    setUpdateState(this.ctx, { notified: found.map(key) });
+    // Keep only what is still an update, so the list does not grow forever, and what was told of an
+    // image the registry did not answer for this time: it was told again after one failed check (audit 2026-11-23).
+    const unread = all.filter((c) => c.status !== 'update' && c.status !== 'current').map((c) => `${c.hostId} ${c.image} `);
+    setUpdateState(this.ctx, { notified: [...new Set([...found.map(key), ...[...told].filter((k) => unread.some((p) => k.startsWith(p)))])] });
     if (!fresh.length || !this.notifier) return;
     const names = new Map(this.ctx.db.select().from(hosts).all().map((h) => [h.id, h.name]));
     const lines = fresh.map((c) => `${c.image} (${names.get(c.hostId) ?? c.hostId})`);
@@ -727,11 +730,15 @@ export class Updater {
    * is a choice, made in the compose file.
    */
   tellNewTags(): void {
-    const found = this.checker.list().filter((c) => c.newerTag);
+    const all = this.checker.list();
+    const found = all.filter((c) => c.newerTag);
     const key = (c: (typeof found)[number]) => `${c.hostId} ${c.image} ${c.newerTag}`;
     const told = new Set(getUpdateState(this.ctx).notifiedTags ?? []);
     const fresh = found.filter((c) => !told.has(key(c)));
-    setUpdateState(this.ctx, { notifiedTags: found.map(key) });
+    // An image still there with no newer tag this time (its tag list maybe not read): what was told
+    // of it kept, not told again after one failed read (audit 2026-11-23).
+    const quiet = all.filter((c) => !c.newerTag).map((c) => `${c.hostId} ${c.image} `);
+    setUpdateState(this.ctx, { notifiedTags: [...new Set([...found.map(key), ...[...told].filter((k) => quiet.some((p) => k.startsWith(p)))])] });
     if (!fresh.length || !this.notifier) return;
     const names = new Map(this.ctx.db.select().from(hosts).all().map((h) => [h.id, h.name]));
     const lines = fresh.map((c) => `${c.image} -> ${c.newerTag} (${names.get(c.hostId) ?? c.hostId})`);

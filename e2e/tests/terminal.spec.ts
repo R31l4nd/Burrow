@@ -10,6 +10,9 @@ const screen = (page: Page) => page.locator('[data-testid=terminal] .xterm-rows'
 
 async function type(page: Page, text: string) {
   await page.getByTestId('terminal').click();
+  // Typed once the terminal has the keyboard: on a busy run (two lanes side by side) the first key
+  // went out before it did ("cho zoom-25", gate 2026-11-24), as in the split terminals test.
+  await expect(page.locator('[data-testid=terminal] .xterm-helper-textarea').first()).toBeFocused();
   await page.keyboard.type(text);
   await page.keyboard.press('Enter');
 }
@@ -393,6 +396,10 @@ test('split terminals on a wide screen: panes side by side, kept after a reload,
     if (session) ws.on('framesent', (f) => typeof f.payload === 'string' && /"t":"(input|resize)"/.test(f.payload) && sent.push(`${session.slice(0, 8)} ${f.payload}`));
   });
   await signIn(page);
+  // The sessions there before: the ones this test opens are closed again at its end, so it can run
+  // again (repeated, it found its own from before, Burrow's limit of sessions reached).
+  const ids = async () => ((await page.request.get('/api/terminal/sessions').then((r) => r.json())) as { id: string }[]).map((x) => x.id);
+  const existed = new Set(await ids());
   const pane = (i: number) => page.getByTestId('term-pane').nth(i);
   const rows = (i: number) => pane(i).locator('[data-testid=terminal] .xterm-rows');
   // Clicked, then typed once the pane's terminal has the keyboard: on a busy machine the first key went out before it did.
@@ -561,12 +568,21 @@ test('split terminals on a wide screen: panes side by side, kept after a reload,
   await expect(page.getByTestId('term-split')).toHaveCount(0);
   await page.setViewportSize({ width: 1600, height: 900 });
   await expect(page.getByTestId('term-pane')).toHaveCount(2);
+  for (const id of (await ids()).filter((x) => !existed.has(x))) expect(await page.evaluate((x) => fetch(`/api/terminal/sessions/${x}`, { method: 'DELETE' }).then((r) => r.ok), id)).toBe(true);
 });
 
 test('a larger text size keeps the terminal and what it shows; it is not built afresh (AUDIT2 TERM-04)', async ({ page }) => {
   await signIn(page);
-  await page.getByRole('button', { name: /^test-sshd/ }).first().click();
-  await expect(page).toHaveURL(/#\/term\//);
+  // A session of its own: the host's button opened the one the paste test used, whose shell ate the
+  // first key of the next line ("cho zoom-25", gates 2026-11-24).
+  const own = await page.evaluate(async () => {
+    const hosts = (await (await fetch('/api/hosts')).json()) as { id: number; name: string }[];
+    const hostId = hosts.find((h) => h.name === 'test-sshd')!.id;
+    const r = await fetch('/api/terminal/sessions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ hostId, cols: 80, rows: 24 }) });
+    return ((await r.json()) as { id: string }).id;
+  });
+  await page.goto(`/#/term/${own}`);
+  await expect(screen(page)).toContainText('$', { timeout: 20_000 });
   await type(page, 'echo zoom-$((5*5))');
   await expect(screen(page)).toContainText('zoom-25');
   const xterm = page.locator('[data-testid=terminal] .xterm');
@@ -582,6 +598,7 @@ test('a larger text size keeps the terminal and what it shows; it is not built a
   await page.getByRole('button', { name: 'Smaller text' }).click();
   await expect.poll(() => xterm.evaluate((el) => getComputedStyle(el.querySelector('.xterm-rows')!).fontSize)).toBe(before);
   await page.keyboard.press('Escape');
+  await page.evaluate((id) => fetch(`/api/terminal/sessions/${id}`, { method: 'DELETE' }), own);
 });
 
 test('a session the server cannot open: its reason said with Try again, no reconnecting for ever (A3-WEB-02)', async ({ page }) => {

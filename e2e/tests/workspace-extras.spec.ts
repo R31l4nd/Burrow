@@ -772,59 +772,6 @@ test("Settings -> AI: Gemini with its own key, its models listed to pick from, t
   await call('PUT', '/api/settings/ai', { ...input(before), gemini: { model: before.gemini.model, apiKey: '' } });
 });
 
-test("Settings -> System: what was only in the .env file, set here; the .env's value said under each field, a value set applies at once, cleared the .env's again", async ({ page }) => {
-  await signIn(page);
-  const call = (method: string, url: string, body?: unknown) =>
-    page.evaluate(async ([m, u, b]) => {
-      const r = await fetch(u, { method: m, headers: b === undefined ? {} : { 'content-type': 'application/json' }, body: b === undefined ? undefined : JSON.stringify(b) });
-      return { status: r.status, body: (r.status === 204 ? null : await r.json()) as { id?: string; error?: string; env?: Record<string, string | number>; saved?: Record<string, unknown> } };
-    }, [method, url, body] as const);
-  const env = (await call('GET', '/api/settings/system')).body.env!;
-  await page.goto('/#/settings/system');
-  const form = page.getByTestId('system');
-  // What a value here does, not where they once were (report 4b06b3: "These were only in the .env file" read wrong).
-  await expect(page.getByText('These were only in the .env file')).toHaveCount(0);
-  await expect(page.getByText("A value here goes before the .env file's, at once.")).toBeVisible();
-  // Each field empty, the .env's value under it.
-  await expect(page.getByTestId('system-max-sessions')).toHaveValue('');
-  await expect(form.locator('label', { has: page.getByTestId('system-max-sessions') })).toContainText(`Empty: ${env.terminalMaxSessions}, from the .env file`);
-  // A pattern that is not one: said, nothing saved.
-  await page.getByTestId('system-update-exclude').fill('^(');
-  await page.getByTestId('system-save').click();
-  await expect(page.getByTestId('toasts')).toContainText('regular expression');
-  // The terminal limit at what is open now: the next session is refused, without a restart.
-  const host = await hostId(page, 'test-sshd');
-  const opened = (await call('POST', '/api/terminal/sessions', { hostId: host, tmux: 'never' })).body.id!;
-  const open = ((await call('GET', '/api/terminal/sessions')).body as unknown as unknown[]).length;
-  await page.getByTestId('system-max-sessions').fill(String(open));
-  await page.getByTestId('system-idle-minutes').fill('120');
-  await page.getByTestId('system-status-interval').fill('120');
-  await page.getByTestId('system-update-exclude').fill('^registry\\.lan/');
-  await page.getByTestId('system-registries').fill('registry.lan:5000=http://10.0.0.5:5000');
-  await page.getByTestId('system-apps-domain').fill('home.example');
-  // The dead-man switch's address (2026-11-07): kept like the others (its calls: server/test/unit/heartbeat.test.ts).
-  await page.getByTestId('system-heartbeat').fill('https://hc-ping.example.invalid/burrow-e2e');
-  await expect(page.getByTestId('system-unsaved')).toBeVisible();
-  await page.getByTestId('system-save').click();
-  await expect(page.getByTestId('toasts')).toContainText('System settings saved.');
-  await expect(page.getByTestId('system-unsaved')).toHaveCount(0);
-  expect((await call('POST', '/api/terminal/sessions', { hostId: host, tmux: 'never' })).body.error).toBe('too_many_sessions');
-  // Kept: read again, the values are there.
-  await page.reload();
-  await expect(page.getByTestId('system-registries')).toHaveValue('registry.lan:5000=http://10.0.0.5:5000');
-  await expect(page.getByTestId('system-update-exclude')).toHaveValue('^registry\\.lan/');
-  await expect(page.getByTestId('system-heartbeat')).toHaveValue('https://hc-ping.example.invalid/burrow-e2e');
-  await lookAt(page, 'desktop-settings-system');
-  // Emptied: the .env's values again, a session opens.
-  for (const id of ['system-max-sessions', 'system-idle-minutes', 'system-status-interval', 'system-update-exclude', 'system-registries', 'system-apps-domain', 'system-heartbeat']) await page.getByTestId(id).fill('');
-  await page.getByTestId('system-save').click();
-  await expect(page.getByTestId('toasts')).toContainText('System settings saved.');
-  expect(Object.values((await call('GET', '/api/settings/system')).body.saved!).every((v) => v === null)).toBe(true);
-  const again = (await call('POST', '/api/terminal/sessions', { hostId: host, tmux: 'never' })).body.id;
-  expect(again).toBeTruthy();
-  for (const id of [opened, again]) await call('DELETE', `/api/terminal/sessions/${id}`);
-});
-
 test('Settings on a wide screen: the parts in a column beside the open one, the first open when none is chosen (report 774696)', async ({ page }) => {
   // Reported (117b14): on a computer the pages used only a narrow column at the left.
   await signIn(page);

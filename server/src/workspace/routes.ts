@@ -345,7 +345,11 @@ export function registerWorkspaceRoutes(app: FastifyInstance, ctx: Ctx, pool: Sf
   /** Another branch checked out; git refuses itself when a change here would be lost. */
   app.post('/api/workspace/:hostId/git/checkout', async (req) => {
     const b = parse(z.object({ root: absPath, branch: z.string().min(1).max(200).regex(/^(?!-)[\w./-]+$/) }), req.body);
-    await gitRun(req, b.root, ['checkout', '-q', b.branch]);
+    // A branch of this repository, never a path: "." or a file's name was taken as one and threw
+    // the changes away without the step-up Discard asks (audit 2026-11-23).
+    const known = await gitRun(req, b.root, ['for-each-ref', '--format=%(refname:short)', `refs/heads/${b.branch}`]);
+    if (known.trim() !== b.branch) throw new HttpError(400, 'no_such_branch', `There is no branch ${b.branch} here.`);
+    await gitRun(req, b.root, ['checkout', '-q', b.branch, '--']);
     audit(ctx, actor(req), 'git.checkout', b.root, { hostId: hostOf(req), branch: b.branch });
     return { ok: true };
   });

@@ -133,4 +133,11 @@
     flex-direction: column;
     gap: 2px;
   }
+  /* A guest's name on one line, cut with ... where the row is narrow: at 320 px "burrowtest-vm" broke
+     at its hyphen beside the state and the menu (the width sweep, gate 2026-11-24). Its menu says it whole. */
+  .guest .main strong {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 </style>

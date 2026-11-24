@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Notifier } from '../../src/notify/channels.js';
 import { channels, pushSubscriptions } from '../../src/db/schema.js';
 import { makeApp, setupAdmin, type TestApp } from '../helpers.js';
+import { eq } from 'drizzle-orm';
 
 // The language of texts made before sending (a report's summary): that of
 // the channels for the topic, else of the other channels, else of the
@@ -115,5 +116,20 @@ describe('a channel that fails (2026-11-07)', () => {
     up = true;
     expect((await n.notify(notice)).sent).toBe(1);
     expect(n.failing.size).toBe(0);
+  });
+
+  it('switched off, renamed or deleted, it is no longer told as failing: it stayed so for good, the self-watch never fine again (audit 2026-11-23)', async () => {
+    const n = new Notifier(t.ctx, { fetch: async () => new Response('nope', { status: 401 }) });
+    const ch = t.ctx.db.insert(channels).values({ kind: 'ntfy', name: 'Old phone', enabled: true, topics: JSON.stringify(['alerts']), lang: 'en', config: JSON.stringify({ url: 'https://ntfy.example.com', topic: 'x' }), createdAt: t.ctx.now() } as typeof channels.$inferInsert).returning().get();
+    await n.notify({ topic: 'alerts', title: 't', body: 'b', page: '/', priority: 3 });
+    expect([...n.failing.keys()]).toContain('Old phone');
+    t.ctx.db.update(channels).set({ name: 'New phone' }).where(eq(channels.id, ch.id)).run();
+    expect([...n.failing.keys()]).toEqual(expect.arrayContaining(['New phone']));
+    expect([...n.failing.keys()]).not.toContain('Old phone');
+    t.ctx.db.update(channels).set({ enabled: false }).where(eq(channels.id, ch.id)).run();
+    expect([...n.failing.keys()]).not.toContain('New phone');
+    t.ctx.db.update(channels).set({ enabled: true }).where(eq(channels.id, ch.id)).run();
+    t.ctx.db.delete(channels).where(eq(channels.id, ch.id)).run();
+    expect([...n.failing.keys()]).not.toContain('New phone');
   });
 });

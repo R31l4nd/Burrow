@@ -29,3 +29,5 @@ export * from './packages.js';
 export * from './schedules.js';
 export * from './widget.js';
 export * from './system.js';
+export * from './pages.js';
+export * from './usage.js';

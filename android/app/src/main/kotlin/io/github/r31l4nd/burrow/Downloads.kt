@@ -24,6 +24,14 @@ import java.util.concurrent.CountDownLatch
  * (AndroidDownloads.kt) in the app, a fake in the JVM tests.
  */
 object Downloads {
+    /**
+     * The half-written items in Downloads that are this app's own, for MediaStore's query: its
+     * package and Download/Burrow only. Without it every pending item was removed at start, other
+     * apps' downloads under way too where Android lets the app see them (All files; audit 2026-11-23).
+     */
+    fun stalePending(packageName: String): Pair<String, Array<String>> =
+        "owner_package_name = ? AND relative_path LIKE ?" to arrayOf(packageName, "Download/Burrow/%")
+
     enum class State { RUNNING, DONE, FAILED, STOPPED }
 
     /** Where the bytes go: the public Downloads/Burrow folder, or a file of the app's own. */
