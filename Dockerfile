@@ -4,7 +4,7 @@
 # Node 24 on Debian 13 slim, pinned on digest (Debian 12 carried 52 HIGH or
 # CRITICAL advisories without a fix there, A3-OPS-10). The same image runs the dev
 # commands (scripts/node.sh); scripts/gate.sh checks that both agree.
-FROM node:24-trixie-slim@sha256:af02d57b57719b9657a45199a79264a9437940cd55b3c7b3fc99615654f124a0 AS deps
+FROM node:24-trixie-slim@sha256:4d00acb4bcc42c454c4eb801526f7ad7f772ea3bd4fd168c5cc2e384abcbb9d4 AS deps
 WORKDIR /app
 COPY package.json package-lock.json .npmrc ./
 COPY shared/package.json shared/
@@ -28,7 +28,7 @@ RUN npm run build
 # image scan fail every few weeks (trivy, .trivyignore.yaml) although shfmt
 # opens no connection. Built for the target on the build's own platform; the
 # module's checksums are checked against Go's checksum database.
-FROM --platform=$BUILDPLATFORM golang:1.27-bookworm@sha256:4fa7c968ba93f1635670522dbb01a2c78150443e1385746924566079f36570ea AS shfmt
+FROM --platform=$BUILDPLATFORM golang:1.27-bookworm@sha256:b754301872c53d3dff666ec39e3fae971dc6f5ecd5a9b01fdefabbebb0f59901 AS shfmt
 ARG TARGETARCH
 # renovate: datasource=github-releases depName=mvdan/sh extractVersion=^v(?<version>.+)$
 ARG SHFMT_VERSION=3.14.1
@@ -39,7 +39,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH="${TARGETARCH:-amd64}" GOTOOLCHAIN=local GOF
 # Downloaded at a fixed version and checked against a pinned SHA-256 per
 # architecture; a changed file fails the build instead of shipping. Named
 # with their licences in README.md (Third-party data and programs).
-FROM debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2 AS tools
+FROM debian:trixie-slim@sha256:8aa5a7bf5a1955bddbe7d74fcdd0b91ab30e74362a8b73af672b0481b35b44a0 AS tools
 # Set by BuildKit for the platform being built (no default here: a default made arm64
 # builds fetch amd64 tools, AUDIT2 OPS-01); amd64 only for the old builder.
 ARG TARGETARCH
@@ -95,7 +95,7 @@ RUN set -eu; \
 
 # Production dependencies only, installed apart so the runtime image carries
 # no compilers, test tools or bundlers.
-FROM node:24-trixie-slim@sha256:af02d57b57719b9657a45199a79264a9437940cd55b3c7b3fc99615654f124a0 AS prod-deps
+FROM node:24-trixie-slim@sha256:4d00acb4bcc42c454c4eb801526f7ad7f772ea3bd4fd168c5cc2e384abcbb9d4 AS prod-deps
 WORKDIR /app
 COPY package.json package-lock.json .npmrc ./
 COPY shared/package.json shared/
@@ -104,7 +104,7 @@ COPY web/package.json web/
 COPY e2e/package.json e2e/
 RUN npm ci --omit=dev --no-audit --no-fund -w @burrow/server -w @burrow/shared
 
-FROM node:24-trixie-slim@sha256:af02d57b57719b9657a45199a79264a9437940cd55b3c7b3fc99615654f124a0
+FROM node:24-trixie-slim@sha256:4d00acb4bcc42c454c4eb801526f7ad7f772ea3bd4fd168c5cc2e384abcbb9d4
 # Which of Burrow's images this is: an untagged one left behind by a build is found by it (scripts/gate.sh, leftovers).
 LABEL burrow.image="app"
 ENV NODE_ENV=production \

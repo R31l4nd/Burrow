@@ -422,6 +422,12 @@ async function pipeTar(src: Client, srcCmd: string, dst: Client, dstCmd: string,
       if (!inp.write(d)) out.pause();
     });
     inp.on("drain", () => out.resume());
+    // Ended by a signal (no exit status): which one, said with the failure (CI 2026-11-24: "ended
+    // without an exit status" said nothing of why).
+    let srcSignal: string | null = null;
+    out.on("exit", (_code: number | null, signal?: string) => {
+      if (signal) srcSignal = signal;
+    });
     out.on("close", (code: number | null) => {
       srcCode = code;
       inp.end();
@@ -435,7 +441,8 @@ async function pipeTar(src: Client, srcCmd: string, dst: Client, dstCmd: string,
       clearTimeout(stall);
       if (srcCode !== 0) {
         out.close();
-        return reject(new HttpError(400, "command_failed", srcCode === null || srcCode === undefined ? "tar on the source ended without an exit status." : `tar on the source: ${srcErr.trim().slice(0, 300)}`));
+        const why = srcCode === null || srcCode === undefined ? (srcSignal ? `tar on the source: ended by ${srcSignal}` : "tar on the source ended without an exit status.") : `tar on the source: ${srcErr.trim().slice(0, 300)}`;
+        return reject(new HttpError(400, "command_failed", why));
       }
       if (code !== 0) return reject(new HttpError(400, "command_failed", `tar on the destination: ${dstErr.trim().slice(0, 300)}`));
       resolve(bytes);

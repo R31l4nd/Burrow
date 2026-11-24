@@ -47,8 +47,12 @@ test('editor diagnostics, uploads, a save conflict and a copy between hosts', as
   await signIn(page);
   const sshd = await hostNamed(page, 'test-sshd');
 
-  // Host B through the API (the UI for adding hosts is tested elsewhere).
-  const b = await api<{ id: number }>(page, 'POST', '/api/hosts', { name: 'test-sshd2', address: SSHD2_HOST, username: 'tester', authMethod: 'password', password: 'burrow-test-password' });
+  // Host B through the API (the UI for adding hosts is tested elsewhere); the one a first try made, on a retry.
+  const made = (await api<{ id: number; name: string }[]>(page, 'GET', '/api/hosts')).find((h) => h.name === 'test-sshd2');
+  const b = made ?? (await api<{ id: number }>(page, 'POST', '/api/hosts', { name: 'test-sshd2', address: SSHD2_HOST, username: 'tester', authMethod: 'password', password: 'burrow-test-password' }));
+  // A retry starts from nothing again: the folder a first try made, on both hosts, gone (CI 2026-11-24:
+  // the retry found "project" there, its New folder dialog stayed open over the list).
+  for (const h of [sshd, b.id]) await api(page, 'POST', `/api/files/${h}/delete`, { paths: ['/home/tester/project'] }).catch(() => {});
   const probe = await api<{ status: string; fingerprint?: string }>(page, 'POST', `/api/hosts/${b.id}/test`);
   if (probe.status === 'unknown_host_key') await api(page, 'POST', `/api/hosts/${b.id}/trust`, { fingerprint: probe.fingerprint });
   // Its row's connect on the host list: a terminal on it (pressed only now and then by press-all before, so the

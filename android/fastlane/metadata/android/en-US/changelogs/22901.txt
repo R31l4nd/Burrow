@@ -1,0 +1,1 @@
+The release 2.29.0 that did not go out: a full security audit fixed, single sign-on links by verified e-mail only, the app asks itself before All files, Settings, Usage shows which pages are used. Plus updated base images.

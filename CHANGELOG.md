@@ -6,6 +6,23 @@ says how it was verified.
 
 ## [Unreleased]
 
+## [2.29.1] - 2026-11-24
+
+2.29.0 was tagged but not published: its CI failed on two tests. This is that release, with what is below; read 2.29.0's notes too (its Breaking part above all: single sign-on links by verified e-mail only).
+
+### Changed
+
+- The base images updated to their newest digests (Debian, Node, the Android build's JDK).
+
+### Fixed
+
+- A copy between hosts that fails because tar on the source was ended by a signal says which signal, not only "ended without an exit status".
+
+### Verified
+
+- CI's two failures: the usage test counted the other lane's pages (now run after both lanes, with what acts on the whole instance); the copy between hosts failed once with "tar on the source ended without an exit status" on a loaded runner, and its retry met what the first try left (the test now starts clean and reuses host B: run twice in a row on one instance, green). Both specs green in a targeted run.
+- The gate, the Android app's test on an emulator, and a fresh install.
+
 ## [2.29.0] - 2026-11-24
 
 ### Breaking

@@ -225,7 +225,7 @@ check_image() {
   scan_image burrow:e2e
 }
 
-GO_IMAGE="golang:1.27-bookworm@sha256:4fa7c968ba93f1635670522dbb01a2c78150443e1385746924566079f36570ea"
+GO_IMAGE="golang:1.27-bookworm@sha256:b754301872c53d3dff666ec39e3fae971dc6f5ecd5a9b01fdefabbebb0f59901"
 check_go() {
   local gw conf rc
   gw="$(docker network inspect bridge -f '{{(index .IPAM.Config 0).Gateway}}')"

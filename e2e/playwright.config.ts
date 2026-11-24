@@ -44,11 +44,12 @@ export default defineConfig({
     // in their lane made. The specs on the host with real Docker (docker-real, made by the first of
     // them to need it) in one, the rest in the other: one after the other they took 82 minutes,
     // most of the gate (audit 2026-11-23).
-    { name: 'desktop', testMatch: /(terminal[a-z-]*|workspace[a-z-]*)\.spec\.ts/, testIgnore: [/workspace-(tour|sizes|sweep|global)\.spec\.ts/, DOCKER_LANE], dependencies: ['hosts'], workers: 1, use: { ...devices['Desktop Chrome'] } },
+    { name: 'desktop', testMatch: /(terminal[a-z-]*|workspace[a-z-]*)\.spec\.ts/, testIgnore: [/workspace-(tour|sizes|sweep|global|usage)\.spec\.ts/, DOCKER_LANE], dependencies: ['hosts'], workers: 1, use: { ...devices['Desktop Chrome'] } },
     { name: 'docker', testMatch: DOCKER_LANE, dependencies: ['hosts'], workers: 1, use: { ...devices['Desktop Chrome'] } },
     // What acts on the whole instance (the admin's other sign-ins ended, the terminal limit for
-    // everyone): after both lanes, never beside one (gate 2026-11-24).
-    { name: 'global', testMatch: /workspace-global\.spec\.ts/, dependencies: ['desktop', 'docker'], workers: 1, use: { ...devices['Desktop Chrome'] } },
+    // everyone) or counts what everyone does (Settings -> Usage: the other lane's pages counted too,
+    // CI 2026-11-24): after both lanes, never beside one (gate 2026-11-24).
+    { name: 'global', testMatch: /workspace-(global|usage)\.spec\.ts/, dependencies: ['desktop', 'docker'], workers: 1, use: { ...devices['Desktop Chrome'] } },
     // What only looks (the tour's six passes, every page at every size): side by side, after the state is built.
     // Three at a time: five (2.12.0) made each tour pass about twice as slow on the gate's 8 cores and e2e 9 minutes longer.
     { name: 'look', testMatch: /workspace-(tour|sizes|sweep)\.spec\.ts/, dependencies: ['global'], fullyParallel: true, workers: 3, use: { ...devices['Desktop Chrome'] } },

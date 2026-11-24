@@ -1,6 +1,6 @@
 {
   "name": "@burrow/web",
-  "version": "2.29.0",
+  "version": "2.29.1",
   "license": "AGPL-3.0-only",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@burrow/shared": "2.29.0",
+    "@burrow/shared": "2.29.1",
     "@codemirror/autocomplete": "6.20.3",
     "@codemirror/commands": "6.11.1",
     "@codemirror/lang-json": "6.0.2",
