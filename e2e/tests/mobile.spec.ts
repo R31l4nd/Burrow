@@ -1783,3 +1783,23 @@ for (const [how, tmuxMode] of [["Burrow's tmux", 'always'], ['a tmux of your own
     await run(`${ours} kill-session -t burrow-${s.id.replace(/[^A-Za-z0-9]/g, 'x')}; ${ours} kill-session -t burrow-${other.id.replace(/[^A-Za-z0-9]/g, 'x')}; ${own} kill-server; rm -f ${ink}`);
   });
 }
+
+test('suggestions coming and going on a phone do not move the terminal: their row keeps its room, empty or not (report 19a340)', async ({ page }) => {
+  await signIn(page);
+  const hostId = await page.evaluate(async () => ((await (await fetch('/api/hosts')).json()) as { id: number; name: string }[]).find((h) => h.name === 'test-sshd')!.id);
+  const s = await page.evaluate((id) => fetch('/api/terminal/sessions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ hostId: id, tmux: 'never' }) }).then((r) => r.json() as Promise<{ id: string }>), hostId);
+  await page.goto(`/#/term/${s.id}`);
+  const rows = page.locator('[data-testid=terminal] .xterm-rows');
+  await expect(rows).toContainText('$');
+  const box = () => page.getByTestId('terminal').evaluate((t) => Math.round(t.getBoundingClientRect().height));
+  // Nothing typed: the row is there, empty.
+  await expect(page.getByTestId('suggestions')).toBeVisible();
+  const before = await box();
+  // Something it knows: suggestions in the same row, the terminal as tall as it was.
+  await page.getByTestId('terminal').click();
+  await page.keyboard.type('ech');
+  await expect(page.getByTestId('suggestions').getByRole('option').first()).toBeVisible({ timeout: 10_000 });
+  expect(await box()).toBe(before);
+  await page.keyboard.press('Control+U');
+  await page.evaluate((id) => fetch(`/api/terminal/sessions/${id}`, { method: 'DELETE' }), s.id);
+});

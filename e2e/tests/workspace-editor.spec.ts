@@ -1166,3 +1166,33 @@ test('signed out with text not saved in the editor: the page stays behind the si
   await page.getByTestId('save').click();
   await expect.poll(async () => (await api<{ content: string }>(page, 'GET', `/api/files/${sshd}/text?path=${encodeURIComponent(path)}`)).content).toContain('typed before the sign-in ran out');
 });
+
+test("the language server's explanation stays out of the way while text is selected: it covered what was being copied (report 96c6e4)", async ({ page }) => {
+  await signIn(page);
+  const sshd = await hostNamed(page, 'test-sshd');
+  await api(page, 'POST', '/api/snippets/run', { hostIds: [sshd], command: "rm -rf ~/proj-hover && mkdir -p ~/proj-hover && printf 'services:\\n  web:\\n    image: nginx\\n    container_name: hover\\n' > ~/proj-hover/compose.yaml" });
+  await page.goto(`/#/edit/${sshd}?p=${encodeURIComponent('/home/tester/proj-hover/compose.yaml')}`);
+  const key = page.locator('.cm-line').filter({ hasText: 'container_name' }).getByText('container_name');
+  await expect(key).toBeVisible();
+  const hover = page.locator('.cm-tooltip-hover');
+  // Nothing selected: pointing at a key explains it (the compose schema, read without the network).
+  await expect(async () => {
+    await page.mouse.move(0, 0);
+    await key.hover();
+    await expect(hover).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 30_000 });
+  // A word selected, the pointer still on it: no explanation over it.
+  await key.dblclick();
+  await expect.poll(() => page.evaluate(() => String(getSelection()))).toContain('container_name');
+  await page.mouse.move(0, 0);
+  await key.hover();
+  await page.waitForTimeout(800);
+  await expect(hover).toBeHidden();
+  // Selection gone: it explains again.
+  await page.locator('.cm-line').filter({ hasText: 'image' }).click();
+  await expect(async () => {
+    await page.mouse.move(0, 0);
+    await key.hover();
+    await expect(hover).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 15_000 });
+});

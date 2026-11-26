@@ -6,6 +6,32 @@ says how it was verified.
 
 ## [Unreleased]
 
+## [2.29.2] - 2026-11-26
+
+2.29.1's images went out, but its GitHub release and the Android app did not: the release step stopped on a folder a fresh checkout does not have. This release has them, and fixes from the first reports on 2.29.
+
+### Added
+
+- A host's history shows its hottest temperature over time too, when the host reads its sensors (report 0acd3d).
+- In a terminal on a computer, the right button on + opens the choice of another host or way, as holding it does (report 840c31).
+
+### Fixed
+
+- Comparing two files goes line by line first: lines the same in both no longer read as changed among long changed ones, "Show unchanged lines" folds them, and a large file is compared quickly instead of hanging the tab (reports b11968, 2de305).
+- The page no longer moves sideways when a list grows past the window (Reports and Analyses): the scroll bar is always there, except on pages that fill the window (report c4db51).
+- In Burrow's tmux the terminal no longer shows a second scroll bar of its own beside the history layer's (report 9360fc).
+- On a phone the row of suggestions keeps its room when empty, so the terminal no longer jumps as they come and go (report 19a340).
+- The side by side icon in the logs (and wherever that icon is used) sits in the middle of its button (report adb94c).
+- A stack's compose opened from the stack no longer becomes Files' place: Files leads back to the folder seen last there, not to that compose every time (reports ab10c2, cc9d3b).
+- The language server's explanation of a key no longer covers text while it is selected, as when copying on a phone (report 96c6e4).
+- The terminal tab in front has the colour of the rail's page in front beside it, not another black (report f0527a).
+
+### Verified
+
+- Each fix started with a test that failed on 2.29.1 (unit for the comparison, e2e for the rest; run on the old code, all red), green after. A new check of every icon: drawn in the middle of its box.
+- The release step's clean checkout tried here as CI does it: without the fix it has no assets folder, with it the direct page is copied.
+- The gate, the Android app's test on an emulator, and a fresh install.
+
 ## [2.29.1] - 2026-11-24
 
 2.29.0 was tagged but not published: its CI failed on two tests. This is that release, with what is below; read 2.29.0's notes too (its Breaking part above all: single sign-on links by verified e-mail only).

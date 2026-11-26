@@ -1,0 +1,1 @@
+De Android-app voor 2.29 (de release was blijven steken), met: bestanden vergelijken per regel, snel bij grote bestanden; de warmste temperatuur in de geschiedenis van een host; de rechtermuisknop op + in een terminal; geen tweede scrollbalk in tmux; de voorspellingsbalk houdt zijn ruimte op de telefoon.

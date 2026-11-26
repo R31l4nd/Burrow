@@ -304,6 +304,12 @@ test('+ held: another host and another way; Delete on the tab in front closes it
   await expect(dialog).toBeVisible();
   await expect(page.getByTestId('term-tab')).toHaveCount(before);
   await expect(dialog.getByTestId('new-host')).toHaveValue(/\d+/);
+  // On a computer the right button opens the same choice: holding was not to be guessed (report 840c31).
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await plus.click({ button: 'right' });
+  await expect(dialog).toBeVisible();
+  await expect(page.getByTestId('term-tab')).toHaveCount(before);
   await lookAt(page, 'desktop-term-new');
   // A host from the list (other specs add more; this one is always there), without tmux.
   await dialog.getByTestId('new-host').selectOption({ label: 'test-sshd' });
@@ -808,4 +814,39 @@ test('a paste longer than one message arrives whole: 70,000 characters in parts,
   const size = () => page.evaluate(async (h) => ((await (await fetch('/api/snippets/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ hostIds: [h], command: 'wc -c < /tmp/paste-e2e.txt' }) })).json()) as { stdout: string }[])[0]!.stdout.trim(), hostId);
   await expect.poll(size, { timeout: 15_000 }).toBe('70000');
   await page.evaluate((s) => fetch(`/api/terminal/sessions/${s}`, { method: 'DELETE' }), id);
+});
+
+test("in Burrow's tmux one scroll bar: the history layer's, not also the terminal's own; a plain session keeps its own (report 9360fc)", async ({ page }) => {
+  await signIn(page);
+  const open = async (tmux: 'always' | 'never') => {
+    const id = await page.evaluate(async (tmux) => {
+      const hosts = (await (await fetch('/api/hosts')).json()) as { id: number; name: string }[];
+      const r = await fetch('/api/terminal/sessions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ hostId: hosts.find((h) => h.name === 'test-sshd')!.id, cols: 100, rows: 30, tmux }) });
+      return ((await r.json()) as { id: string }).id;
+    }, tmux);
+    await page.goto(`/#/term/${id}`);
+    await expect(screen(page)).toContainText('$', { timeout: 20_000 });
+    return id;
+  };
+  // The terminal's own scroll bar: its viewport's, unless hidden.
+  const ownBar = () => page.locator('[data-testid=terminal] .xterm-viewport').first().evaluate((v) => getComputedStyle(v).scrollbarWidth);
+  const tmuxed = await open('always');
+  expect(await ownBar()).toBe('none');
+  const plain = await open('never');
+  expect(await ownBar()).not.toBe('none');
+  for (const id of [tmuxed, plain]) await page.evaluate((x) => fetch(`/api/terminal/sessions/${x}`, { method: 'DELETE' }), id);
+});
+
+test("the terminal tab in front in the colour of the rail's page in front, not another black beside it (report f0527a)", async ({ page }) => {
+  await signIn(page);
+  await page.setViewportSize({ width: 1528, height: 794 });
+  await page.getByRole('button', { name: /^test-sshd/ }).first().click();
+  await expect(page).toHaveURL(/#\/term\//);
+  const bg = (l: import('@playwright/test').Locator) => l.evaluate((e) => getComputedStyle(e).backgroundColor);
+  const tab = page.getByRole('tab', { selected: true });
+  const rail = page.locator('.bottomnav a[aria-current="page"]');
+  await expect(tab).toBeVisible();
+  expect(await bg(tab)).toBe(await bg(rail));
+  // Its words as the rail's: white on that dark.
+  expect(await tab.evaluate((e) => getComputedStyle(e).color)).toBe(await rail.evaluate((e) => getComputedStyle(e).color));
 });

@@ -13,6 +13,9 @@ export function navOf(path: string): NavId | null {
   const hostLogs = first === 'logs' && (new URLSearchParams(qs).get('t') ?? '').split(',').every((x) => /^\d+::/.test(x.trim()));
   if (first === 'hosts' || first === 'groups' || first === 'import' || (first === 'logs' && hostLogs)) return 'hosts';
   if (first === 'term' || first === 'sessions') return 'term';
+  // A stack's compose opened from the stack is the stack's: kept as Files' place, Files led back
+  // to it every time (reports ab10c2, cc9d3b).
+  if (first === 'edit' && new URLSearchParams(qs).has('stack')) return 'containers';
   if (first === 'files' || first === 'edit') return 'files';
   if (['containers', 'apps', 'stacks', 'alerts', 'reports', 'logs'].includes(first)) return 'containers';
   if (['settings', 'keys', 'snippets', 'audit'].includes(first)) return 'settings';

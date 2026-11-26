@@ -244,6 +244,8 @@
   const tablet = $state({ on: tabletQuery?.matches ?? false });
   tabletQuery?.addEventListener('change', () => (tablet.on = tabletQuery.matches));
   const full = $derived((section === 'term' || section === 'edit' || section === 'apps' || section === 'ws') && !!route.parts[1]);
+  // A page that fills the window: no room kept for a scroll bar it never has (app.css, report c4db51).
+  $effect(() => void document.documentElement.classList.toggle('fills-window', full));
 </script>
 
 {#snippet badAddress()}

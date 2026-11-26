@@ -23,6 +23,16 @@ describe('each section keeps its place (report d6ea6c)', () => {
     // Never been there: its start.
     expect(navTarget('containers', '/term/abc', last)).toBe('/containers');
   });
+  it("a stack's compose opened from the stack is the stack's, not Files' place: Files led back to it every time (reports ab10c2, cc9d3b)", () => {
+    expect(navOf('/edit/1?p=%2Fhome%2Fdebian%2Fdocker-compose.yml&stack=debian')).toBe('containers');
+    const store = new Map<string, string>();
+    vi.stubGlobal('sessionStorage', { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => store.set(k, v), removeItem: (k: string) => store.delete(k) });
+    notePage('/files/1?p=%2Fdata');
+    notePage('/edit/1?p=%2Fhome%2Fdebian%2Fdocker-compose.yml&stack=debian');
+    // From the compose, Files: the folder seen last in Files, not the compose again.
+    expect(navTarget('files', '/edit/1?p=%2Fhome%2Fdebian%2Fdocker-compose.yml&stack=debian', lastPages())).toBe('/files/1?p=%2Fdata');
+    forgetPages();
+  });
 });
 
 describe('the last page of each section, this tab', () => {

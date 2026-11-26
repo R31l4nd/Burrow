@@ -3,6 +3,7 @@
   import { EditorView } from '@codemirror/view';
   import { EditorState, Text } from '@codemirror/state';
   import { Chunk, getChunks, MergeView, unifiedMergeView } from '@codemirror/merge';
+  import { lineFirst } from '../lib/linediff.js';
   import { burrowEditorTheme, editorLabel } from '../lib/editor/theme.js';
   import { chunkAt, diffSummary, markPlaces } from '../lib/editor/diffinfo.js';
   import { deletedNumbers } from '../lib/editor/deletednumbers.js';
@@ -54,7 +55,7 @@
   const docA = $derived(Text.of(original.split('\n')));
   const docB = $derived(Text.of(modified.split('\n')));
   // From the texts themselves, so the count is there before the view is.
-  const summary = $derived(diffSummary(Chunk.build(docA, docB), docA, docB));
+  const summary = $derived(diffSummary(Chunk.build(docA, docB, lineFirst), docA, docB));
   const places = $derived(markPlaces(chunks, docB));
 
   $effect(() => {
@@ -78,6 +79,8 @@
         b: { doc: modified, extensions: [...base, editorLabel(names?.[1] ?? label)] },
         gutter: true,
         highlightChanges: true,
+        // Line by line first (lib/linediff.ts): lines the same in both read as the same (report b11968).
+        diffConfig: lineFirst,
         ...(collapse ? { collapseUnchanged: collapse } : {}),
       });
       target = mv.b;
@@ -86,7 +89,7 @@
     } else {
       const v = new EditorView({
         parent: el,
-        state: EditorState.create({ doc: modified, extensions: [...base, editorLabel(label), deletedNumbers, unifiedMergeView({ original, mergeControls: false, ...(collapse ? { collapseUnchanged: collapse } : {}) })] }),
+        state: EditorState.create({ doc: modified, extensions: [...base, editorLabel(label), deletedNumbers, unifiedMergeView({ original, mergeControls: false, diffConfig: lineFirst, ...(collapse ? { collapseUnchanged: collapse } : {}) })] }),
       });
       target = v;
       found = getChunks(v.state)?.chunks ?? [];

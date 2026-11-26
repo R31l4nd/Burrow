@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from './fixtures.js';
 import { sayYes } from './confirm.js';
 import { addAuthenticator, signIn } from './passkey.js';
@@ -646,4 +647,19 @@ test("a host's own health alert is muted as the host's, not as a container (W-FU
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
   await page.unroute(/\/api\/alerts$/);
+});
+
+test("every icon drawn in the middle of its box: one off-centre sat high in its round button (report adb94c, side by side in the logs)", async ({ page }) => {
+  const src = readFileSync(new URL('../../web/src/components/Icon.svelte', import.meta.url), 'utf8');
+  const block = src.slice(src.indexOf('const paths = {'), src.indexOf('};', src.indexOf('const paths = {')));
+  const icons = [...block.matchAll(/^\s+'?([a-zA-Z-]+)'?:\s*'([^']+)'/gm)].map((m) => [m[1]!, m[2]!] as const);
+  expect(icons.length).toBeGreaterThan(60);
+  await page.setContent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">${icons.map(([n, d]) => `<path id="i-${n}" d="${d}"/>`).join('')}</svg>`);
+  const off = await page.evaluate((names) => names.flatMap((n) => {
+    const b = (document.getElementById(`i-${n}`) as unknown as SVGGraphicsElement).getBBox();
+    const [x, y] = [b.x + b.width / 2 - 12, b.y + b.height / 2 - 12];
+    return Math.abs(x) > 1 || Math.abs(y) > 1 ? [`${n}: ${x.toFixed(1)}, ${y.toFixed(1)}`] : [];
+  }), icons.map(([n]) => n));
+  // A play triangle sits a little right on purpose: centred by its box, it looks left.
+  expect(off.filter((o) => !o.startsWith('play:'))).toEqual([]);
 });

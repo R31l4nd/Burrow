@@ -13,7 +13,7 @@
       // The console admin invite (docs/DEPLOY.md, Locked out): run in the container, never imported.
       "entry": ["test/**/*.ts", "test/sshd/*.mjs", "src/invite-admin.ts"],
       // Started as programs by the editor's language servers (src/lsp), never imported.
-      "ignoreDependencies": ["bash-language-server", "dockerfile-language-server-nodejs", "vscode-langservers-extracted", "yaml-language-server"]
+      "ignoreDependencies": ["bash-language-server", "dockerfile-language-server-nodejs", "vscode-langservers-extracted"]
     },
     "web": {
       // The service worker is loaded by its URL.

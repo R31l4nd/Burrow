@@ -63,8 +63,9 @@
     play: 'M7 4l13 8-13 8z',
     stop: 'M6 6h12v12H6z',
     filter: 'M3 5h18l-7 8v6l-4-2v-4z',
-    layers: 'M12 3l9 5-9 5-9-5zM3 13l9 5 9-5',
-    chart: 'M4 20h16M7 16v-5M12 16V6M17 16v-8',
+    // Drawn in the middle of its box: 1.5 high, it sat high in its round button (report adb94c).
+    layers: 'M12 4.5l9 5-9 5-9-5zM3 14.5l9 5 9-5',
+    chart: 'M4 19h16M7 15v-5M12 15V5M17 15v-8',
     copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
     cut: 'M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM20 4L8.12 15.88M14.47 14.48L20 20M8.12 8.12L12 12',
     check: 'M20 6L9 17l-5-5',

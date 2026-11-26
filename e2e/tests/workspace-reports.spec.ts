@@ -282,3 +282,18 @@ test('a schedule opened and saved keeps what it had: off, UTC, its hosts; none o
   expect(named.every((r) => r.target.hostId === sshd)).toBe(true);
   await api('DELETE', `/api/reports/schedules/${made.json.id}`);
 });
+
+test('switching between reports and analyses does not move the page sideways: the scroll bar always there, not on a terminal (report c4db51)', async ({ page }) => {
+  await signIn(page);
+  const gutter = () => page.evaluate(() => getComputedStyle(document.documentElement).overflowY);
+  await page.goto('/#/reports');
+  await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible();
+  // A list that grows past the window brought the scroll bar, and everything moved left by its width: always there.
+  expect(await gutter()).toBe('scroll');
+  // A page that fills the window and never scrolls keeps all its width.
+  const sessions = await page.evaluate(async () => (await (await fetch('/api/terminal/sessions')).json()) as { id: string }[]);
+  if (sessions[0]) {
+    await page.goto(`/#/term/${sessions[0].id}`);
+    await expect.poll(gutter).toBe('visible');
+  }
+});

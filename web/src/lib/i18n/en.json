@@ -485,7 +485,7 @@
   "term.close": "Close session",
   "term.closeThis": "Close this session",
   "term.confirmClose": "Close session \"{name}\"? The shell ends for every device.",
-  "term.newHint": "New session on this host (hold for another host or way)",
+  "term.newHint": "New session on this host (hold, or right-click, for another host or way)",
   "term.newHintWay": "New terminal here (hold or right click for another way)",
   "term.newTitle": "New session",
   "term.newHost": "Host",
@@ -2680,5 +2680,6 @@
   "settings.what.usage": "Which pages and dialogs are opened, and which never",
   "usage.notSaved": "Not changed: {error}",
   "error.no_such_branch": "There is no branch {branch} here.",
-  "error.sudo_moved": "Not saved as root: the path leads to another file than when the save began. Open it again."
+  "error.sudo_moved": "Not saved as root: the path leads to another file than when the save began. Open it again.",
+  "stats.tempMax": "Hottest C"
 }

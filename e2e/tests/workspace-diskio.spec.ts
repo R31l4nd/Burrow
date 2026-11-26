@@ -256,3 +256,20 @@ test("a host's charts: the value and time of the moment under the pointer, besid
   await page.unroute('**/api/hosts/*/stats/history*');
   await page.setViewportSize({ width: 1280, height: 720 });
 });
+
+test("a host's hottest temperature over time, beside CPU, memory, disk and load; none when the host reads no sensors (report 0acd3d)", async ({ page }) => {
+  await signIn(page);
+  const host = await hostNamed(page, 'test-sshd');
+  const start = Date.parse('2026-10-21T08:00:00Z');
+  const samples = (celsius: (i: number) => number | null) => Array.from({ length: 6 }, (_, i) => ({ at: new Date(start + i * 300_000).toISOString(), cpu: 10, memPercent: 40, load1: 0.5, diskPercent: 50, maxCelsius: celsius(i) }));
+  let withSensors = true;
+  await page.route('**/api/hosts/*/stats/history*', (r) => r.fulfill({ json: samples((i) => (withSensors ? 50 + i : null)) }));
+  await page.goto(`/#/hosts/${host}/stats`);
+  const hottest = page.getByTestId('stats-chart').filter({ hasText: T('stats.tempMax') });
+  await expect(hottest.getByTestId('chart-value')).toContainText('55');
+  await expect(page.getByTestId('stats-chart')).toHaveCount(5);
+  withSensors = false;
+  await page.reload();
+  await expect(page.getByTestId('stats-chart')).toHaveCount(4);
+  await page.unroute('**/api/hosts/*/stats/history*');
+});

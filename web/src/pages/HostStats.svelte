@@ -175,6 +175,21 @@
   });
   // Red from the host's own "disk full" limit, amber fifteen points before.
   const full = $derived(limits?.limits.diskPercent ?? 90);
+  // The history's charts; the hottest temperature too when the host reads sensors (report 0acd3d),
+  // a moment without a reading drawn as the one before it.
+  const charts = $derived.by(() => {
+    const out: [string, number[], number | null][] = [
+      ['CPU %', history.map((x) => x.cpu), 100],
+      [t('stats.memoryPct'), history.map((x) => x.memPercent), 100],
+      [t('stats.diskPct'), history.map((x) => x.diskPercent), 100],
+      [t('stats.load'), history.map((x) => x.load1), null],
+    ];
+    if (history.some((x) => x.maxCelsius !== null)) {
+      let last = history.find((x) => x.maxCelsius !== null)!.maxCelsius!;
+      out.push([t('stats.tempMax'), history.map((x) => (last = x.maxCelsius ?? last)), null]);
+    }
+    return out;
+  });
   const level = (p: number) => (p >= full ? 'bad' : p >= full - 15 ? 'warn' : 'ok');
 </script>
 
@@ -224,7 +239,7 @@
       {:else if history.length < 2}
         <p class="dim small">{t('stats.noHistory')}</p>
       {:else}
-        {#each [['CPU %', history.map((x) => x.cpu), 100], [t('stats.memoryPct'), history.map((x) => x.memPercent), 100], [t('stats.diskPct'), history.map((x) => x.diskPercent), 100], [t('stats.load'), history.map((x) => x.load1), null]] as const as [label, values, max] (label)}
+        {#each charts as [label, values, max] (label)}
           <!-- Touched or pointed at: that moment's value beside the pointer, in every chart at once (reports 4af4ec, af0eec). -->
           <HistoryChart {label} values={[...values]} at={historyAt} {max} bind:picked testid="stats-chart" />
         {/each}

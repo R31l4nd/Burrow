@@ -195,6 +195,9 @@ jobs:
         if: env.HAS_KEY == 'true'
         run: |
           git worktree add --detach "$RUNNER_TEMP/apk" HEAD
+          # The assets folder holds only the direct page, which git ignores: not there in a fresh
+          # checkout (v2.29.1's release stopped here: cp could not create it).
+          mkdir -p "$RUNNER_TEMP/apk/android/app/src/main/assets"
           rm -rf "$RUNNER_TEMP/apk/android/app/src/main/assets/direct"
           cp -r android/app/src/main/assets/direct "$RUNNER_TEMP/apk/android/app/src/main/assets/direct"
           printf 'BURROW_ORIGIN=http://localhost:8080\n' > "$RUNNER_TEMP/apk/.env"

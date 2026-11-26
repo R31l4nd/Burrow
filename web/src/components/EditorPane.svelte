@@ -368,6 +368,9 @@
       roConf.of(readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false), EditorView.contentAttributes.of({ tabindex: '0', 'aria-readonly': 'true' })] : []),
       problemNumbers,
       changeGutter,
+      // The language server's explanation hidden while text is selected: on a phone a long press
+      // selects and points at once, and it covered what was being copied (report 96c6e4).
+      EditorView.editorAttributes.compute(['selection'], (st) => (st.selection.ranges.some((r) => !r.empty) ? { class: 'selecting' } : ({} as Record<string, string>))),
       langConf.of([]),
       EditorView.updateListener.of((u) => {
         if (u.focusChanged) focused = u.view.hasFocus;
@@ -888,6 +891,9 @@
 </Dialog>
 
 <style>
+  :global(.cm-editor.selecting .cm-tooltip-hover) {
+    display: none;
+  }
   .pane {
     flex: 1;
     min-height: 0;

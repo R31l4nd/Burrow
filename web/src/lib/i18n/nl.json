@@ -485,7 +485,7 @@
   "term.close": "Sessie sluiten",
   "term.closeThis": "Deze sessie sluiten",
   "term.confirmClose": "Sessie \"{name}\" sluiten? De shell stopt voor alle apparaten.",
-  "term.newHint": "Nieuwe sessie op deze host (vasthouden voor een andere host of manier)",
+  "term.newHint": "Nieuwe sessie op deze host (vasthouden of rechtsklikken voor een andere host of manier)",
   "term.newHintWay": "Nieuwe terminal hier (vasthouden of rechtsklik voor een andere manier)",
   "term.newTitle": "Nieuwe sessie",
   "term.newHost": "Host",
@@ -2680,5 +2680,6 @@
   "settings.what.usage": "Welke pagina's en vensters geopend worden, en welke nooit",
   "usage.notSaved": "Niet gewijzigd: {error}",
   "error.no_such_branch": "Er is hier geen branch {branch}.",
-  "error.sudo_moved": "Niet als root opgeslagen: het pad leidt nu naar een ander bestand dan toen het opslaan begon. Open het opnieuw."
+  "error.sudo_moved": "Niet als root opgeslagen: het pad leidt nu naar een ander bestand dan toen het opslaan begon. Open het opnieuw.",
+  "stats.tempMax": "Warmst C"
 }

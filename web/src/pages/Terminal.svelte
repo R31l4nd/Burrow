@@ -391,11 +391,14 @@
   let directIds = $state<number[]>([]);
   function plusDown() {
     plusHeld = false;
-    plusTimer = setTimeout(() => {
-      plusHeld = true;
-      newHost = info?.hostId ?? host?.id ?? data.hosts[0]?.id ?? null;
-      newOpen = true;
-    }, 550);
+    plusTimer = setTimeout(plusChoice, 550);
+  }
+  /** Which host and how: held, or (on a computer) the right button (report 840c31). */
+  function plusChoice() {
+    plusUp();
+    plusHeld = true;
+    newHost = info?.hostId ?? host?.id ?? data.hosts[0]?.id ?? null;
+    newOpen = true;
   }
   function plusUp() {
     if (plusTimer) clearTimeout(plusTimer);
@@ -529,7 +532,7 @@
         onpointerdown={plusDown}
         onpointerup={plusUp}
         onpointerleave={plusUp}
-        oncontextmenu={(e) => e.preventDefault()}
+        oncontextmenu={(e) => (e.preventDefault(), plusChoice())}
         onclick={newHere}
         data-testid="term-new"><Icon name="plus" /></button
       >
@@ -811,10 +814,12 @@
   }
   /* The session in front: dark on light (light on dark), the accent kept
      for actions. */
+  /* In front: as the rail's page in front beside it (its dark, white words); another black beside
+     the rail's read as a mistake (report f0527a). */
   .tab.active {
-    background: var(--text);
-    border-color: var(--text);
-    color: var(--bg-raised);
+    background: var(--side-active);
+    border-color: var(--side-active);
+    color: #fff;
     font-weight: 700;
     padding-right: 2px;
   }

@@ -951,6 +951,24 @@
   // Two grips under the selection's ends, as on any phone: dragged, that end
   // moves and the other stays. Where they sit, in the terminal's box.
   let wrapEl: HTMLDivElement | undefined = $state();
+  // The room of the terminal and its row of suggestions together: the same whether the row is
+  // there or not, so it decides without going back and forth.
+  let rowEl: HTMLDivElement | undefined = $state();
+  let room = $state(0);
+  $effect(() => {
+    const w = wrapEl;
+    const row = rowEl;
+    if (!w) return;
+    const measure = () => (room = w.clientHeight + (row?.offsetHeight ?? 0));
+    const ro = new ResizeObserver(measure);
+    ro.observe(w);
+    if (row) ro.observe(row);
+    measure();
+    return () => ro.disconnect();
+  });
+  // An empty row keeps its room where there is room (report 19a340); in a low panel on a phone
+  // the terminal needs it more (its text squeezed under 140 px).
+  const keepRow = $derived(!keyBars.show || room === 0 || room >= 320);
   let handles = $state<{ from: { x: number; y: number } | null; to: { x: number; y: number } | null } | null>(null);
   let dragEnd: 'from' | 'to' | null = null;
   function placeHandles() {
@@ -1531,7 +1549,7 @@
       {/if}
     {/each}
   {/if}
-  <div class="term" bind:this={el} style:min-height={keptHeight !== null ? `${keptHeight - 8}px` : null} data-testid="terminal" data-private></div>
+  <div class="term" class:own-history={!!onscrollback} bind:this={el} style:min-height={keptHeight !== null ? `${keptHeight - 8}px` : null} data-testid="terminal" data-private></div>
   {#if layer?.lines}
     <!-- Over the part of the terminal in sight: with the keyboard up the box holds more rows and is scrolled to the cursor. -->
     <div class="layer" style:top={layerView ? `${layerView.top}px` : null} style:height={layerView ? `${layerView.height}px` : null} style:bottom={layerView ? 'auto' : null}>
@@ -1564,12 +1582,13 @@
   {/if}
 </div>
 
-<!-- On a computer (no key bar) the row stays, empty or not: coming and going
-     it made the terminal jump up and down while typing (report 854cb3). -->
-{#if suggestions.length || aiLine !== null || !keyBars.show}
+<!-- The row stays, empty or not: coming and going it made the terminal jump up and down while
+     typing, on a computer (report 854cb3) and on a phone too (report 19a340, the user chose the
+     room kept). Not empty in a low panel on a phone: there the terminal needs the room (keepRow). -->
+{#if suggestions.length || aiLine !== null || keepRow}
   <!-- In the terminal's own font size, as tall as the text box: larger and brighter than the
        terminal, the row took much of its room (report c02b7a). -->
-  <div use:scrollCue class="suggest" class:idle={!suggestions.length && aiLine === null} role="listbox" aria-label={t('term.suggestions')} data-testid="suggestions" style:--chip-font="{prefs.fontSize}px" style:--chip-h="{composeOne}px">
+  <div use:scrollCue class="suggest" bind:this={rowEl} class:idle={!suggestions.length && aiLine === null} role="listbox" aria-label={t('term.suggestions')} data-testid="suggestions" style:--chip-font="{prefs.fontSize}px" style:--chip-h="{composeOne}px">
     {#if aiLine !== null}
       <button class="chip-btn ai" role="option" aria-selected="false" onpointerdown={(e) => e.preventDefault()} onclick={() => onai?.(aiLine ?? '')}
         ><Icon name="sparkle" size={14} /> {t('ai.askChip')}</button
@@ -1950,5 +1969,13 @@
   }
   .tsearch .on {
     color: var(--accent);
+  }
+  /* In Burrow's tmux the history is tmux's, shown in the history layer with its own scroll bar:
+     xterm's scroll bar (what came before tmux) stood beside it, a second one (report 9360fc). */
+  .term.own-history :global(.xterm-viewport) {
+    scrollbar-width: none;
+  }
+  .term.own-history :global(.xterm-viewport::-webkit-scrollbar) {
+    display: none;
   }
 </style>

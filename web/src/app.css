@@ -290,6 +290,14 @@ body {
   min-height: 100dvh;
 }
 
+/* The scroll bar always there: a list that grew past the window brought it, and the whole page
+   moved left by its width (report c4db51: Reports and Analyses). Not only its room kept
+   (scrollbar-gutter): that left an empty strip the title bar stopped short of. Not on a page that
+   fills the window and never scrolls (a terminal, the editor; App.svelte). */
+html:not(.fills-window) {
+  overflow-y: scroll;
+}
+
 a {
   color: var(--focus);
 }
