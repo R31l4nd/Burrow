@@ -305,7 +305,11 @@ test('what differs stands out as in VS Code: a changed word coloured behind it, 
     });
   for (const scheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme: scheme });
+    // A fresh page each time: the same address again kept the light one's comparison going away
+    // while the dark one was read (an element taken out of the page reads no style; CI 2026-11-27).
     await page.goto(`/#/ws/${ws.id}`);
+    await page.reload();
+    await expect(page.getByTestId('diff')).toHaveCount(0);
     await page.locator('[data-testid="tree-node"][data-path="new.env"]').click({ button: 'right' });
     await page.getByRole('dialog', { name: 'new.env' }).getByTestId('compare-open').click();
     const dialog = page.getByRole('dialog', { name: /^Compare new\.env/ });

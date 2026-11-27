@@ -6,6 +6,14 @@ says how it was verified.
 
 ## [Unreleased]
 
+## [2.30.1] - 2026-11-27
+
+2.30.0 as it was meant to go out: its tag stopped in CI's gate before anything was published (no images, no GitHub release, no app). A test of the comparison's colours read the light comparison as it went away, on a runner slower than here; it now starts each colour on a fresh page. Nothing else changed.
+
+### Verified
+
+- The test of the comparison's colours six times in a row and with the rest of its file, green each time; the gate, the Android app's test on an emulator, and a fresh install.
+
 ## [2.30.0] - 2026-11-27
 
 ### Fixed
