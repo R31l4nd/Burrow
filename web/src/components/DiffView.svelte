@@ -3,9 +3,9 @@
   import { EditorView } from '@codemirror/view';
   import { EditorState, Text } from '@codemirror/state';
   import { Chunk, getChunks, MergeView, unifiedMergeView } from '@codemirror/merge';
-  import { lineFirst } from '../lib/linediff.js';
-  import { burrowEditorTheme, editorLabel } from '../lib/editor/theme.js';
-  import { chunkAt, diffSummary, markPlaces } from '../lib/editor/diffinfo.js';
+  import { lineFirst, lineFirstDiff } from '../lib/linediff.js';
+  import { burrowEditorTheme, diffTheme, editorLabel } from '../lib/editor/theme.js';
+  import { chunkAt, diffSummary, markKind, markPlaces } from '../lib/editor/diffinfo.js';
   import { deletedNumbers } from '../lib/editor/deletednumbers.js';
   import { untrack } from 'svelte';
   import { t } from '../lib/i18n/index.svelte.js';
@@ -54,8 +54,31 @@
 
   const docA = $derived(Text.of(original.split('\n')));
   const docB = $derived(Text.of(modified.split('\n')));
+  // Large texts: first said ("Comparing 60000 lines..."), then worked out after that is on screen;
+  // nothing showed while it worked, and the tab seemed stuck (report 2de305). The answer is kept
+  // (lib/linediff.ts), so the count and the view below take it from there.
+  const lines = $derived(docA.lines + docB.lines);
+  const big = $derived(lines > 5000);
+  let worked = $state<[string, string] | null>(null);
+  $effect(() => {
+    if (!big) return;
+    const a = original;
+    const b = modified;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const frame = requestAnimationFrame(() => {
+      timer = setTimeout(() => {
+        lineFirstDiff(a, b);
+        worked = [a, b];
+      });
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(timer);
+    };
+  });
+  const ready = $derived(!big || (worked?.[0] === original && worked[1] === modified));
   // From the texts themselves, so the count is there before the view is.
-  const summary = $derived(diffSummary(Chunk.build(docA, docB, lineFirst), docA, docB));
+  const summary = $derived(ready ? diffSummary(Chunk.build(docA, docB, lineFirst), docA, docB) : null);
   const places = $derived(markPlaces(chunks, docB));
 
   $effect(() => {
@@ -66,8 +89,8 @@
   });
 
   $effect(() => {
-    if (!el || !width) return;
-    const base = [editorSetup(), burrowEditorTheme, EditorView.editable.of(false), EditorView.lineWrapping];
+    if (!el || !width || !ready) return;
+    const base = [editorSetup(), burrowEditorTheme, diffTheme, EditorView.editable.of(false), EditorView.lineWrapping];
     const collapse = showAll ? undefined : { margin: 3, minSize: 6 };
     let destroy: () => void;
     // Kept in a local first: read back from the state, it made this effect depend on what it writes.
@@ -127,13 +150,15 @@
 
 <div class="diffwrap" class:fill bind:this={wrap}>
   <div class="diffbar">
-    {#if summary.places}
+    {#if !summary}
+      <span class="small dim" role="status" data-testid="diff-busy">{t('diff.busy', { n: lines })}</span>
+    {:else if summary.places}
       <span class="small" data-testid="diff-summary"><b class="add">+{summary.added}</b> <b class="del">-{summary.removed}</b> {t('diff.places', { n: summary.places })}{#if index >= 0}{` | ${t('diff.at', { i: index + 1, n: chunks.length })}`}{/if}</span>
     {:else}
       <span class="small">{t('diff.same')}</span>
     {/if}
     <span class="spacer"></span>
-    {#if summary.places}
+    {#if summary?.places}
       <label class="check small"><input type="checkbox" bind:checked={showAll} data-testid="diff-all" />{t('diff.showAll')}</label>
       <button class="icon-btn" aria-pressed={side} aria-label={t('diff.sideBySide')} title={t('diff.sideBySide')} onclick={() => (asked = side ? 'one' : 'side')} data-testid="diff-layout"><Icon name="columns" size={18} /></button>
       <button class="icon-btn" aria-label={t('diff.prev')} title={t('diff.prev')} disabled={index <= 0} onclick={() => step(-1)} data-testid="diff-prev"><Icon name="chevron-up" size={18} /></button>
@@ -150,7 +175,7 @@
     <div class="marks" aria-hidden="true">
       {#each places as p, i (i)}
         <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-        <span class="mark" class:on={i === index} style:top="{p * 100}%" onclick={() => go(i)} data-testid="diff-mark"></span>
+        <span class="mark {markKind(chunks[i]!)}" class:on={i === index} style:top="{p * 100}%" onclick={() => go(i)} data-testid="diff-mark"></span>
       {/each}
     </div>
   </div>
@@ -232,6 +257,16 @@
     border-radius: 2px;
     background: var(--accent);
     cursor: pointer;
+  }
+  /* As VS Code's ruler: blue changed, green added, red removed (the accent can be green too). */
+  .mark.changed {
+    background: var(--info);
+  }
+  .mark.added {
+    background: var(--ok);
+  }
+  .mark.removed {
+    background: var(--danger);
   }
   .mark.on {
     background: var(--text);

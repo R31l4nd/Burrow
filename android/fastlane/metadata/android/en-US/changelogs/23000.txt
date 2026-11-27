@@ -1,0 +1,1 @@
+Comparing files is clearer and faster: changed words coloured as in VS Code, a hatched gap where a line is only on one side, large files compared line by line with a sign of progress.

@@ -65,7 +65,8 @@ test('usage: pages and dialogs opened are counted by name, never a host; off cou
 
   // Turning it off that does not save: said, and still on.
   await page.route('**/api/usage/settings', (r) => r.fulfill({ status: 500, json: { error: 'internal', message: 'Disk full.' } }));
-  await usage.getByTestId('usage-on').uncheck();
+  // A click, not uncheck(): the box goes back at once, and uncheck() calls that "no change".
+  await usage.getByTestId('usage-on').click();
   await expect(usage.getByTestId('usage-save-failed')).toHaveText('Not changed: Disk full.');
   await expect(usage.getByTestId('usage-on')).toBeChecked();
   await page.unroute('**/api/usage/settings');
@@ -73,12 +74,19 @@ test('usage: pages and dialogs opened are counted by name, never a host; off cou
   // Off: opening pages counts nothing, until on again.
   await usage.getByTestId('usage-on').uncheck();
   await expect(usage.getByTestId('usage-on')).not.toBeChecked();
+  // Saved (the box usable again): only then does this browser stop counting. The box ticks at
+  // once; going on before the save was a race a slow CI runner lost.
+  await expect(usage.getByTestId('usage-on')).toBeEnabled();
   await page.goto('/#/alerts');
   await open();
   await expect(usage.getByTestId('usage-on')).not.toBeChecked();
   expect(await count('alerts')).toBe(2);
+  // A slow save, as on a busy runner: the race made certain, not left to chance.
+  await page.route('**/api/usage/settings', async (r) => (await new Promise((res) => setTimeout(res, 1500)), await r.continue()));
   await usage.getByTestId('usage-on').check();
   await expect(usage.getByTestId('usage-on')).toBeChecked();
+  await expect(usage.getByTestId('usage-on')).toBeEnabled();
+  await page.unroute('**/api/usage/settings');
   await page.goto('/#/alerts');
   await open();
   await expect.poll(() => count('alerts')).toBe(3);

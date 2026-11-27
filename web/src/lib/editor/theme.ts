@@ -43,5 +43,22 @@ export const burrowEditorTheme = [
   syntaxHighlighting(highlight),
 ];
 
+/**
+ * A comparison as VS Code shows one (report b11968: code-server's was clearer): changed lines tinted,
+ * the changed words in them coloured behind (CodeMirror's own thin line under them was hard to see,
+ * on the dark theme most), and a hatched gap facing lines only the other side has. In Burrow's
+ * colours; "&.cm-editor" outweighs @codemirror/merge's own light and dark rules.
+ */
+export const diffTheme = EditorView.theme({
+  '&.cm-editor.cm-merge-a .cm-changedLine, &.cm-editor .cm-deletedChunk': { backgroundColor: 'color-mix(in srgb, var(--danger) 10%, transparent)' },
+  '&.cm-editor.cm-merge-b .cm-changedLine, &.cm-editor .cm-inlineChangedLine': { backgroundColor: 'color-mix(in srgb, var(--ok) 10%, transparent)' },
+  '&.cm-editor.cm-merge-a .cm-changedText, &.cm-editor .cm-deletedChunk .cm-deletedText': { background: 'color-mix(in srgb, var(--danger) 26%, transparent)', borderRadius: '2px' },
+  '&.cm-editor.cm-merge-b .cm-changedText, &.cm-editor .cm-inlineChangedLine .cm-changedText': { background: 'color-mix(in srgb, var(--ok) 26%, transparent)', borderRadius: '2px' },
+  '&.cm-editor .cm-mergeSpacer': { backgroundImage: 'repeating-linear-gradient(-45deg, transparent 0 6px, color-mix(in srgb, var(--text-dim) 22%, transparent) 6px 7px)' },
+  '&.cm-editor.cm-merge-a .cm-changedLineGutter, &.cm-editor .cm-deletedLineGutter': { background: 'var(--danger)' },
+  '&.cm-editor.cm-merge-b .cm-changedLineGutter': { background: 'var(--ok)' },
+  '&.cm-editor .cm-collapsedLines': { color: 'var(--text-dim)', background: 'var(--bg-raised)', borderBlock: '1px solid var(--border)', fontFamily: 'var(--font, inherit)', fontSize: '13px' },
+});
+
 /** The text area's name for screen readers: the file, or what the diff shows. */
 export const editorLabel = (label: string) => EditorView.contentAttributes.of({ 'aria-label': label });

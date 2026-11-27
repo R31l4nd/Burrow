@@ -159,6 +159,20 @@ Checked 2026-10-06.
     workspace's comparison opens as a tab of its own, as VS Code's does
     (report a43cd5), named "other <-> this"; it is not kept with the open
     tabs, its texts being as they were then.
+  - VS Code's diff editor tints a changed line and colours the changed
+    characters in it (diffEditor.insertedTextBackground and
+    removedTextBackground), fills the room facing lines only the other side
+    has with diagonal stripes (diffEditor.diagonalFill), and marks its
+    overview ruler blue, green and red for modified, added and removed. Its
+    diff works on lines first and only then on the characters of changed
+    lines, giving up on the character part after a time
+    (diffEditor.maxComputationTime). git's patience diff (git diff
+    --patience) matches lines found once in each file first, in order, and
+    what lies between the same way. Taken over (reports b11968, 2de305):
+    all of it, in Burrow's colours; lines matched as patience does, the
+    characters within changed lines compared while there is time, a value
+    with little in common with the other side marked whole; a large
+    comparison says "Comparing N lines..." first.
   - VS Code resizes its side bar, its editor groups and an editor beside
     its Markdown preview by a sash between them (drag; a double click on
     the sash between groups makes them even again), and keeps the sizes;

@@ -1,0 +1,1 @@
+Bestanden vergelijken is duidelijker en sneller: gewijzigde woorden gekleurd zoals in VS Code, een gearceerd vlak waar een regel maar aan één kant staat, grote bestanden per regel vergeleken met voortgang.

@@ -1645,6 +1645,7 @@
   "editor.matchCount": "{shown} {n:treffer|treffers}",
   "diff.places": "op {n} {n:plek|plekken}",
   "diff.at": "{i} van {n}",
+  "diff.busy": "{n} {n:regel|regels} vergelijken...",
   "diff.same": "Geen verschillen",
   "diff.showAll": "Ongewijzigde regels tonen",
   "diff.prev": "Vorig verschil (Shift+F7)",

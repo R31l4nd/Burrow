@@ -249,3 +249,83 @@ test('a comparison opens in a tab of its own, the two files side by side scrolli
   await api(page, 'DELETE', `/api/workspaces/${ws.id}`);
   await api(page, 'POST', '/api/snippets/run', { hostIds: [sshd], command: 'rm -rf ~/cmp-tab' });
 });
+
+test('two large files compared: first said that they are being compared and how many lines, then each changed line on its own, not the whole file as one change (report 2de305)', async ({ page }) => {
+  await signIn(page);
+  const sshd = await hostNamed(page, 'test-sshd');
+  await api(page, 'POST', '/api/snippets/run', {
+    hostIds: [sshd],
+    command: "rm -rf ~/cmp-big && mkdir -p ~/cmp-big && seq 1 30000 | sed 's/^/line /' > ~/cmp-big/a.txt && seq 1 30000 | sed 's/^/line /; s/^line \\(.*7\\)$/line \\1 changed/' > ~/cmp-big/b.txt",
+  });
+  const ws = await api<{ id: number }>(page, 'POST', '/api/workspaces', { hostId: sshd, root: '/home/tester/cmp-big' });
+  await page.evaluate((id) => localStorage.removeItem(`burrow.ws.${id}`), ws.id);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`/#/ws/${ws.id}`);
+  await page.locator('[data-testid="tree-node"][data-path="b.txt"]').click({ button: 'right' });
+  await page.getByRole('dialog', { name: 'b.txt' }).getByTestId('compare-open').click();
+  const dialog = page.getByRole('dialog', { name: /^Compare b\.txt/ });
+  await dialog.getByTestId('compare-find').fill('a.txt');
+  // What showed while it worked: watched from before the choice.
+  await page.evaluate(() => {
+    const w = window as unknown as { busySaid: string };
+    w.busySaid = '';
+    new MutationObserver(() => {
+      const b = document.querySelector('[data-testid=diff-busy]');
+      if (b && !w.busySaid) w.busySaid = b.textContent ?? '';
+    }).observe(document.body, { childList: true, subtree: true, characterData: true });
+  });
+  await dialog.getByTestId('compare-file').first().click();
+  await expect(page.getByTestId('diff-summary')).toContainText('+3000 -3000', { timeout: 20_000 });
+  expect(await page.evaluate(() => (window as unknown as { busySaid: string }).busySaid)).toBe("Comparing 60002 lines...");
+  await expect(page.getByTestId('diff-busy')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await api(page, 'DELETE', `/api/workspaces/${ws.id}`);
+});
+
+test('what differs stands out as in VS Code: a changed word coloured behind it, not a thin line under it; changed lines tinted; a line only on one side faces a hatched gap (report b11968)', async ({ page }) => {
+  await signIn(page);
+  const sshd = await hostNamed(page, 'test-sshd');
+  await api(page, 'POST', '/api/snippets/run', {
+    hostIds: [sshd],
+    command: "rm -rf ~/cmp-look2 && mkdir -p ~/cmp-look2 && printf 'PUID=1000\\nPORT=587\\nUSER=demo\\n' > ~/cmp-look2/old.env && printf 'PUID=1000\\nPORT=465\\nUSER=demo\\nNEW=1\\n' > ~/cmp-look2/new.env",
+  });
+  const ws = await api<{ id: number }>(page, 'POST', '/api/workspaces', { hostId: sshd, root: '/home/tester/cmp-look2' });
+  await page.evaluate((id) => localStorage.removeItem(`burrow.ws.${id}`), ws.id);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  // The alpha of a computed colour: rgb(), rgba(), or color(srgb r g b / a) as color-mix gives it.
+  const alpha = (c: string) => {
+    const m = /\/\s*([\d.]+)\s*\)$/.exec(c) ?? /^rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\)$/.exec(c);
+    if (m) return Number(m[1]);
+    return /^(rgb|color)\(/.test(c) ? 1 : 0;
+  };
+  const style = (sel: string) =>
+    page.locator(sel).first().evaluate((e) => {
+      const s = getComputedStyle(e);
+      return { image: s.backgroundImage, color: s.backgroundColor };
+    });
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.goto(`/#/ws/${ws.id}`);
+    await page.locator('[data-testid="tree-node"][data-path="new.env"]').click({ button: 'right' });
+    await page.getByRole('dialog', { name: 'new.env' }).getByTestId('compare-open').click();
+    const dialog = page.getByRole('dialog', { name: /^Compare new\.env/ });
+    await dialog.getByTestId('compare-find').fill('old.env');
+    await dialog.getByTestId('compare-file').first().click();
+    await expect(page.getByTestId('diff-summary')).toContainText('+2 -1');
+    const diff = page.getByTestId('diff');
+    // The changed number, on each side: a colour behind it, no line under it.
+    for (const side of ['a', 'b']) {
+      const word = await style(`[data-testid=diff] .cm-merge-${side} .cm-changedText`);
+      expect(word.image, `${scheme} ${side}`).toBe('none');
+      expect(alpha(word.color), `${scheme} ${side} ${word.color}`).toBeGreaterThanOrEqual(0.2);
+      const line = await style(`[data-testid=diff] .cm-merge-${side} .cm-changedLine`);
+      expect(alpha(line.color), `${scheme} ${side} ${line.color}`).toBeGreaterThanOrEqual(0.08);
+    }
+    // NEW=1 only in the newer: the older faces it with a hatched gap.
+    await expect(diff.locator('.cm-merge-a .cm-mergeSpacer').first()).toBeVisible();
+    expect((await style('[data-testid=diff] .cm-merge-a .cm-mergeSpacer')).image).toContain('repeating-linear-gradient');
+    await page.keyboard.press('Escape');
+  }
+  await page.emulateMedia({ colorScheme: null });
+  await api(page, 'DELETE', `/api/workspaces/${ws.id}`);
+});

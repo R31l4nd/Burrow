@@ -1645,6 +1645,7 @@
   "editor.matchCount": "{shown} {n:match|matches}",
   "diff.places": "in {n} {n:place|places}",
   "diff.at": "{i} of {n}",
+  "diff.busy": "Comparing {n} {n:line|lines}...",
   "diff.same": "No differences",
   "diff.showAll": "Show unchanged lines",
   "diff.prev": "Previous difference (Shift+F7)",

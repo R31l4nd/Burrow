@@ -7,7 +7,7 @@ import { pageOf } from './pages.js';
 import { accessible, listsReadable, titlesRoomy, selectsRoomy, namesRoomy, selectsFit, togglesSmall, iconsConsistent, pillsSpaced, controlsInCards, helpTipsBeside, textLinksUnderlined, helpTipsWork, fieldsAligned, headingTipsBeside, stillWhenAsked, buttonsInSight, mainReachable, mainRoomy } from './checks/basics.js';
 import { termBarKept, termRowsInside, placeholdersWhole, textNotSqueezed, rowButtonOneLine, buttonLabelsOneLine, rowButtonsSameWidth, tablesFromTablet, logLinesWhole, buttonsInside, loneControlsFill, besideFieldSameHeight, clampedTextInside, actionRowsOneLine, rowsFill, textBesideButton, contentUnderBar, nothingOutOfReach } from './checks/rows.js';
 import { nothingCutSideways, spacerInARow, textInsideItsBorder, segmentsFit, segmentsEven, wordsWhole, centredTogether, cardsApart, buttonsOffLines, boxesApart, textApart, controlsOffEdges, textInsideBorders, widthsEven } from './checks/edges.js';
-import { gapsEven, barsEdgeToEdge, floatersOneLine, rowsBalanced, controlsEven, dotsSolid, floatersClear, footBarsFree, buttonsLegible, chosenVisible, noKeysOnTouch, toastsOnce, layoutForScreen, pillsWhole, chromeCompact, rowButtonsEven, listsApart, recordsApart, rowActionsBeside, iconsWhole, columnsEven, cardTitlesLevel, privateMarked, oneScroll, panelAtBottom, topbarTipsBeside, wordsForPeople, separatorsSpaced, textOnScreen, levelsTopped, rowsReachable, dialogEdgesVisible, dialogTextInside, floatersOffButtons, toastsOffFields, fieldTipsBeside, activeTabVisible, noLoneInWrap, namesWhole, editorPanelsTouch } from './checks/spacing.js';
+import { gapsEven, barsEdgeToEdge, floatersOneLine, rowsBalanced, controlsEven, dotsSolid, floatersClear, footBarsFree, buttonsLegible, chosenVisible, noKeysOnTouch, toastsOnce, layoutForScreen, pillsWhole, chromeCompact, rowButtonsEven, listsApart, recordsApart, rowActionsBeside, iconsWhole, columnsEven, cardTitlesLevel, privateMarked, oneScroll, panelAtBottom, topbarTipsBeside, wordsForPeople, separatorsSpaced, textOnScreen, levelsTopped, rowsReachable, dialogEdgesVisible, dialogTextInside, floatersOffButtons, toastsOffFields, fieldTipsBeside, dutchThroughout, activeTabVisible, noLoneInWrap, namesWhole, editorPanelsTouch } from './checks/spacing.js';
 
 // Checks for the slips people notice first, shared by the specs that look
 // at pages and dialogs. lookAt() runs them all and keeps a screenshot.
@@ -173,6 +173,7 @@ async function lookOnce(page: Page, name: string, opts: { tips?: boolean; axe?: 
   await rowsFill(page, name);
   await actionRowsOneLine(page, name);
   await textBesideButton(page, name);
+  await dutchThroughout(page, name);
   await besideFieldSameHeight(page, name);
   await clampedTextInside(page, name);
   await contentUnderBar(page, name);

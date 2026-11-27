@@ -56,7 +56,10 @@
 
   // Review before deploy.
   let reviewOpen = $state(false);
-  let review = $state<{ file: string; before: string; beforeLabel: string; after: string; check: ComposeCheck } | null>(null);
+  // What the review compares with, kept as which it is: its words made when shown, in the language
+  // of the moment (made once, a switch of language left them in the other one).
+  let review = $state<{ file: string; before: string; base: { deployedAt: string } | 'edit' | 'none'; after: string; check: ComposeCheck } | null>(null);
+  const beforeLabel = $derived(!review ? '' : typeof review.base === 'object' ? t('stack.sinceDeploy', { at: dateTime(review.base.deployedAt) }) : review.base === 'edit' ? t('stack.sinceEdit') : t('stack.noBase'));
 
   const hostName = $derived(data.hosts.find((h) => h.id === hostId)?.name ?? '');
   // No update: what its own images' checks say (AUDIT2 PAGE-07).
@@ -261,7 +264,7 @@
       review = {
         file: path,
         before: deployed?.content ?? start ?? now.content,
-        beforeLabel: deployed ? t('stack.sinceDeploy', { at: dateTime(deployed.at) }) : start !== null ? t('stack.sinceEdit') : t('stack.noBase'),
+        base: deployed ? { deployedAt: deployed.at } : start !== null ? 'edit' : 'none',
         after: now.content,
         check,
       };
@@ -546,7 +549,7 @@
 <Dialog tour="stack-review" size="wide" bind:open={reviewOpen} title={t('stack.reviewTitle', { name: project })}>
   {#if review}
     <div class="stack">
-      <p class="dim small">{review.beforeLabel}</p>
+      <p class="dim small">{beforeLabel}</p>
       {#if (info?.configFiles.length ?? 0) > 1}<p class="dim small">{t('stack.reviewScope', { file: review.file })}</p>{/if}
       <!-- What runs may differ from the file although the file did not change here (W-FUNC-04): compose's own hashes say. -->
       {#if differs.length}<p class="alert warn small">{t('stack.willRecreate', { services: differs.join(', ') })}</p>{/if}
@@ -554,7 +557,7 @@
       {#if review.before === review.after}
         <p class="small" data-testid="no-changes">{differs.length || missing.length ? t('stack.noChangesInFile') : t('stack.noChanges')}</p>
       {:else}
-        <DiffView original={review.before} modified={review.after} label={review.beforeLabel} names={[review.beforeLabel, t('stack.reviewNow')]} />
+        <DiffView original={review.before} modified={review.after} label={beforeLabel} names={[beforeLabel, t('stack.reviewNow')]} />
       {/if}
       {#if review.check.ok}
         <p class="small ok" data-testid="compose-ok"><Icon name="check" size={14} /> {t('editor.composeOk')}</p>

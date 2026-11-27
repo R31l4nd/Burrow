@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, type Page } from '@playwright/test';
 
 // Spacing and the rest: gaps, floating bars, pills, dialogs, names, tabs. Part of checks.ts (lookAt).
@@ -591,6 +592,35 @@ export async function panelAtBottom(page: Page, where: string) {
 export async function topbarTipsBeside(page: Page, where: string) {
   const far = await page.locator('.topbar > .helptip').evaluateAll((els) => els.filter((e) => (e as HTMLElement).getClientRects().length).map((e) => e.closest('.topbar')!.querySelector('h1')?.textContent?.trim() ?? '?'));
   expect.soft(far, `help tips away from the page title (${where})`).toEqual([]);
+}
+
+// The English sentences that read otherwise in Dutch: one of them on a Dutch screen was made in
+// English and kept (a review's label, made when it opened, stayed English after a switch of language).
+const i18nDir = new URL('../../../web/src/lib/i18n/', import.meta.url);
+const en = JSON.parse(readFileSync(new URL('en.json', i18nDir), 'utf8')) as Record<string, string>;
+const nl = JSON.parse(readFileSync(new URL('nl.json', i18nDir), 'utf8')) as Record<string, string>;
+const englishOnly = [...new Set(Object.entries(en).filter(([k, v]) => !v.includes('{') && v.includes(' ') && v.length >= 12 && nl[k] !== undefined && nl[k] !== v).map(([, v]) => v))];
+
+/**
+ * A Dutch screen in Dutch: no sentence of Burrow's own in English on it. A message (an error, a
+ * toast) says what happened then, in the language of then, as a log line does; a screen's own words
+ * follow the language (the tour switches it with the screen open).
+ */
+export async function dutchThroughout(page: Page, where: string) {
+  if ((await page.locator('html').getAttribute('lang')) !== 'nl') return;
+  const found = await page.evaluate((english) => {
+    const known = new Set(english);
+    const out: string[] = [];
+    const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+      const el = n.parentElement;
+      if (!el || !el.getClientRects().length || el.closest('pre, code, .mono, .xterm, .cm-editor, [data-testid=log], textarea, input, dialog:not([open]), .alert, .toast, [role=alert], [role=status]')) continue;
+      const text = (n.textContent ?? '').replace(/\s+/g, ' ').trim();
+      if (known.has(text)) out.push(text);
+    }
+    return out;
+  }, englishOnly);
+  expect.soft(found, `English on a Dutch screen (${where})`).toEqual([]);
 }
 
 /**

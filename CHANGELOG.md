@@ -6,6 +6,23 @@ says how it was verified.
 
 ## [Unreleased]
 
+## [2.30.0] - 2026-11-27
+
+### Fixed
+
+- Comparing two files: what differs stands out as in VS Code: changed lines tinted, the changed words in them coloured (not a thin line under them), a hatched gap facing lines only the other side has, and the marks along the edge blue, green or red for changed, added and removed (report b11968).
+- Two values with nothing in common (two keys) are marked as one change, not in scattered pieces that happened to match (report b11968).
+- A large file with many changed lines is compared line by line as git does (patience), each changed line on its own, instead of one change over the whole file; large files first say "Comparing N lines..." and the result is worked out once for the count, the view and each switch (report 2de305).
+- Lines added or removed after a last line without a line break no longer put the comparison one character off.
+- A stack's review names what it compares with in the language of the moment, not the one it opened in. The tour now checks every Dutch screen for sentences of Burrow's own left in English.
+
+### Verified
+
+- Each fix started with a test that failed on 2.29.2, green after: unit tests of the comparison (many changed lines in a large file, the answer kept, values with nothing in common, the changes applied giving the newer text at the start and end of a file), e2e tests of the colours in light and dark, the hatched gap, "Comparing N lines..." on two files of 30,000 lines, and the review's words after a switch of language. The new check of Dutch screens found that review label; run over the whole tour, it found nothing else but messages, which keep the language they appeared in.
+- The comparison looked at by hand, side by side in light and dark and in one column on a phone, with two .env files of made-up keys.
+- Settings -> Usage's test waits for a change to be saved before going on (on 2.29.2's CI it went on first and counted one page too few); a slow save makes that certain in the test.
+- The gate, the Android app's test on an emulator, and a fresh install.
+
 ## [2.29.2] - 2026-11-26
 
 2.29.1's images went out, but its GitHub release and the Android app did not: the release step stopped on a folder a fresh checkout does not have. This release has them, and fixes from the first reports on 2.29.

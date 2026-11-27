@@ -26,6 +26,13 @@ export function markPlaces(chunks: readonly Chunk[], b: Text): number[] {
   return chunks.map((c) => (b.lineAt(Math.min(c.fromB, b.length)).number - 1) / lines);
 }
 
+/** What a place is, for the colour of its mark along the edge (as VS Code's ruler): green added, red removed, blue changed. */
+export function markKind(c: Chunk): 'added' | 'removed' | 'changed' {
+  if (c.fromA === c.toA) return 'added';
+  if (c.fromB === c.toB) return 'removed';
+  return 'changed';
+}
+
 /** The place a position of the newer document is in or after; -1 before the first. */
 export function chunkAt(chunks: readonly Chunk[], pos: number): number {
   let at = -1;

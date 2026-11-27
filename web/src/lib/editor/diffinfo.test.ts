@@ -1,7 +1,7 @@
 import { Chunk } from '@codemirror/merge';
 import { Text } from '@codemirror/state';
 import { describe, expect, it } from 'vitest';
-import { chunkAt, deletedLines, diffSummary, markPlaces } from './diffinfo.js';
+import { chunkAt, deletedLines, diffSummary, markKind, markPlaces } from './diffinfo.js';
 
 // Comparing two files said at once where they differ and how much (user, 2026-10-23, as VS Code):
 // the places, the lines added and removed, and marks along the scrollbar.
@@ -21,6 +21,12 @@ describe('diff information', () => {
     expect(p).toHaveLength(2);
     expect(p[0]!).toBeCloseTo(1 / b.lines, 2);
     expect(p[1]!).toBeCloseTo(10 / b.lines, 2);
+  });
+
+  it("what kind of place each is, its mark coloured so (as VS Code's ruler): lines changed, added, removed", () => {
+    expect(chunks.map(markKind)).toEqual(['changed', 'added']);
+    const gone = Text.of(['one', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', '']);
+    expect(Chunk.build(a, gone).map(markKind)).toEqual(['removed']);
   });
 
   it('which place the cursor is in or after', () => {
